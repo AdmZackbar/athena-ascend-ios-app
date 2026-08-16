@@ -23,6 +23,10 @@ extension SchemaV1 {
             self.sets = sets
         }
         
+        enum Order: Codable, Equatable, Hashable, CaseIterable {
+            case series, parallel
+        }
+        
         struct ExerciseSet: Codable, Hashable, Equatable {
             /// The name of the set
             var name: String
@@ -30,11 +34,14 @@ extension SchemaV1 {
             var exercises: [Exercise]
             /// The amount of rest time between exercises in seconds
             var restTime: Int
+            /// The order in which to perform each exercise
+            var order: Order
             
-            init(name: String = "", exercises: [Exercise] = [], restTime: Int = 180) {
+            init(name: String = "", exercises: [Exercise] = [], restTime: Int = 180, order: Order = .parallel) {
                 self.name = name
                 self.exercises = exercises
                 self.restTime = restTime
+                self.order = order
             }
         }
         

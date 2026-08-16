@@ -5,6 +5,15 @@
 //  Created by Zach Wassynger on 8/16/26.
 //
 
+extension Routine.Order {
+    var name: String {
+        switch self {
+        case .series: return "Series"
+        case .parallel: return "Parallel"
+        }
+    }
+}
+
 extension Routine.Side {
     var abbreviation: String {
         switch self {

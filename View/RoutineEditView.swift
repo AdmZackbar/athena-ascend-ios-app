@@ -24,9 +24,6 @@ struct RoutineEditView: View {
             TextField("Name", text: $item.name)
             ForEach($item.sets) { $set in
                 Section {
-                    Stepper(value: $set.restTime, in: 0...300, step: 30) {
-                        Text("Rest Time: \(set.restTime) s")
-                    }
                     ForEach($set.exercises) { $exercise in
                         Button {
                             editExercise = (set.id, exercise.id)
@@ -70,7 +67,17 @@ struct RoutineEditView: View {
                         }.disabled(set.exercises.isEmpty)
                     }
                 } header: {
-                    TextField("Set Name", text: $set.name)
+                    VStack {
+                        TextField("Set Name", text: $set.name)
+                        Picker("Order:", selection: $set.order) {
+                            ForEach(Routine.Order.allCases, id: \.name) { order in
+                                Text(order.name).tag(order)
+                            }
+                        }.pickerStyle(.segmented)
+                        Stepper(value: $set.restTime, in: 0...300, step: 30) {
+                            Text("Rest Time: \(set.restTime) s")
+                        }
+                    }
                 }
             }
             Button {
@@ -143,11 +150,17 @@ struct RoutineEditView: View {
                     Stepper("\(item.numReps) reps", value: $item.numReps, in: 1...30)
                     Stepper("Time On: \(item.timeOn)s", value: $item.timeOn, in: 0...30)
                     Stepper("Time Off: \(item.timeOff)s", value: $item.timeOff, in: 0...30)
-                    HStack {
-                        Text("Weight:")
-                        TextField("", value: $item.weight, format: .number.precision(.fractionLength(0...2)))
-                            .keyboardType(.decimalPad)
-                        Text("lbs")
+                    Stepper(value: $item.weight, in: -200...200, step: 5) {
+                        HStack {
+                            Button {
+                                item.weight = -item.weight
+                            } label: {
+                                Text("Weight:")
+                            }.buttonStyle(.glass)
+                            TextField("", value: $item.weight, format: .number.precision(.fractionLength(0...2)))
+                                .keyboardType(.decimalPad)
+                            Text("lbs")
+                        }
                     }
                 } header: {
                     TextField("Tag", text: $item.tag)
@@ -168,11 +181,17 @@ struct RoutineEditView: View {
                         }
                     }.pickerStyle(.segmented)
                     Stepper("Target: \(item.target)s", value: $item.target, in: 0...30)
-                    HStack {
-                        Text("Weight:")
-                        TextField("", value: $item.weight, format: .number.precision(.fractionLength(0...2)))
-                            .keyboardType(.decimalPad)
-                        Text("lbs")
+                    Stepper(value: $item.weight, in: -200...200, step: 5) {
+                        HStack {
+                            Button {
+                                item.weight = -item.weight
+                            } label: {
+                                Text("Weight:")
+                            }.buttonStyle(.glass)
+                            TextField("", value: $item.weight, format: .number.precision(.fractionLength(0...2)))
+                                .keyboardType(.decimalPad)
+                            Text("lbs")
+                        }
                     }
                 } header: {
                     TextField("Tag", text: $item.tag)
@@ -223,7 +242,7 @@ struct RoutineEditView: View {
         }
         
         func toRoutineSet(_ set: Set) -> Routine.ExerciseSet {
-            .init(name: set.name, exercises: set.exercises.map(toRoutineExercise), restTime: set.restTime)
+            .init(name: set.name, exercises: set.exercises.map(toRoutineExercise), restTime: set.restTime, order: set.order)
         }
         
         func toRoutineExercise(_ exercise: Exercise) -> Routine.Exercise {
@@ -240,6 +259,7 @@ struct RoutineEditView: View {
             var name: String
             var exercises: [Exercise]
             var restTime: Int
+            var order: Routine.Order
             
             var invalid: Bool {
                 name.isEmpty || restTime < 0 || exercises.contains(where: \.invalid)
@@ -251,10 +271,12 @@ struct RoutineEditView: View {
                     self.name = set.name
                     self.exercises = set.exercises.map({ Exercise($0) })
                     self.restTime = set.restTime
+                    self.order = set.order
                 } else {
                     self.name = ""
                     self.exercises = []
                     self.restTime = 0
+                    self.order = .parallel
                 }
             }
         }
