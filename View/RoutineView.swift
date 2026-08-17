@@ -55,6 +55,13 @@ struct RoutineView: View {
                         Label("Edit", systemImage: "pencil")
                     }
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        navigationStore.push(ViewType.routineStart(routine: routine))
+                    } label: {
+                        Label("Session", systemImage: "plus")
+                    }
+                }
             }
     }
 }

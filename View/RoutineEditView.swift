@@ -318,22 +318,8 @@ struct RoutineEditView: View {
 }
 
 #Preview {
+    @Previewable @Query var routines: [Routine]
     NavigationStack {
-        RoutineEditView(routine: .init(
-            name: "Spring 2026 Monday",
-            sets: [
-                .init(name: "Set A",
-                     exercises: [
-                        .repeater(.init(tag: "10 mm HC", numReps: 7, timeOn: 7, timeOff: 3, weight: 10)),
-                        .repeater(.init(tag: "10 mm HC", numReps: 6, timeOn: 7, timeOff: 3, weight: 20)),
-                        .repeater(.init(tag: "10 mm HC", numReps: 5, timeOn: 7, timeOff: 3, weight: 30)),
-                     ],
-                     restTime: 120),
-                .init(name: "Set B",
-                     exercises: [
-                        .maxHang(.init(tag: "BM Middle", side: .left, target: 10, weight: 35.0))
-                     ])
-            ]
-        ))
+        RoutineEditView(routine: routines.first!)
     }
 }

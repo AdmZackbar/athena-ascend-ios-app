@@ -27,6 +27,11 @@ struct MainView: View {
                     }.buttonStyle(.plain)
                         .contextMenu {
                             Button {
+                                navigationStore.push(ViewType.routineStart(routine: routine))
+                            } label: {
+                                Label("Start Session", systemImage: "plus")
+                            }
+                            Button {
                                 navigationStore.push(ViewType.routineEdit(routine: routine))
                             } label: {
                                 Label("Edit", systemImage: "pencil")
@@ -72,6 +77,8 @@ struct MainView: View {
             RoutineEditView()
         case .routineEdit(let routine):
             RoutineEditView(routine: routine)
+        case .routineStart(let routine):
+            RoutineSessionView(routine: routine)
         }
     }
 }
@@ -80,6 +87,7 @@ enum ViewType: Hashable {
     case routineView(routine: Routine)
     case routineAdd
     case routineEdit(routine: Routine)
+    case routineStart(routine: Routine)
 }
 
 #Preview(traits: .modifier(TestDataModifier())) {
