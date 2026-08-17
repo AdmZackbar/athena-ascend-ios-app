@@ -16,13 +16,12 @@ struct RoutineSessionView: View {
     
     let routine: Routine
     
-    let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
-    
     @State private var state: SessionState = .start
-    @State private var time: Int = 0
-    @State private var timeFraction: Int = 0
     @State private var rep: Int = 0
-    @State private var active: Bool = false
+    @State private var elapsedSeconds: Duration = .seconds(0)
+    // For better interactivity precision
+    @State private var elapsedMilliseconds: Int = 0
+    @State private var cancellable: Cancellable?
     
     init(routine: Routine) {
         self.routine = routine
@@ -33,25 +32,6 @@ struct RoutineSessionView: View {
             .navigationTitle(routine.name)
             .navigationBarTitleDisplayMode(state == .start ? .automatic : .inline)
             .background(computeBackground())
-            .onReceive(timer) { t in
-                if time > 0 || timeFraction > 0 {
-                    guard active else { return }
-                    if timeFraction > 0 {
-                        timeFraction -= 1
-                    } else {
-                        time -= 1
-                        timeFraction = 9
-                    }
-                } else {
-                    // Only auto go to next for these states
-                    switch state {
-                    case .ready(_, _), .active(_, _):
-                        nextState()
-                    default:
-                        break
-                    }
-                }
-            }
     }
     
     func nextState() {
@@ -59,36 +39,25 @@ struct RoutineSessionView: View {
         case .start:
             state = .set(index: 0)
         case .set(let index):
-            readyTimer()
+            startTimer()
             state = .ready(setIndex: index, exerciseIndex: 0)
         case .ready(let setIndex, let exerciseIndex):
             let exercise = routine.sets[setIndex].exercises[exerciseIndex]
             switch exercise {
             case .repeater(let r):
                 rep = (r.numReps - 1) * 2
-                time = r.timeOn
-            case .maxHang(let m):
+            case .maxHang(_):
                 rep = 0
                 // TODO allow for target overshoot
-                time = m.target
             }
             state = .active(setIndex: setIndex, exerciseIndex: exerciseIndex)
         case .active(let setIndex, let exerciseIndex):
             if rep > 0 {
                 rep -= 1
-                let exercise = routine.sets[setIndex].exercises[exerciseIndex]
-                switch exercise {
-                case .repeater(let r):
-                    time = rep % 2 == 0 ? r.timeOn : r.timeOff
-                case .maxHang(let r):
-                    time = r.target
-                }
             } else {
-                time = routine.sets[setIndex].restTime
                 state = .record(setIndex: setIndex, exerciseIndex: exerciseIndex)
             }
         case .record(let setIndex, let exerciseIndex):
-            readyTimer()
             if exerciseIndex >= routine.sets[setIndex].exercises.count - 1 {
                 if setIndex >= routine.sets.count - 1 {
                     state = .finish
@@ -163,7 +132,7 @@ struct RoutineSessionView: View {
                 }
             }
             Button("Start") {
-                readyTimer()
+                startTimer()
                 state = .ready(setIndex: index, exerciseIndex: 0)
             }.disabled(set.exercises.isEmpty)
         }
@@ -173,9 +142,26 @@ struct RoutineSessionView: View {
     func restView(setIndex: Int, exerciseIndex: Int) -> some View {
         let exercise = routine.sets[setIndex].exercises[exerciseIndex]
         VStack(alignment: .center) {
-            Text("Get Ready")
-            Text(formatTimer())
+            Spacer()
             Text(exercise.description)
+                .font(.title)
+                .bold()
+            ZStack {
+                RingShape(progress: 1.0)
+                    .stroke(.secondary, lineWidth: 8)
+                RingShape(progress: 1.0 - progress)
+                    .stroke(.primary, style: .init(lineWidth: 12, lineCap: .round))
+                VStack(spacing: 0) {
+                    Text("Get Ready")
+                        .font(.system(size: 40))
+                        .bold()
+                    Text(durationSeconds - elapsedSeconds, format: .time(pattern: .minuteSecond(padMinuteToLength: 2)))
+                        .contentTransition(.numericText())
+                        .monospaced()
+                        .font(.system(size: 60))
+                        .bold()
+                }
+            }.padding()
             Spacer()
             controlView(setIndex: setIndex, exerciseIndex: exerciseIndex)
         }.font(.title)
@@ -215,15 +201,15 @@ struct RoutineSessionView: View {
             ZStack {
                 RingShape(progress: 1.0)
                     .stroke(.secondary, lineWidth: 8)
-                let max = Double(isOn ? repeater.timeOn : repeater.timeOff)
-                let current = Double(time) + (Double(timeFraction) / 10.0)
-                RingShape(progress: (max - current) / max)
+                RingShape(progress: 1.0 - progress)
                     .stroke(.primary, style: .init(lineWidth: 12, lineCap: .round))
                 VStack(spacing: 0) {
                     Text(isOn ? "On" : "Off")
                         .font(.system(size: 48))
                         .bold()
-                    Text(formatTimer())
+                    Text(durationSeconds - elapsedSeconds, format: .time(pattern: .minuteSecond(padMinuteToLength: 2)))
+                        .contentTransition(.numericText())
+                        .monospaced()
                         .font(.system(size: 60))
                         .bold()
                 }
@@ -235,7 +221,9 @@ struct RoutineSessionView: View {
     func recordView(setIndex: Int, exerciseIndex: Int) -> some View {
         VStack(alignment: .center) {
             Text("Rest")
-            Text(formatTimer())
+            Text(durationSeconds - elapsedSeconds, format: .time(pattern: .minuteSecond(padMinuteToLength: 2)))
+                .contentTransition(.numericText())
+                .monospaced()
             Text("TODO: record")
             if exerciseIndex < routine.sets[setIndex].exercises.count - 1 {
                 let next = routine.sets[setIndex].exercises[exerciseIndex + 1]
@@ -252,20 +240,26 @@ struct RoutineSessionView: View {
         HStack(spacing: 16) {
             Spacer()
             Button {
-                readyTimer()
+                stopAndResetTimer()
                 state = .ready(setIndex: setIndex, exerciseIndex: exerciseIndex - 1)
             } label: {
                 Image(systemName: "arrowshape.backward.circle")
                     .font(.system(size: 64))
             }.disabled(exerciseIndex <= 0)
             Button {
-                active.toggle()
+                toggleTimer()
             } label: {
-                Image(systemName: active ? "pause.circle" : "play.circle")
+                Image(systemName: isTimerValid ? "pause.circle" : "play.circle")
                     .font(.system(size: 96))
             }
             Button {
-                nextState()
+                switch state {
+                case .ready(_, _), .active(_, _):
+                    stopAndResetTimer()
+                    startTimer()
+                default:
+                    nextState()
+                }
             } label: {
                 Image(systemName: "arrowshape.forward.circle")
                     .font(.system(size: 64))
@@ -274,22 +268,90 @@ struct RoutineSessionView: View {
         }.buttonStyle(.plain)
     }
     
-    func readyTimer() {
-        // TODO 10
-        time = 3
-        active = true
+    private func toggleTimer() {
+        isTimerValid ? pauseTimer() : startTimer()
+    }
+        
+    private func startTimer() {
+        cancellable = Timer
+            .publish(every: 0.01, on: .main, in: .common)
+            .autoconnect()
+            .sink { _ in
+                if newSecondPassed {
+                    withAnimation(.easeInOut) {
+                        if elapsedSeconds < durationSeconds {
+                            elapsedSeconds += .seconds(1.0)
+                        }
+                    } completion: {
+                        if shouldStopTimer {
+                            stopAndResetTimer()
+                        }
+                    }
+                }
+                if !shouldStopTimer {
+                    elapsedMilliseconds += 10
+                }
+            }
     }
     
-    func formatTimer() -> String {
-        let seconds = Double(time)
-        let formatter = DateComponentsFormatter()
-        formatter.allowedUnits = [.minute, .second]
-        formatter.unitsStyle = .positional // Produces 00:00 format
-        formatter.zeroFormattingBehavior = .pad // Adds leading zeros
-        if seconds > 30 {
-            return formatter.string(from: seconds) ?? "00:00"
+    private var progress: Double {
+        // Using milliseconds for smoother animation
+        let elapsed: Duration = .milliseconds(elapsedMilliseconds)
+        return (durationSeconds - elapsed) / durationSeconds
+    }
+    
+    private var isTimerValid: Bool {
+        cancellable != nil
+    }
+    
+    private var durationSeconds: Duration {
+        switch state {
+        case .active(let setIndex, let exerciseIndex):
+            let set = routine.sets[setIndex]
+            let exercise = set.exercises[exerciseIndex]
+            switch exercise {
+            case .repeater(let r):
+                return .seconds(rep % 2 == 0 ? r.timeOn : r.timeOff)
+            case .maxHang(let m):
+                return .seconds(m.target)
+            }
+        case .record(let setIndex, _):
+            return .seconds(routine.sets[setIndex].restTime)
+        default: return .seconds(10)
         }
-        return "\(formatter.string(from: seconds) ?? "00:00").\(timeFraction)"
+    }
+
+    private func shouldShowCancelButton() -> Bool {
+        return isTimerValid || elapsedSeconds > .seconds(0)
+    }
+    
+    private var shouldStopTimer: Bool {
+        .milliseconds(elapsedMilliseconds) == durationSeconds
+    }
+    
+    private var newSecondPassed: Bool {
+        elapsedMilliseconds > 0 && elapsedMilliseconds % 1000 == 0
+    }
+    
+    private func pauseTimer() {
+        cancellable?.cancel()
+        cancellable = nil
+    }
+    
+    private func stopAndResetTimer() {
+        pauseTimer()
+        elapsedMilliseconds = 0
+        withAnimation(.easeInOut) {
+            elapsedSeconds = .seconds(0)
+        }
+        // TODO dont reset for record
+        switch state {
+        case .ready(_, _), .active(_, _):
+            nextState()
+            startTimer()
+        default:
+            break
+        }
     }
     
     enum SessionState: Codable, Hashable, Equatable {
