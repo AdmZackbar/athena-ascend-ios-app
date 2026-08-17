@@ -10,11 +10,16 @@ import SwiftUI
 internal import Combine
 
 struct RoutineSessionView: View {
+    @Environment(\.modelContext) var modelContext
+    @Environment(\.dismiss) var dismiss
+    
     let activeColor = Color("ActiveColor")
     let readyColor = Color("ReadyColor")
     let restColor = Color("RestColor")
     
+    let session: Session
     let routine: Routine
+    var newSession: Bool
     
     @State private var state: SessionState = .start
     @State private var rep: Int = 0
@@ -24,14 +29,34 @@ struct RoutineSessionView: View {
     @State private var cancellable: Cancellable?
     
     init(routine: Routine) {
+        self.session = Session()
+        session.routine = routine
         self.routine = routine
+        self.newSession = true
+    }
+    
+    init(session: Session) {
+        self.session = session
+        self.routine = session.routine!
+        self.newSession = false
     }
     
     var body: some View {
         mainView()
             .navigationTitle(routine.name)
             .navigationBarTitleDisplayMode(state == .start ? .automatic : .inline)
+            .navigationBarBackButtonHidden()
             .background(computeBackground())
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        // TODO ask user if they want to end session
+                        dismiss()
+                    } label: {
+                        Label("Back", systemImage: "chevron.left")
+                    }
+                }
+            }
     }
     
     func nextState() {

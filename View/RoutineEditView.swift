@@ -69,11 +69,6 @@ struct RoutineEditView: View {
                 } header: {
                     VStack {
                         TextField("Set Name", text: $set.name)
-                        Picker("Order:", selection: $set.order) {
-                            ForEach(Routine.Order.allCases, id: \.name) { order in
-                                Text(order.name).tag(order)
-                            }
-                        }.pickerStyle(.segmented)
                         Stepper(value: $set.restTime, in: 0...300, step: 30) {
                             Text("Rest Time: \(set.restTime) s")
                         }
@@ -242,7 +237,7 @@ struct RoutineEditView: View {
         }
         
         func toRoutineSet(_ set: Set) -> Routine.ExerciseSet {
-            .init(name: set.name, exercises: set.exercises.map(toRoutineExercise), restTime: set.restTime, order: set.order)
+            .init(name: set.name, exercises: set.exercises.map(toRoutineExercise), restTime: set.restTime)
         }
         
         func toRoutineExercise(_ exercise: Exercise) -> Routine.Exercise {
@@ -259,7 +254,6 @@ struct RoutineEditView: View {
             var name: String
             var exercises: [Exercise]
             var restTime: Int
-            var order: Routine.Order
             
             var invalid: Bool {
                 name.isEmpty || restTime < 0 || exercises.contains(where: \.invalid)
@@ -271,12 +265,10 @@ struct RoutineEditView: View {
                     self.name = set.name
                     self.exercises = set.exercises.map({ Exercise($0) })
                     self.restTime = set.restTime
-                    self.order = set.order
                 } else {
                     self.name = ""
                     self.exercises = []
                     self.restTime = 0
-                    self.order = .parallel
                 }
             }
         }
@@ -317,7 +309,7 @@ struct RoutineEditView: View {
     }
 }
 
-#Preview {
+#Preview(traits: .modifier(TestDataModifier())) {
     @Previewable @Query var routines: [Routine]
     NavigationStack {
         RoutineEditView(routine: routines.first!)
