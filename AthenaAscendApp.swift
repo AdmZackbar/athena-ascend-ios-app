@@ -41,21 +41,43 @@ struct TestDataModifier: PreviewModifier {
     static func populateContainer(_ container: ModelContainer) {
         let routine: Routine = .init(name: "Spring 2026 Monday", sets: [
             .init(name: "Hangboard Block A", exercises: [
-                .repeater(.init(tag: "10mm HC", numReps: 7)),
-                .repeater(.init(tag: "10mm HC", numReps: 5, weight: 20.0)),
-                .repeater(.init(tag: "MR S Pocket", numReps: 7, weight: -40.0)),
-                .repeater(.init(tag: "MR S Pocket", numReps: 6, weight: -30.0)),
-                .repeater(.init(tag: "MR S Pocket", numReps: 5, weight: -20.0)),
-                .repeater(.init(tag: "M L Pocket", numReps: 7, timeOn: 5, timeOff: 5, weight: -60.0)),
-                .repeater(.init(tag: "M L Pocket", numReps: 6, timeOn: 5, timeOff: 5, weight: -50.0)),
-                .repeater(.init(tag: "M L Pocket", numReps: 5, timeOn: 5, timeOff: 5, weight: -40.0))
-            ], restTime: 120),
+                .repeater(.init(tag: "10mm HC", sets: [
+                    .init(numReps: 7),
+                    .init(numReps: 5, weight: 20.0),
+                ])),
+                .repeater(.init(tag: "MR S Pocket", sets: [
+                    .init(numReps: 7, weight: -40.0),
+                    .init(numReps: 6, weight: -30.0),
+                    .init(numReps: 5, weight: -20.0),
+                ])),
+                .repeater(.init(tag: "M L Pocket", timeOn: 5, timeOff: 5, sets: [
+                    .init(numReps: 7, weight: -60.0),
+                    .init(numReps: 6, weight: -50.0),
+                    .init(numReps: 5, weight: -40.0),
+                ])),
+            ], restTime: 120, order: .dfs),
             .init(name: "Max Hang Block B", exercises: [
-                .maxHang(.init(tag: "BM Middle", side: .right, target: 10, weight: 35.0)),
-                .maxHang(.init(tag: "BM Middle", side: .left, target: 10, weight: 35.0)),
-                .maxHang(.init(tag: "BM Middle", side: .right, target: 6, weight: 40.0)),
-                .maxHang(.init(tag: "BM Middle", side: .left, target: 6, weight: 40.0)),
-            ])
+                .maxHang(.init(tag: "BM Middle", sets: [
+                    .init(side: .left, target: 10, weight: 35.0),
+                    .init(side: .right, target: 10, weight: 40.0),
+                    .init(side: .left, target: 6, weight: 40.0),
+                    .init(side: .right, target: 6, weight: 45.0),
+                    .init(side: .left, target: 6, weight: 40.0),
+                    .init(side: .right, target: 6, weight: 45.0),
+                ]))
+            ], order: .dfs),
+            .init(name: "Warmup Set", exercises: [
+                .generic(.init(name: "Dumbbell Bench Press", sets: [
+                    .init(num: 10),
+                    .init(num: 8),
+                    .init(num: 6),
+                ])),
+                .generic(.init(name: "Curtsy Squat", sets: [
+                    .init(min: 8, max: 12),
+                    .init(min: 8, max: 12),
+                    .init(min: 8, max: 12),
+                ]))
+            ], restTime: 15, order: .bfs)
         ])
         container.mainContext.insert(routine)
     }

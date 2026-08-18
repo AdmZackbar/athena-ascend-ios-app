@@ -29,6 +29,9 @@ struct RoutineEditView: View {
                             editExercise = (set.id, exercise.id)
                         } label: {
                             switch exercise.type {
+                            case .generic:
+                                genericView(exercise.generic)
+                                    .contentShape(Rectangle())
                             case .repeater:
                                 repeaterView(exercise.repeater)
                                     .contentShape(Rectangle())
@@ -36,11 +39,15 @@ struct RoutineEditView: View {
                                 maxHangView(exercise.maxHang)
                                     .contentShape(Rectangle())
                             }
-                            
                         }.buttonStyle(.plain)
                         
                     }
                     Menu("Add Exercise") {
+                        Button("Basic") {
+                            let exercise = Item.Exercise(.generic(.init()))
+                            set.exercises.append(exercise)
+                            editExercise = (set.id, exercise.id)
+                        }
                         Button("Repeater") {
                             let exercise = Item.Exercise(.repeater(.init()))
                             set.exercises.append(exercise)
@@ -55,6 +62,8 @@ struct RoutineEditView: View {
                             var exercise: Item.Exercise {
                                 let last = set.exercises.last!
                                 switch last.type {
+                                case .generic:
+                                    return .init(.generic(last.generic))
                                 case .repeater:
                                     return .init(.repeater(last.repeater))
                                 case .maxHang:
@@ -72,6 +81,11 @@ struct RoutineEditView: View {
                         Stepper(value: $set.restTime, in: 0...300, step: 30) {
                             Text("Rest Time: \(set.restTime) s")
                         }
+                        Picker("", selection: $set.order) {
+                            ForEach(Routine.Order.allCases, id: \.name) { order in
+                                Text(order.name).tag(order)
+                            }
+                        }.pickerStyle(.segmented)
                     }
                 }
             }
@@ -91,10 +105,12 @@ struct RoutineEditView: View {
                 let exercise = $item.sets.filter { $0.id == editExercise.0 }.first!
                     .exercises.filter { $0.id == editExercise.1 }.first!
                 switch exercise.wrappedValue.type {
+                case .generic:
+                    EditGenericSetsSheet(item: exercise.generic)
                 case .repeater:
-                    EditRepeaterSheet(item: exercise.repeater)
+                    EditRepeaterSetsSheet(item: exercise.repeater)
                 case .maxHang:
-                    EditMaxHangSheet(item: exercise.maxHang)
+                    EditMaxHangSetsSheet(item: exercise.maxHang)
                 }
             }
         }.navigationTitle(item.routine != nil ? "Edit Routine" : "Create Routine")
@@ -119,79 +135,261 @@ struct RoutineEditView: View {
             }
     }
     
-    private func repeaterView(_ repeater: Routine.Repeater) -> some View {
-        HStack {
-            Text(repeater.tag)
-            Text("\(repeater.timeOn)/\(repeater.timeOff) s x\(repeater.numReps)")
-            Text("\(repeater.weight.formatted(.number.precision(.fractionLength(0...2)))) lb")
+    private func genericView(_ generic: Routine.GenericSets) -> some View {
+        VStack(alignment: .leading) {
+            Text(generic.name)
+                .font(.title3)
+                .bold()
+            ForEach(generic.sets, id: \.hashValue) { set in
+                Text("\(set.text) \(generic.setDetailText)")
+            }.font(.subheadline)
+                .padding(.leading, 8)
         }
     }
     
-    private func maxHangView(_ maxHang: Routine.MaxHang) -> some View {
+    private func repeaterView(_ repeater: Routine.RepeaterSets) -> some View {
         HStack {
+            VStack(alignment: .leading) {
+                HStack(alignment: .center) {
+                    Text("\(repeater.tag):")
+                        .font(.title3)
+                        .bold()
+                    Text("\(repeater.timeOn)/\(repeater.timeOff) s")
+                        .bold()
+                }
+                ForEach(repeater.sets, id: \.hashValue) { set in
+                    Text(set.text)
+                }.font(.subheadline)
+                    .padding(.leading, 8)
+            }
+            Spacer()
+        }
+    }
+    
+    private func maxHangView(_ maxHang: Routine.MaxHangSets) -> some View {
+        VStack(alignment: .leading) {
             Text(maxHang.tag)
-            Text(maxHang.side.abbreviation)
-            Text("Target: \(maxHang.target)s")
-            Text("\(maxHang.weight.formatted(.number.precision(.fractionLength(0...2)))) lb")
+                .font(.title3)
+                .bold()
+            HStack {
+                VStack(alignment: .leading) {
+                    Text("Left")
+                        .underline()
+                        .font(.headline)
+                    ForEach(maxHang.sets.filter({ $0.side == .left }), id: \.hashValue) { set in
+                        Text(set.text)
+                    }
+                }
+                Spacer()
+                VStack(alignment: .trailing) {
+                    Text("Right")
+                        .underline()
+                        .font(.headline)
+                    ForEach(maxHang.sets.filter({ $0.side == .right }), id: \.hashValue) { set in
+                        Text(set.text)
+                    }
+                }
+            }.font(.subheadline)
         }
     }
     
-    struct EditRepeaterSheet: View {
-        @Binding var item: Routine.Repeater
+    struct EditGenericSetsSheet: View {
+        @Binding var item: Routine.GenericSets
+        @State private var selectionType: SelectionType = .single
         
         var body: some View {
             Form {
                 Section {
-                    Stepper("\(item.numReps) reps", value: $item.numReps, in: 1...30)
-                    Stepper("Time On: \(item.timeOn)s", value: $item.timeOn, in: 0...30)
-                    Stepper("Time Off: \(item.timeOff)s", value: $item.timeOff, in: 0...30)
-                    Stepper(value: $item.weight, in: -200...200, step: 5) {
-                        HStack {
-                            Button {
-                                item.weight = -item.weight
-                            } label: {
-                                Text("Weight:")
-                            }.buttonStyle(.glass)
-                            TextField("", value: $item.weight, format: .number.precision(.fractionLength(0...2)))
-                                .keyboardType(.decimalPad)
-                            Text("lbs")
+                    TextField("Name", text: $item.name)
+                } header: {
+                    Text("Name")
+                }
+                Section {
+                    ForEach($item.sets.enumerated(), id: \.offset) { offset, $set in
+                        switch selectionType {
+                        case .single:
+                            Stepper(value: .init(get: {
+                                $set.wrappedValue.min
+                            }, set: { newValue in
+                                $set.wrappedValue.min = newValue
+                                $set.wrappedValue.max = newValue
+                            }), in: 1...100, step: 1) {
+                                Text("\(set.min) \(item.setDetailText)")
+                            }
+                        case .range:
+                            HStack {
+                                Stepper(value: $set.min, in: 1...100, step: 1) {
+                                    Text("\(set.min) \(item.setDetailText)")
+                                }
+                                Stepper(value: $set.max, in: 1...100, step: 1) {
+                                    Text("\(set.max) \(item.setDetailText)")
+                                }
+                            }
                         }
                     }
                 } header: {
-                    TextField("Tag", text: $item.tag)
+                    VStack {
+                        HStack(spacing: 16) {
+                            Text("Sets")
+                            Spacer()
+                            Button {
+                                if let last = item.sets.last {
+                                    item.sets.append(.init(min: last.min, max: last.max))
+                                } else {
+                                    item.sets.append(.init())
+                                }
+                            } label: {
+                                Image(systemName: "plus")
+                            }
+                            Button {
+                                item.sets.removeLast()
+                            } label: {
+                                Image(systemName: "minus")
+                            }.disabled(item.sets.isEmpty)
+                        }.buttonStyle(.plain)
+                        Picker("Type", selection: $item.dataType) {
+                            ForEach(Routine.GenericSets.DataType.allCases, id: \.name) { type in
+                                Text(type.name).tag(type)
+                            }
+                        }.pickerStyle(.segmented)
+                        Picker("", selection: $selectionType) {
+                            ForEach(SelectionType.allCases, id: \.name) { type in
+                                Text(type.name).tag(type)
+                            }
+                        }.pickerStyle(.segmented)
+                    }
                 }
-            }.presentationDetents([.height(300), .medium])
+            }.presentationDetents([.medium, .large])
+        }
+        
+        enum SelectionType: CaseIterable, Codable, Hashable, Equatable {
+            case single, range
+            
+            var name: String {
+                switch self {
+                case .single:
+                    "Single"
+                case .range:
+                    "Range"
+                }
+            }
         }
     }
     
-    struct EditMaxHangSheet: View {
-        @Binding var item: Routine.MaxHang
+    struct EditRepeaterSetsSheet: View {
+        @Binding var item: Routine.RepeaterSets
         
         var body: some View {
             Form {
                 Section {
-                    Picker("Side", selection: $item.side) {
-                        ForEach(Routine.Side.allCases, id: \.name) { side in
-                            Text(side.name).tag(side)
-                        }
-                    }.pickerStyle(.segmented)
-                    Stepper("Target: \(item.target)s", value: $item.target, in: 0...30)
-                    Stepper(value: $item.weight, in: -200...200, step: 5) {
+                    TextField("Tag", text: $item.tag)
+                } header: {
+                    Text("Hold/Grip")
+                } footer: {
+                    HStack {
+                        Stepper("On: \(item.timeOn)s", value: $item.timeOn, in: 0...30)
+                        Stepper("Off: \(item.timeOff)s", value: $item.timeOff, in: 0...30)
+                    }.bold()
+                }
+                Section {
+                    ForEach($item.sets.enumerated(), id: \.offset) { offset, $set in
                         HStack {
-                            Button {
-                                item.weight = -item.weight
-                            } label: {
-                                Text("Weight:")
-                            }.buttonStyle(.glass)
-                            TextField("", value: $item.weight, format: .number.precision(.fractionLength(0...2)))
-                                .keyboardType(.decimalPad)
-                            Text("lbs")
+                            Stepper("\(set.numReps) reps", value: $set.numReps, in: 1...30)
+                            Stepper(value: $set.weight, in: -200...200, step: 5) {
+                                HStack {
+                                    TextField("", value: $set.weight, format: .number.precision(.fractionLength(0...2)))
+                                        .keyboardType(.decimalPad)
+                                    Text("lbs")
+                                }
+                            }
                         }
                     }
                 } header: {
+                    HStack(spacing: 16) {
+                        Text("Sets")
+                        Spacer()
+                        Button {
+                            if let last = item.sets.last {
+                                item.sets.append(.init(numReps: last.numReps, weight: last.weight))
+                            } else {
+                                item.sets.append(.init())
+                            }
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        Button {
+                            item.sets.removeLast()
+                        } label: {
+                            Image(systemName: "minus")
+                        }.disabled(item.sets.isEmpty)
+                    }.buttonStyle(.plain)
+                }
+            }.presentationDetents([.medium, .large])
+        }
+    }
+    
+    struct EditMaxHangSetsSheet: View {
+        @Binding var item: Routine.MaxHangSets
+        
+        var body: some View {
+            Form {
+                Section {
                     TextField("Tag", text: $item.tag)
                 }
-            }.presentationDetents([.height(280), .medium])
+                Section {
+                    ForEach($item.sets.filter({ $0.wrappedValue.side == .left }).enumerated(), id: \.offset) { offset, $set in
+                        VStack {
+                            Stepper("\(set.target)s", value: $set.target, in: 0...30)
+                            Stepper(value: $set.weight, in: -200...200, step: 5) {
+                                HStack {
+                                    TextField("", value: $set.weight, format: .number.precision(.fractionLength(0...2)))
+                                        .keyboardType(.decimalPad)
+                                    Text("lbs")
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    HStack(spacing: 16) {
+                        Text("Left")
+                        Spacer()
+                        Button {
+                            if let left = item.sets.filter({ $0.side == .left }).last {
+                                item.sets.append(.init(side: .left, target: left.target, weight: left.weight))
+                            } else {
+                                item.sets.append(.init(side: .left))
+                            }
+                            if let right = item.sets.filter({ $0.side == .right }).last {
+                                item.sets.append(.init(side: .right, target: right.target, weight: right.weight))
+                            } else {
+                                item.sets.append(.init(side: .right))
+                            }
+                            
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        Button {
+                            item.sets.removeLast(2)
+                        } label: {
+                            Image(systemName: "minus")
+                        }.disabled(item.sets.isEmpty)
+                    }.buttonStyle(.plain)
+                }
+                Section("Right") {
+                    ForEach($item.sets.filter({ $0.wrappedValue.side == .right }).enumerated(), id: \.offset) { offset, $set in
+                        HStack {
+                            Stepper("\(set.target)s", value: $set.target, in: 0...30)
+                            Stepper(value: $set.weight, in: -200...200, step: 5) {
+                                HStack {
+                                    TextField("", value: $set.weight, format: .number.precision(.fractionLength(0...2)))
+                                        .keyboardType(.decimalPad)
+                                    Text("lbs")
+                                }
+                            }
+                        }
+                    }
+                }
+            }.presentationDetents([.medium, .large])
         }
     }
     
@@ -237,11 +435,13 @@ struct RoutineEditView: View {
         }
         
         func toRoutineSet(_ set: Set) -> Routine.ExerciseSet {
-            .init(name: set.name, exercises: set.exercises.map(toRoutineExercise), restTime: set.restTime)
+            .init(name: set.name, exercises: set.exercises.map(toRoutineExercise), restTime: set.restTime, order: set.order)
         }
         
         func toRoutineExercise(_ exercise: Exercise) -> Routine.Exercise {
             switch exercise.type {
+            case .generic:
+                .generic(exercise.generic)
             case .repeater:
                 .repeater(exercise.repeater)
             case .maxHang:
@@ -254,6 +454,7 @@ struct RoutineEditView: View {
             var name: String
             var exercises: [Exercise]
             var restTime: Int
+            var order: Routine.Order
             
             var invalid: Bool {
                 name.isEmpty || restTime < 0 || exercises.contains(where: \.invalid)
@@ -265,45 +466,63 @@ struct RoutineEditView: View {
                     self.name = set.name
                     self.exercises = set.exercises.map({ Exercise($0) })
                     self.restTime = set.restTime
+                    self.order = set.order
                 } else {
                     self.name = ""
                     self.exercises = []
                     self.restTime = 0
+                    self.order = .bfs
                 }
             }
         }
         
         enum ExerciseType {
-            case repeater, maxHang
+            case generic, repeater, maxHang
         }
         
         struct Exercise: Identifiable {
             let id: UUID
             var type: ExerciseType
-            var repeater: Routine.Repeater
-            var maxHang: Routine.MaxHang
+            var generic: Routine.GenericSets = .init()
+            var repeater: Routine.RepeaterSets = .init()
+            var maxHang: Routine.MaxHangSets = .init()
             
             var invalid: Bool {
                 switch type {
+                case .generic:
+                    generic.name.isEmpty || generic.sets.isEmpty || generic.sets.contains(where: isInvalid)
                 case .repeater:
-                    repeater.tag.isEmpty || repeater.numReps <= 0
+                    repeater.tag.isEmpty || repeater.sets.isEmpty || repeater.sets.contains(where: isInvalid)
                 case .maxHang:
-                    maxHang.tag.isEmpty || maxHang.target <= 0
+                    maxHang.tag.isEmpty || maxHang.sets.isEmpty || maxHang.sets.contains(where: isInvalid)
                 }
             }
             
             init(_ exercise: Routine.Exercise) {
                 self.id = .init()
                 switch exercise {
-                case .repeater(let r):
+                case .generic(let d):
+                    self.type = .generic
+                    self.generic = d
+                case .repeater(let d):
                     self.type = .repeater
-                    self.repeater = r
-                    self.maxHang = .init()
-                case .maxHang(let m):
+                    self.repeater = d
+                case .maxHang(let d):
                     self.type = .maxHang
-                    self.maxHang = m
-                    self.repeater = .init()
+                    self.maxHang = d
                 }
+            }
+            
+            func isInvalid(_ set: Routine.GenericSet) -> Bool {
+                set.min <= 0 || set.max <= 0 || set.min > set.max
+            }
+            
+            func isInvalid(_ set: Routine.RepeaterSet) -> Bool {
+                set.numReps <= 0
+            }
+            
+            func isInvalid(_ set: Routine.MaxHangSet) -> Bool {
+                set.target <= 0
             }
         }
     }

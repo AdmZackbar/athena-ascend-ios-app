@@ -18,12 +18,16 @@ extension SchemaV1 {
         /// The list of sets to execute for the routine
         var sets: [ExerciseSet] = []
         @Relationship(deleteRule: .nullify, inverse: \Session.routine)
-        var sessions: [Session] = []
+        var sessions: [Session]! = []
         
         init(name: String = "", sets: [ExerciseSet] = [], sessions: [Session] = []) {
             self.name = name
             self.sets = sets
             self.sessions = sessions
+        }
+        
+        enum Order: CaseIterable, Codable, Hashable, Equatable {
+            case bfs, dfs
         }
         
         struct ExerciseSet: Codable, Hashable, Equatable {
@@ -33,36 +37,90 @@ extension SchemaV1 {
             var exercises: [Exercise]
             /// The amount of rest time between exercises in seconds
             var restTime: Int
+            /// The ordering of exercises and their sets
+            /// * BFS: one set from each exercise before moving to the next set in each exercise
+            /// * DFS: all sets from the first exercise before moving to the next exercise
+            var order: Order
             
-            init(name: String = "", exercises: [Exercise] = [], restTime: Int = 180) {
+            init(name: String = "", exercises: [Exercise] = [], restTime: Int = 180, order: Order = .bfs) {
                 self.name = name
                 self.exercises = exercises
                 self.restTime = restTime
+                self.order = order
             }
         }
         
         enum Exercise: Codable, Equatable, Hashable {
-            case repeater(_ details: Repeater)
-            case maxHang(_ details: MaxHang)
+            case generic(_ data: GenericSets)
+            case repeater(_ data: RepeaterSets)
+            case maxHang(_ data: MaxHangSets)
         }
         
-        struct Repeater: Codable, Hashable, Equatable {
+        struct GenericSets: Codable, Hashable, Equatable {
+            /// The name of the exercise
+            var name: String
+            /// The data type(s) contained in the sets
+            var dataType: DataType
+            /// The sets of the exercise in order
+            var sets: [GenericSet]
+            
+            init(name: String = "", dataType: DataType = .repWeight, sets: [GenericSet] = []) {
+                self.name = name
+                self.dataType = dataType
+                self.sets = sets
+            }
+            
+            enum DataType: CaseIterable, Codable, Hashable, Equatable {
+                case rep
+                case repWeight
+                case time
+                case timeWeight
+            }
+        }
+        
+        struct GenericSet: Codable, Hashable, Equatable {
+            /// The lower value of the rep/time range, inclusive
+            var min: Int
+            /// The upper value of the rep/time range, inclusive
+            var max: Int
+            
+            init(num: Int = 1) {
+                self.min = num
+                self.max = num
+            }
+            
+            init(min: Int, max: Int) {
+                self.min = min
+                self.max = max
+            }
+        }
+        
+        struct RepeaterSets: Codable, Hashable, Equatable {
             /// The name of the hold, grip type, etc.
             var tag: String
-            /// The number of times on the hold
-            var numReps: Int
             /// The amount of time per rep on the hold in seconds
             var timeOn: Int
             /// The amount of rest time between reps in seconds
             var timeOff: Int
+            /// The repeater sets in order
+            var sets: [RepeaterSet] = []
+            
+            init(tag: String = "", timeOn: Int = 7, timeOff: Int = 3, sets: [RepeaterSet] = []) {
+                self.tag = tag
+                self.timeOn = timeOn
+                self.timeOff = timeOff
+                self.sets = sets
+            }
+        }
+        
+        struct RepeaterSet: Codable, Hashable, Equatable {
+            /// The number of times on the hold
+            var numReps: Int
             /// The amount of weight added or removed in pounds (negative is removed, positive is added)
             var weight: Double
             
-            init(tag: String = "", numReps: Int = 6, timeOn: Int = 7, timeOff: Int = 3, weight: Double = 0.0) {
-                self.tag = tag
+            init(numReps: Int = 6, weight: Double = 0.0) {
                 self.numReps = numReps
-                self.timeOn = timeOn
-                self.timeOff = timeOff
                 self.weight = weight
             }
         }
@@ -73,18 +131,27 @@ extension SchemaV1 {
             case both
         }
         
-        struct MaxHang: Codable, Hashable, Equatable {
+        struct MaxHangSets: Codable, Hashable, Equatable {
             /// The name of the hold, grip type, etc.
             var tag: String
-            /// Which arm to hang from
+            /// The sets for each side in order
+            var sets: [MaxHangSet]
+            
+            init(tag: String = "", sets: [MaxHangSet] = []) {
+                self.tag = tag
+                self.sets = sets
+            }
+        }
+        
+        struct MaxHangSet: Codable, Hashable, Equatable {
+            /// The arm used for this set
             var side: Side
             /// The expected time on the hold in seconds
             var target: Int
             /// The amount of weight added or removed in pounds (negative is removed, positive is added)
             var weight: Double
             
-            init(tag: String = "", side: Side = .both, target: Int = 10, weight: Double = 0.0) {
-                self.tag = tag
+            init(side: Side, target: Int = 10, weight: Double = 0.0) {
                 self.side = side
                 self.target = target
                 self.weight = weight

@@ -7,6 +7,15 @@
 
 import Foundation
 
+extension Routine.Order {
+    var name: String {
+        switch self {
+        case .bfs: return "Parallel"
+        case .dfs: return "Series"
+        }
+    }
+}
+
 extension Routine.Side {
     var abbreviation: String {
         switch self {
@@ -25,19 +34,163 @@ extension Routine.Side {
     }
 }
 
+extension Routine.GenericSets.DataType {
+    var name: String {
+        switch self {
+        case .rep: return "Reps"
+        case .repWeight: return "Rep/Weight"
+        case .time: return "Time"
+        case .timeWeight: return "Time/Weight"
+        }
+    }
+}
+
 extension Routine.Exercise {
+    // TODO
     var description: String {
         switch self {
-        case .repeater(let r):
-            if r.weight != 0 {
-                return "\(r.tag) \(r.timeOn)s/\(r.timeOff)s x\(r.numReps) \(r.weight > 0 ? "+" : "")\(r.weight.formatted(.number.precision(.fractionLength(0...2))))lb"
-            }
-            return "\(r.tag) \(r.timeOn)s/\(r.timeOff)s x\(r.numReps)"
-        case .maxHang(let m):
-            if m.weight != 0 {
-                return "\(m.tag) \(m.side.abbreviation) \(m.target)s \(m.weight > 0 ? "+" : "")\(m.weight.formatted(.number.precision(.fractionLength(0...2))))lb"
-            }
-            return "\(m.tag) \(m.side.abbreviation) \(m.target)s"
+        case .generic(let d):
+            return "\(d.name): \(numSets) sets"
+        case .repeater(let d):
+            return "Repeater: \(d.tag) \(d.timeOn)s/\(d.timeOff)s \(numSets) sets"
+        case .maxHang(let d):
+            return "Max Hang: \(d.tag) \(numSets) sets"
         }
+    }
+    
+    var numSets: Int {
+        switch self {
+        case .generic(let d):
+            return d.sets.count
+        case .repeater(let d):
+            return d.sets.count
+        case .maxHang(let d):
+            return d.sets.count
+        }
+    }
+    
+    func getDescription(setIndex: Int) -> String {
+        switch self {
+        case .generic(let d):
+            return "\(d.name) (\(setIndex + 1)/\(numSets)): \(d.sets[setIndex].text) \(d.setDetailText)"
+        case .repeater(let d):
+            return "\(d.tag) (\(setIndex + 1)/\(numSets)): \(d.timeOn)s/\(d.timeOff)s \(d.sets[setIndex].text)"
+        case .maxHang(let d):
+            return "\(d.tag) (\(setIndex + 1)/\(numSets)): \(d.sets[setIndex].text)"
+        }
+    }
+}
+
+extension Session.Exercise {
+    // TODO
+    var description: String {
+        switch self {
+        case .generic(let d):
+            return "\(d.expected.name): \(numSets) sets"
+        case .repeater(let d):
+            return "Repeater: \(d.expected.tag) \(d.expected.timeOn)s/\(d.expected.timeOff)s \(numSets) sets"
+        case .maxHang(let d):
+            return "Max Hang: \(d.expected.tag) \(numSets) sets"
+        }
+    }
+    
+    var numSets: Int {
+        switch self {
+        case .generic(let d):
+            return d.expected.sets.count
+        case .repeater(let d):
+            return d.expected.sets.count
+        case .maxHang(let d):
+            return d.expected.sets.count
+        }
+    }
+    
+    func getDescription(setIndex: Int) -> String {
+        switch self {
+        case .generic(let d):
+            return "\(d.expected.name) (\(setIndex + 1)/\(numSets)): \(d.expected.sets[setIndex].text) \(d.expected.setDetailText)"
+        case .repeater(let d):
+            return "\(d.expected.tag) (\(setIndex + 1)/\(numSets)): \(d.expected.timeOn)s/\(d.expected.timeOff)s \(d.expected.sets[setIndex].text)"
+        case .maxHang(let d):
+            return "\(d.expected.tag) (\(setIndex + 1)/\(numSets)): \(d.expected.sets[setIndex].text)"
+        }
+    }
+}
+
+extension Double {
+    var lbsFormat: String {
+        return "\(self.formatted(.number.precision(.fractionLength(0...2)))) lb"
+    }
+}
+
+extension Routine.GenericSets {
+    var setDetailText: String {
+        switch dataType {
+        case .rep, .repWeight: return "reps"
+        case .time, .timeWeight: return "s"
+        }
+    }
+}
+
+extension Routine.GenericSet {
+    var text: String {
+        return min == max ? min.formatted() : "\(min)-\(max)"
+    }
+    
+    var avg: Int {
+        return min + ((max - min) / 2)
+    }
+}
+
+extension Session.Exercise {
+    var hasData: Bool {
+        switch self {
+        case .generic(let d):
+            return !d.actual.isEmpty
+        case .repeater(let d):
+            return !d.actual.isEmpty
+        case .maxHang(let d):
+            return !d.actual.isEmpty
+        }
+    }
+}
+
+extension Session.GenericDataSet {
+    var text: String {
+        if let numReps, let weight {
+            return "\(numReps) reps @ \(weight.lbsFormat)"
+        } else if let numReps {
+            return "\(numReps) reps"
+        } else if let time, let weight {
+            return "\(time) s @ \(weight.lbsFormat)"
+        } else if let time {
+            return "\(time) s"
+        } else {
+            return "N/A"
+        }
+    }
+}
+
+extension Routine.RepeaterSet {
+    var text: String {
+        return weight == 0 ? "\(numReps) reps" : "\(numReps) reps @ \(weight.lbsFormat)"
+    }
+}
+
+extension Session.RepeaterSet {
+    var text: String {
+        return weight == 0 ? "\(numReps) reps" : "\(numReps) reps @ \(weight.lbsFormat)"
+    }
+}
+
+extension Routine.MaxHangSet {
+    var text: String {
+        return weight == 0 ? "\(side.abbreviation) \(target)s" : "\(side.abbreviation) \(target)s @ \(weight.lbsFormat)"
+    }
+}
+
+extension Session.MaxHangSet {
+    var text: String {
+        return weight == 0 ? "\(side.abbreviation) \(target)s" : "\(side.abbreviation) \(target)s @ \(weight.lbsFormat)"
     }
 }
