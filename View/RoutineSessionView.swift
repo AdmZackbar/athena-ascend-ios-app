@@ -136,8 +136,8 @@ struct RoutineSessionView: View {
             switch indices.details {
             case .generic:
                 genericExerciseView()
-            case .repeater(let s, _):
-                repeaterExerciseView(s)
+            case .repeater(let s, let rep):
+                repeaterExerciseView(s, rep)
             case .maxHang(let s):
                 maxHangExerciseView(s)
             }
@@ -265,9 +265,30 @@ struct RoutineSessionView: View {
         }
     }
     
-    func next() {
+    func prev() {
         if let indices {
-            if let newIndices = tryNextExercise(indices) {
+            // Stop timer first in all cases
+            stopAndResetTimer()
+            if let newIndices = tryPrevExercise(indices) {
+                // Stay on current exercise set, moving to new state
+                self.indices = newIndices
+            } else {
+                // Moving to new exercise set, exercise, or routine set
+                // Next exercise is determined by set order
+                let set = session.sets[indices.routineSetIndex]
+                switch set.order {
+                case .bfs:
+                    prevBfs(indices)
+                case .dfs:
+                    prevDfs(indices)
+                }
+            }
+        }
+    }
+    
+    func next(skip: Bool = false) {
+        if let indices {
+            if !skip, let newIndices = tryNextExercise(indices) {
                 // Stay on current exercise set, moving to new state
                 self.indices = newIndices
                 // Currently, all internal states should auto-start timer
@@ -290,6 +311,33 @@ struct RoutineSessionView: View {
             // Start at beginning
             updateIndices(routineSetIndex: 0, setExerciseIndex: 0, exerciseSetIndex: 0)
         }
+    }
+    
+    func prevBfs(_ indices: ExerciseIndices) {
+        let set = session.sets[indices.routineSetIndex]
+        var targetIndex = indices.exerciseSetIndex
+        // First check behind
+        for i in (0..<indices.setExerciseIndex).reversed() {
+            if targetIndex < set.exercises[i].numSets {
+                updateIndices(routineSetIndex: indices.routineSetIndex, setExerciseIndex: i, exerciseSetIndex: targetIndex)
+                return
+            }
+        }
+        targetIndex -= 1
+        if targetIndex < 0 {
+            // Exit early if impossible
+            self.indices = nil
+            return
+        }
+        // Then loop back around to 0 for the next set
+        for i in (0..<set.exercises.count).reversed() {
+            if targetIndex < set.exercises[i].numSets {
+                updateIndices(routineSetIndex: indices.routineSetIndex, setExerciseIndex: i, exerciseSetIndex: targetIndex)
+                return
+            }
+        }
+        // Finish screen
+        self.indices = nil
     }
     
     func nextBfs(_ indices: ExerciseIndices) {
@@ -320,6 +368,22 @@ struct RoutineSessionView: View {
         }
     }
     
+    func prevDfs(_ indices: ExerciseIndices) {
+        if indices.exerciseSetIndex > 0 {
+            // Prev set within the exercise
+            updateIndices(routineSetIndex: indices.routineSetIndex, setExerciseIndex: indices.setExerciseIndex, exerciseSetIndex: indices.exerciseSetIndex - 1)
+        } else if indices.setExerciseIndex > 0 {
+            // Next exercise within the routine set
+            updateIndices(routineSetIndex: indices.routineSetIndex, setExerciseIndex: indices.setExerciseIndex - 1, exerciseSetIndex: 0)
+        } else if indices.routineSetIndex > 0 {
+            // Next set wtihin the routine
+            updateIndices(routineSetIndex: indices.routineSetIndex - 1, setExerciseIndex: 0, exerciseSetIndex: 0)
+        } else {
+            // Finish screen
+            self.indices = nil
+        }
+    }
+    
     func nextDfs(_ indices: ExerciseIndices) {
         let set = session.sets[indices.routineSetIndex]
         let exercise = set.exercises[indices.setExerciseIndex]
@@ -335,6 +399,31 @@ struct RoutineSessionView: View {
         } else {
             // Finish screen
             self.indices = nil
+        }
+    }
+    
+    func tryPrevExercise(_ indices: ExerciseIndices) -> ExerciseIndices? {
+        switch indices.details {
+        case .generic:
+            return nil
+        case .repeater(let s, let reps):
+            switch s {
+            case .ready:
+                return nil
+            default:
+                if case .repeater(let d) = currentExercise {
+                    return .init(baseIndices: indices, details: .repeater(.ready, reps: d.expected.sets[indices.exerciseSetIndex].numReps))
+                } else {
+                    return nil
+                }
+            }
+        case .maxHang(let s):
+            switch s {
+            case .ready:
+                return nil
+            default:
+                return .init(baseIndices: indices, details: .maxHang(.ready))
+            }
         }
     }
     
@@ -375,17 +464,88 @@ struct RoutineSessionView: View {
     }
     
     @ViewBuilder
-    func repeaterExerciseView(_ state: RepeaterState) -> some View {
-        switch state {
-        case .ready:
-            timerView("Get Ready")
-        case .on:
-            timerView("On")
-        case .off:
-            timerView("Off")
-        case .done:
-            restAndRecordView()
-        }
+    func repeaterExerciseView(_ state: RepeaterState, _ rep: Int) -> some View {
+        let text: String = {
+            switch state {
+            case .ready:
+                return "Get Ready"
+            case .on:
+                return "On"
+            case .off:
+                return "Off"
+            case .done:
+                return "Rest"
+            }
+        }()
+        let setIndex = indices!.exerciseSetIndex
+        VStack(alignment: .center) {
+            Spacer()
+            if case .repeater(let d) = currentExercise {
+                let numReps = d.expected.sets[setIndex].numReps
+                HStack {
+                    Text(d.expected.tag)
+                        .font(.system(size: 40))
+                        .bold()
+                    Spacer()
+                }
+                HStack {
+                    Text("\(d.expected.timeOn)s/\(d.expected.timeOff)s")
+                    Spacer()
+                    Text("\(d.expected.sets[setIndex].weight.lbsFormat)")
+                }.font(.system(size: 32))
+                    .fontWeight(.semibold)
+                HStack {
+                    Text("Rep:")
+                    Spacer()
+                    Text("\(numReps - rep + (state != .on ? 0 : 1))/\(numReps)")
+                }.font(.title2)
+                    .fontWeight(.semibold)
+            } else {
+                Text(currentExercise?.description ?? "???")
+                    .font(.title)
+                    .bold()
+            }
+            ZStack {
+                RingShape(progress: 1.0)
+                    .stroke(.secondary, lineWidth: 8)
+                RingShape(progress: 1.0 - progress)
+                    .stroke(.primary, style: .init(lineWidth: 12, lineCap: .round))
+                VStack(spacing: 0) {
+                    Text(text)
+                        .font(.system(size: 40))
+                        .bold()
+                    Text(timerDuration - elapsedSeconds, format: .time(pattern: .minuteSecond(padMinuteToLength: 2)))
+                        .contentTransition(.numericText())
+                        .monospaced()
+                        .font(.system(size: 60))
+                        .bold()
+                }
+            }.padding()
+            if state == .done {
+                VStack {
+                    HStack {
+                        Stepper(value: $repeaterData.numReps, in: 0...100) {
+                            Text("\(repeaterData.numReps) reps")
+                        }
+                        Spacer()
+                        Stepper(value: $repeaterData.weight, in: -200...200, step: 5) {
+                            HStack {
+                                TextField("", value: $repeaterData.weight, format: .number.precision(.fractionLength(0...2)))
+                                    .keyboardType(.decimalPad)
+                                Text("lbs")
+                            }
+                        }
+                    }.font(.title2)
+                        .bold()
+                    TextField("Notes", text: $repeaterData.notes, axis: .vertical)
+                        .font(.headline)
+                        .lineLimit(2)
+                }
+            }
+            Spacer()
+            controlView()
+        }.font(.title)
+            .padding()
     }
     
     @ViewBuilder
@@ -522,9 +682,7 @@ struct RoutineSessionView: View {
         HStack(spacing: 16) {
             Spacer()
             Button {
-                // TODO
-//                stopAndResetTimer()
-//                state = .ready(setIndex: setIndex, exerciseIndex: exerciseIndex - 1)
+                prev()
             } label: {
                 Image(systemName: "arrowshape.backward.circle")
                     .font(.system(size: 64))
@@ -537,7 +695,7 @@ struct RoutineSessionView: View {
             }
             Button {
                 stopAndResetTimer()
-                next()
+                next(skip: true)
             } label: {
                 Image(systemName: "arrowshape.forward.circle")
                     .font(.system(size: 64))
