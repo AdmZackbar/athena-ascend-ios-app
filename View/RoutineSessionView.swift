@@ -31,6 +31,7 @@ struct RoutineSessionView: View {
     @State private var cancellable: Cancellable?
     @State private var genericData: GenericDataSet = .init()
     @State private var showSheet: Bool = false
+    @State private var editExercise: (Int, Int)? = nil
     
     var currentExercise: Session.Exercise? {
         if let indices {
@@ -88,6 +89,23 @@ struct RoutineSessionView: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 }.presentationDetents([.medium, .large])
+            }
+            .sheet(isPresented: .init(get: {
+                editExercise != nil
+            }, set: { newValue in
+                if !newValue {
+                    editExercise = nil
+                }
+            })) {
+                if let editExercise {
+                    SessionExerciseSheet(exercise: .init(get: {
+                        session.sets[editExercise.0].exercises[editExercise.1]
+                    }, set: { newValue in
+                        session.sets[editExercise.0].exercises[editExercise.1] = newValue
+                    }))
+                } else {
+                    Text("TODO FIX ME")
+                }
             }
             .toolbar(content: buildToolbar)
     }
@@ -220,10 +238,17 @@ struct RoutineSessionView: View {
                             updateIndices(routineSetIndex: setIndex, setExerciseIndex: exerciseIndex, exerciseSetIndex: 0)
                         } label: {
                             HStack {
-                                exerciseEntryView(exercise)
+                                SessionExerciseEntryView(exercise: exercise)
                                 Spacer()
                             }.contentShape(Rectangle())
                         }.buttonStyle(.plain)
+                            .contextMenu {
+                                Button {
+                                    editExercise = (setIndex, exerciseIndex)
+                                } label: {
+                                    Label("Edit Main Details", systemImage: "pencil")
+                                }
+                            }
                     }
                 } header: {
                     HStack {
@@ -231,155 +256,6 @@ struct RoutineSessionView: View {
                         Spacer()
                         Text("\(set.restTime)s Rest")
                     }
-                }
-            }
-        }
-    }
-    
-    @ViewBuilder
-    func exerciseEntryView(_ exercise: Session.Exercise) -> some View {
-        switch exercise {
-        case .generic(let d):
-            genericEntryView(d)
-        case .repeater(let d):
-            repeaterEntryView(d)
-        case .maxHang(let d):
-            maxHangEntryView(d)
-        }
-    }
-    
-    @ViewBuilder
-    func genericEntryView(_ d: Session.GenericData) -> some View {
-        VStack(alignment: .leading) {
-            Text(d.expected.name)
-                .bold()
-            VStack(alignment: .leading) {
-                ForEach(d.expected.sets.enumerated(), id: \.offset) { offset, expected in
-                    if offset < d.actual.count {
-                        let actual = d.actual[offset]
-                        VStack(alignment: .leading) {
-                            HStack {
-                                Text(actual.text)
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                                Text("[\(expected.text) \(d.expected.setDetailText)]")
-                                    .font(.subheadline)
-                                    .italic()
-                                Spacer()
-                            }
-                            if !actual.notes.isEmpty {
-                                Text(actual.notes)
-                                    .lineLimit(1)
-                                    .font(.caption)
-                                    .padding(.leading, 4)
-                            }
-                        }
-                    } else {
-                        Text("\(expected.text) \(d.expected.setDetailText)")
-                            .font(.subheadline)
-                    }
-                }
-            }.padding(.leading, 4)
-        }
-    }
-    
-    @ViewBuilder
-    func repeaterEntryView(_ d: Session.RepeaterData) -> some View {
-        VStack(alignment: .leading) {
-            Text("Repeater")
-                .font(.subheadline)
-                .italic()
-            Text("\(d.expected.tag): \(d.expected.timeOn)s/\(d.expected.timeOff)s")
-                .bold()
-            ForEach(d.expected.sets.enumerated(), id: \.offset) { offset, expected in
-                if offset >= d.actual.count {
-                    Text(expected.text)
-                        .font(.subheadline)
-                        .italic()
-                        .padding(.leading, 4)
-                } else {
-                    VStack(alignment: .leading) {
-                        let actual = d.actual[offset]
-                        HStack {
-                            Text(actual.text)
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                            let diff: String? = {
-                                if actual.numReps != expected.numReps && actual.weight != expected.weight {
-                                    return expected.text
-                                } else if actual.numReps != expected.numReps {
-                                    return "\(expected.numReps) reps"
-                                } else if actual.weight != expected.weight {
-                                    return expected.weight.lbsFormat
-                                } else {
-                                    return nil
-                                }
-                            }()
-                            if let diff {
-                                Text("[\(diff)]")
-                                    .font(.subheadline)
-                                    .italic()
-                            }
-                            Spacer()
-                        }
-                        if !actual.notes.isEmpty {
-                            Text(actual.notes)
-                                .lineLimit(1)
-                                .font(.caption)
-                                .padding(.leading, 4)
-                        }
-                    }.padding(.leading, 4)
-                }
-            }
-        }
-    }
-    
-    @ViewBuilder
-    func maxHangEntryView(_ d: Session.MaxHangData) -> some View {
-        VStack(alignment: .leading) {
-            Text("Max Hang")
-                .font(.subheadline)
-                .italic()
-            Text(d.expected.tag)
-                .bold()
-            ForEach(d.expected.sets.enumerated(), id: \.offset) { offset, expected in
-                if offset >= d.actual.count {
-                    Text(expected.text)
-                        .font(.subheadline)
-                        .italic()
-                        .padding(.leading, 4)
-                } else {
-                    VStack(alignment: .leading) {
-                        let actual = d.actual[offset]
-                        HStack {
-                            Text(actual.text)
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                            let diff: String? = {
-                                if actual.target != expected.target && actual.weight != expected.weight {
-                                    return expected.text
-                                } else if actual.target != expected.target {
-                                    return "\(expected.target) s"
-                                } else if actual.weight != expected.weight {
-                                    return expected.weight.lbsFormat
-                                } else {
-                                    return nil
-                                }
-                            }()
-                            if let diff {
-                                Text("[\(diff)]")
-                                    .font(.subheadline)
-                                    .italic()
-                            }
-                            Spacer()
-                        }
-                        if !actual.notes.isEmpty {
-                            Text(actual.notes)
-                                .lineLimit(1)
-                                .font(.caption)
-                                .padding(.leading, 4)
-                        }
-                    }.padding(.leading, 4)
                 }
             }
         }
