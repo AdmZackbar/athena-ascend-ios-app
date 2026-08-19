@@ -17,7 +17,7 @@ struct RoutineSessionView: View {
     let readyColor = Color("ReadyColor")
     let restColor = Color("RestColor")
     
-    let readyTime: Duration = .seconds(3)
+    let readyTime: Duration = .seconds(10)
     
     var hasData: Bool {
         session.sets.contains(where: { $0.exercises.contains(where: \.hasData) })
@@ -30,8 +30,7 @@ struct RoutineSessionView: View {
     @State private var elapsedMilliseconds: Int = 0
     @State private var cancellable: Cancellable?
     @State private var genericData: GenericDataSet = .init()
-    @State private var repeaterData: Session.RepeaterSet = .init()
-    @State private var maxHangData: Session.MaxHangSet = .init(side: .left)
+    @State private var showSheet: Bool = false
     
     var currentExercise: Session.Exercise? {
         if let indices {
@@ -82,6 +81,14 @@ struct RoutineSessionView: View {
             .navigationBarTitleDisplayMode(indices == nil ? .automatic : .inline)
             .navigationBarBackButtonHidden()
             .background(computeBackground())
+            .sheet(isPresented: $showSheet) {
+                NavigationStack {
+                    Form {
+                        TextField("Notes", text: $genericData.notes, axis: .vertical)
+                            .lineLimit(6)
+                    }.navigationTitle("Notes")
+                }.presentationDetents([.medium])
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
@@ -154,14 +161,23 @@ struct RoutineSessionView: View {
                 Form {
                     ForEach(session.sets.enumerated(), id: \.offset) { offset, set in
                         let setIndex = offset
-                        Section("Set \(setIndex + 1)/\(session.sets.count): \(set.name)") {
+                        Section {
                             ForEach(set.exercises.enumerated(), id: \.offset) { offset, exercise in
                                 let exerciseIndex = offset
                                 Button {
                                     updateIndices(routineSetIndex: setIndex, setExerciseIndex: exerciseIndex, exerciseSetIndex: 0)
                                 } label: {
-                                    exerciseEntryView(exercise)
-                                }
+                                    HStack {
+                                        exerciseEntryView(exercise)
+                                        Spacer()
+                                    }.contentShape(Rectangle())
+                                }.buttonStyle(.plain)
+                            }
+                        } header: {
+                            HStack {
+                                Text(set.name)
+                                Spacer()
+                                Text("\(set.restTime)s Rest")
                             }
                         }
                     }
@@ -179,39 +195,146 @@ struct RoutineSessionView: View {
     func exerciseEntryView(_ exercise: Session.Exercise) -> some View {
         switch exercise {
         case .generic(let d):
-            if d.actual.isEmpty {
-                Text(exercise.description)
-            } else {
-                VStack(alignment: .leading) {
-                    Text(exercise.description)
-                    ForEach(d.actual.enumerated(), id: \.offset) { offset, set in
-                        Text(set.text)
-                            .font(.subheadline)
-                    }
-                }
-            }
+            genericEntryView(d)
         case .repeater(let d):
-            if d.actual.isEmpty {
-                Text(exercise.description)
-            } else {
-                VStack(alignment: .leading) {
-                    Text(exercise.description)
-                    ForEach(d.actual.enumerated(), id: \.offset) { offset, set in
-                        Text(set.text)
+            repeaterEntryView(d)
+        case .maxHang(let d):
+            maxHangEntryView(d)
+        }
+    }
+    
+    @ViewBuilder
+    func genericEntryView(_ d: Session.GenericData) -> some View {
+        VStack(alignment: .leading) {
+            Text(d.expected.name)
+                .bold()
+            VStack(alignment: .leading) {
+                ForEach(d.expected.sets.enumerated(), id: \.offset) { offset, expected in
+                    if offset < d.actual.count {
+                        let actual = d.actual[offset]
+                        VStack(alignment: .leading) {
+                            HStack {
+                                Text(actual.text)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                Text("[\(expected.text) \(d.expected.setDetailText)]")
+                                    .font(.subheadline)
+                                    .italic()
+                                Spacer()
+                            }
+                            if !actual.notes.isEmpty {
+                                Text(actual.notes)
+                                    .lineLimit(1)
+                                    .font(.caption)
+                                    .padding(.leading, 4)
+                            }
+                        }
+                    } else {
+                        Text("\(expected.text) \(d.expected.setDetailText)")
                             .font(.subheadline)
                     }
                 }
+            }.padding(.leading, 4)
+        }
+    }
+    
+    @ViewBuilder
+    func repeaterEntryView(_ d: Session.RepeaterData) -> some View {
+        VStack(alignment: .leading) {
+            Text("Repeater")
+                .font(.subheadline)
+                .italic()
+            Text("\(d.expected.tag): \(d.expected.timeOn)s/\(d.expected.timeOff)s")
+                .bold()
+            ForEach(d.expected.sets.enumerated(), id: \.offset) { offset, expected in
+                if offset >= d.actual.count {
+                    Text(expected.text)
+                        .font(.subheadline)
+                        .italic()
+                        .padding(.leading, 4)
+                } else {
+                    VStack(alignment: .leading) {
+                        let actual = d.actual[offset]
+                        HStack {
+                            Text(actual.text)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            let diff: String? = {
+                                if actual.numReps != expected.numReps && actual.weight != expected.weight {
+                                    return expected.text
+                                } else if actual.numReps != expected.numReps {
+                                    return "\(expected.numReps) reps"
+                                } else if actual.weight != expected.weight {
+                                    return expected.weight.lbsFormat
+                                } else {
+                                    return nil
+                                }
+                            }()
+                            if let diff {
+                                Text("[\(diff)]")
+                                    .font(.subheadline)
+                                    .italic()
+                            }
+                            Spacer()
+                        }
+                        if !actual.notes.isEmpty {
+                            Text(actual.notes)
+                                .lineLimit(1)
+                                .font(.caption)
+                                .padding(.leading, 4)
+                        }
+                    }.padding(.leading, 4)
+                }
             }
-        case .maxHang(let d):
-            if d.actual.isEmpty {
-                Text(exercise.description)
-            } else {
-                VStack(alignment: .leading) {
-                    Text(exercise.description)
-                    ForEach(d.actual.enumerated(), id: \.offset) { offset, set in
-                        Text(set.text)
-                            .font(.subheadline)
-                    }
+        }
+    }
+    
+    @ViewBuilder
+    func maxHangEntryView(_ d: Session.MaxHangData) -> some View {
+        VStack(alignment: .leading) {
+            Text("Max Hang")
+                .font(.subheadline)
+                .italic()
+            Text(d.expected.tag)
+                .bold()
+            ForEach(d.expected.sets.enumerated(), id: \.offset) { offset, expected in
+                if offset >= d.actual.count {
+                    Text(expected.text)
+                        .font(.subheadline)
+                        .italic()
+                        .padding(.leading, 4)
+                } else {
+                    VStack(alignment: .leading) {
+                        let actual = d.actual[offset]
+                        HStack {
+                            Text(actual.text)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            let diff: String? = {
+                                if actual.target != expected.target && actual.weight != expected.weight {
+                                    return expected.text
+                                } else if actual.target != expected.target {
+                                    return "\(expected.target) s"
+                                } else if actual.weight != expected.weight {
+                                    return expected.weight.lbsFormat
+                                } else {
+                                    return nil
+                                }
+                            }()
+                            if let diff {
+                                Text("[\(diff)]")
+                                    .font(.subheadline)
+                                    .italic()
+                            }
+                            Spacer()
+                        }
+                        if !actual.notes.isEmpty {
+                            Text(actual.notes)
+                                .lineLimit(1)
+                                .font(.caption)
+                                .padding(.leading, 4)
+                        }
+                    }.padding(.leading, 4)
                 }
             }
         }
@@ -226,11 +349,11 @@ struct RoutineSessionView: View {
             indices = .init(routineSetIndex: routineSetIndex, setExerciseIndex: setExerciseIndex, exerciseSetIndex: exerciseSetIndex, details: .generic)
         case .repeater(let d):
             let expected = d.expected.sets[exerciseSetIndex]
-            repeaterData = .init(numReps: expected.numReps, weight: expected.weight)
+            genericData = .init(num: expected.numReps, weight: expected.weight)
             indices = .init(routineSetIndex: routineSetIndex, setExerciseIndex: setExerciseIndex, exerciseSetIndex: exerciseSetIndex, details: .repeater(.ready, reps: d.expected.sets[exerciseSetIndex].numReps))
         case .maxHang(let d):
             let expected = d.expected.sets[exerciseSetIndex]
-            maxHangData = .init(side: expected.side, target: expected.target, weight: expected.weight)
+            genericData = .init(side: expected.side, num: expected.target, weight: expected.weight)
             indices = .init(routineSetIndex: routineSetIndex, setExerciseIndex: setExerciseIndex, exerciseSetIndex: exerciseSetIndex, details: .maxHang(.ready))
         }
     }
@@ -241,25 +364,25 @@ struct RoutineSessionView: View {
         case .generic(let d):
             var newActual: [Session.GenericDataSet] = d.actual
             if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = genericData.toSessionData(d.expected.dataType)
+                newActual[indices.exerciseSetIndex] = genericData.toGeneric(d.expected.dataType)
             } else {
-                newActual.append(genericData.toSessionData(d.expected.dataType))
+                newActual.append(genericData.toGeneric(d.expected.dataType))
             }
             session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .generic(.init(expected: d.expected, actual: newActual, notes: d.notes))
         case .repeater(let d):
             var newActual: [Session.RepeaterSet] = d.actual
             if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = repeaterData
+                newActual[indices.exerciseSetIndex] = genericData.toRepeater()
             } else {
-                newActual.append(repeaterData)
+                newActual.append(genericData.toRepeater())
             }
             session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .repeater(.init(expected: d.expected, actual: newActual, notes: d.notes))
         case .maxHang(let d):
             var newActual: [Session.MaxHangSet] = d.actual
             if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = maxHangData
+                newActual[indices.exerciseSetIndex] = genericData.toMaxHang()
             } else {
-                newActual.append(maxHangData)
+                newActual.append(genericData.toMaxHang())
             }
             session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .maxHang(.init(expected: d.expected, actual: newActual, notes: d.notes))
         }
@@ -295,9 +418,8 @@ struct RoutineSessionView: View {
                 startTimer()
             } else {
                 // Moving to new exercise set, exercise, or routine set
+                // Stop timer in all cases
                 stopAndResetTimer()
-                // Save recorded data
-                saveData(indices)
                 // Next exercise is determined by set order
                 let set = session.sets[indices.routineSetIndex]
                 switch set.order {
@@ -406,7 +528,7 @@ struct RoutineSessionView: View {
         switch indices.details {
         case .generic:
             return nil
-        case .repeater(let s, let reps):
+        case .repeater(let s, _):
             switch s {
             case .ready:
                 return nil
@@ -478,27 +600,27 @@ struct RoutineSessionView: View {
             }
         }()
         let setIndex = indices!.exerciseSetIndex
-        VStack(alignment: .center) {
+        VStack(alignment: .center, spacing: 8) {
             Spacer()
             if case .repeater(let d) = currentExercise {
                 let numReps = d.expected.sets[setIndex].numReps
                 HStack {
                     Text(d.expected.tag)
-                        .font(.system(size: 40))
-                        .bold()
                     Spacer()
-                }
+                    Text("[\(setIndex + 1)/\(d.expected.sets.count)]")
+                }.font(.system(size: 36))
+                    .bold()
                 HStack {
                     Text("\(d.expected.timeOn)s/\(d.expected.timeOff)s")
                     Spacer()
                     Text("\(d.expected.sets[setIndex].weight.lbsFormat)")
-                }.font(.system(size: 32))
+                }.font(.system(size: 30))
                     .fontWeight(.semibold)
                 HStack {
-                    Text("Rep:")
+                    Text("Rep")
                     Spacer()
                     Text("\(numReps - rep + (state != .on ? 0 : 1))/\(numReps)")
-                }.font(.title2)
+                }.font(.system(size: 30))
                     .fontWeight(.semibold)
             } else {
                 Text(currentExercise?.description ?? "???")
@@ -524,22 +646,42 @@ struct RoutineSessionView: View {
             if state == .done {
                 VStack {
                     HStack {
-                        Stepper(value: $repeaterData.numReps, in: 0...100) {
-                            Text("\(repeaterData.numReps) reps")
+                        Stepper(value: $genericData.num, in: 0...100) {
+                            Text("\(genericData.num) reps")
                         }
                         Spacer()
-                        Stepper(value: $repeaterData.weight, in: -200...200, step: 5) {
+                        Stepper(value: $genericData.weight, in: -200...200, step: 5) {
                             HStack {
-                                TextField("", value: $repeaterData.weight, format: .number.precision(.fractionLength(0...2)))
+                                TextField("", value: $genericData.weight, format: .number.precision(.fractionLength(0...2)))
                                     .keyboardType(.decimalPad)
                                 Text("lbs")
                             }
                         }
                     }.font(.title2)
                         .bold()
-                    TextField("Notes", text: $repeaterData.notes, axis: .vertical)
-                        .font(.headline)
-                        .lineLimit(2)
+                    Button {
+                        showSheet = true
+                    } label: {
+                        HStack {
+                            Text(genericData.notes.isEmpty ? "Add Notes..." : genericData.notes)
+                                .lineLimit(3)
+                            Spacer()
+                        }.contentShape(Rectangle())
+                            .font(.headline)
+                            .italic()
+                    }
+                    Button("Save") {
+                        // Save recorded data
+                        saveData(indices!)
+                    }
+                }
+            } else {
+                Button {
+                    if let indices {
+                        self.indices = .init(routineSetIndex: indices.routineSetIndex, setExerciseIndex: indices.setExerciseIndex, exerciseSetIndex: indices.exerciseSetIndex, details: .repeater(.done, reps: 0))
+                    }
+                } label: {
+                    Text("Record Data")
                 }
             }
             Spacer()
@@ -636,41 +778,77 @@ struct RoutineSessionView: View {
                 default:
                     EmptyView()
                 }
-                TextField("Notes", text: $genericData.notes, axis: .vertical)
-                    .font(.headline)
-                    .lineLimit(2)
+                Button {
+                    showSheet = true
+                } label: {
+                    HStack {
+                        Text(genericData.notes.isEmpty ? "Add Notes..." : genericData.notes)
+                            .lineLimit(3)
+                        Spacer()
+                    }.contentShape(Rectangle())
+                        .font(.headline)
+                        .italic()
+                }
+                Button("Save") {
+                    // Save recorded data
+                    saveData(indices!)
+                }
             }
         case .repeater(_):
             VStack {
-                Stepper(value: $repeaterData.numReps, in: 0...100) {
-                    Text("\(repeaterData.numReps) reps")
+                Stepper(value: $genericData.num, in: 0...100) {
+                    Text("\(genericData.num) reps")
                 }
-                Stepper(value: $repeaterData.weight, in: -200...200, step: 5) {
+                Stepper(value: $genericData.weight, in: -200...200, step: 5) {
                     HStack {
-                        TextField("", value: $repeaterData.weight, format: .number.precision(.fractionLength(0...2)))
+                        TextField("", value: $genericData.weight, format: .number.precision(.fractionLength(0...2)))
                             .keyboardType(.decimalPad)
                         Text("lbs")
                     }
                 }
-                TextField("Notes", text: $repeaterData.notes, axis: .vertical)
-                    .font(.headline)
-                    .lineLimit(2)
+                Button {
+                    showSheet = true
+                } label: {
+                    HStack {
+                        Text(genericData.notes.isEmpty ? "Add Notes..." : genericData.notes)
+                            .lineLimit(3)
+                        Spacer()
+                    }.contentShape(Rectangle())
+                        .font(.headline)
+                        .italic()
+                }
+                Button("Save") {
+                    // Save recorded data
+                    saveData(indices!)
+                }
             }
         case .maxHang(_):
             VStack {
-                Stepper(value: $maxHangData.target, in: 0...30) {
-                    Text("\(maxHangData.target) seconds")
+                Stepper(value: $genericData.num, in: 0...30) {
+                    Text("\(genericData.num) seconds")
                 }
-                Stepper(value: $maxHangData.weight, in: -200...200, step: 5) {
+                Stepper(value: $genericData.weight, in: -200...200, step: 5) {
                     HStack {
-                        TextField("", value: $maxHangData.weight, format: .number.precision(.fractionLength(0...2)))
+                        TextField("", value: $genericData.weight, format: .number.precision(.fractionLength(0...2)))
                             .keyboardType(.decimalPad)
                         Text("lbs")
                     }
                 }
-                TextField("Notes", text: $maxHangData.notes, axis: .vertical)
-                    .font(.headline)
-                    .lineLimit(2)
+                Button {
+                    showSheet = true
+                } label: {
+                    HStack {
+                        Text(genericData.notes.isEmpty ? "Add Notes..." : genericData.notes)
+                            .lineLimit(3)
+                        Spacer()
+                    }.contentShape(Rectangle())
+                        .font(.headline)
+                        .italic()
+                }
+                Button("Save") {
+                    // Save recorded data
+                    saveData(indices!)
+                }
             }
         case nil:
             EmptyView()
@@ -789,17 +967,19 @@ struct RoutineSessionView: View {
     }
     
     struct GenericDataSet: Codable, Hashable, Equatable {
+        var side: Routine.Side
         var num: Int
         var weight: Double
         var notes: String
         
-        init(num: Int = 1, weight: Double = 0.0, notes: String = "") {
+        init(side: Routine.Side = .both, num: Int = 1, weight: Double = 0.0, notes: String = "") {
+            self.side = side
             self.num = num
             self.weight = weight
             self.notes = notes
         }
         
-        func toSessionData(_ type: Routine.GenericSets.DataType) -> Session.GenericDataSet {
+        func toGeneric(_ type: Routine.GenericSets.DataType) -> Session.GenericDataSet {
             switch type {
             case .rep:
                 return .init(numReps: num)
@@ -810,6 +990,14 @@ struct RoutineSessionView: View {
             case .timeWeight:
                 return .init(weight: weight, time: num)
             }
+        }
+        
+        func toRepeater() -> Session.RepeaterSet {
+            return .init(numReps: num, weight: weight, notes: notes)
+        }
+        
+        func toMaxHang() -> Session.MaxHangSet {
+            return .init(side: side, target: num, weight: weight, notes: notes)
         }
     }
     

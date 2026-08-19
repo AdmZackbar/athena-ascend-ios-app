@@ -173,24 +173,24 @@ extension Session.GenericDataSet {
 
 extension Routine.RepeaterSet {
     var text: String {
-        return weight == 0 ? "\(numReps) reps" : "\(numReps) reps @ \(weight.lbsFormat)"
+        return "\(numReps) reps @ \(weight.lbsFormat)"
     }
 }
 
 extension Session.RepeaterSet {
     var text: String {
-        return weight == 0 ? "\(numReps) reps" : "\(numReps) reps @ \(weight.lbsFormat)"
+        return "\(numReps) reps @ \(weight.lbsFormat)"
     }
 }
 
 extension Routine.MaxHangSet {
     var text: String {
-        return weight == 0 ? "\(side.abbreviation) \(target)s" : "\(side.abbreviation) \(target)s @ \(weight.lbsFormat)"
+        return "\(side.abbreviation) \(target)s @ \(weight.lbsFormat)"
     }
 }
 
 extension Session.MaxHangSet {
     var text: String {
-        return weight == 0 ? "\(side.abbreviation) \(target)s" : "\(side.abbreviation) \(target)s @ \(weight.lbsFormat)"
+        return "\(side.abbreviation) \(target)s @ \(weight.lbsFormat)"
     }
 }
