@@ -201,8 +201,16 @@ struct RoutineEditView: View {
             Form {
                 Section {
                     TextField("Name", text: $item.name)
-                } header: {
-                    Text("Name")
+                    Picker("Type", selection: $item.dataType) {
+                        ForEach(Routine.GenericSets.DataType.allCases, id: \.name) { type in
+                            Text(type.name).tag(type)
+                        }
+                    }
+                    Toggle("Multi-Weight", isOn: .init(get: {
+                        item.multiWeight ?? false
+                    }, set: { newValue in
+                        item.multiWeight = newValue
+                    }))
                 }
                 Section {
                     ForEach($item.sets.enumerated(), id: \.offset) { offset, $set in
@@ -247,11 +255,6 @@ struct RoutineEditView: View {
                                 Image(systemName: "minus")
                             }.disabled(item.sets.isEmpty)
                         }.buttonStyle(.plain)
-                        Picker("Type", selection: $item.dataType) {
-                            ForEach(Routine.GenericSets.DataType.allCases, id: \.name) { type in
-                                Text(type.name).tag(type)
-                            }
-                        }.pickerStyle(.segmented)
                         Picker("", selection: $selectionType) {
                             ForEach(SelectionType.allCases, id: \.name) { type in
                                 Text(type.name).tag(type)

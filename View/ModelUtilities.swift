@@ -156,17 +156,21 @@ extension Session.Exercise {
 }
 
 extension Session.GenericDataSet {
-    var text: String {
-        if let numReps, let weight {
-            return "\(numReps) reps @ \(weight.lbsFormat)"
-        } else if let numReps {
-            return "\(numReps) reps"
-        } else if let time, let weight {
-            return "\(time) s @ \(weight.lbsFormat)"
-        } else if let time {
-            return "\(time) s"
-        } else {
-            return "N/A"
+    func weightText(_ multiWeight: Bool) -> String {
+        let num = (weight ?? 0).formatted(.number.precision(.fractionLength(0...2)))
+        return multiWeight ? "\(num)/\(num) lbs" : "\(num) lbs"
+    }
+    
+    func toString(_ data: Routine.GenericSets) -> String {
+        switch data.dataType {
+        case .rep:
+            return "\(numReps ?? 0) reps"
+        case .repWeight:
+            return "\(numReps ?? 0) reps @ \(weightText(data.multiWeight ?? false))"
+        case .time:
+            return "\(time ?? 0)s"
+        case .timeWeight:
+            return "\(time ?? 0)s @ \(weightText(data.multiWeight ?? false))"
         }
     }
 }

@@ -33,7 +33,7 @@ struct SessionExerciseEntryView: View {
                         let actual = d.actual[offset]
                         VStack(alignment: .leading) {
                             HStack {
-                                Text(actual.text)
+                                Text(actual.toString(d.expected))
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
                                 Text("[\(expected.text) \(d.expected.setDetailText)]")

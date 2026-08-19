@@ -61,12 +61,15 @@ extension SchemaV1 {
             var name: String
             /// The data type(s) contained in the sets
             var dataType: DataType
+            /// If true, the weight is used for both left and right sides
+            var multiWeight: Bool?
             /// The sets of the exercise in order
             var sets: [GenericSet]
             
-            init(name: String = "", dataType: DataType = .repWeight, sets: [GenericSet] = []) {
+            init(name: String = "", dataType: DataType = .repWeight, multiWeight: Bool = false, sets: [GenericSet] = []) {
                 self.name = name
                 self.dataType = dataType
+                self.multiWeight = multiWeight
                 self.sets = sets
             }
             

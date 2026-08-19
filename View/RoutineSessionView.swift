@@ -128,14 +128,15 @@ struct RoutineSessionView: View {
                             Label("Re-open Session", systemImage: "play")
                         }
                     }
-                    
                 } label: {
                     Label("Edit", systemImage: "pencil")
                 }
-                Button {
-                    next()
-                } label: {
-                    Label("Start", systemImage: "play")
+                if session.endTime == nil {
+                    Button {
+                        next()
+                    } label: {
+                        Label("Start", systemImage: "play")
+                    }
                 }
             }
         }
@@ -234,26 +235,37 @@ struct RoutineSessionView: View {
                 Section {
                     ForEach(set.exercises.enumerated(), id: \.offset) { offset, exercise in
                         let exerciseIndex = offset
-                        Menu {
-                            Button {
-                                // Make sure timer is reset
-                                stopAndResetTimer()
-                                // Go to exercise
-                                updateIndices(routineSetIndex: setIndex, setExerciseIndex: exerciseIndex, exerciseSetIndex: 0)
+                        if session.endTime == nil {
+                            Menu {
+                                Button {
+                                    // Make sure timer is reset
+                                    stopAndResetTimer()
+                                    // Go to exercise
+                                    updateIndices(routineSetIndex: setIndex, setExerciseIndex: exerciseIndex, exerciseSetIndex: 0)
+                                } label: {
+                                    Label("Start Exercise", systemImage: "play")
+                                }
+                                Button {
+                                    editExercise = (setIndex, exerciseIndex)
+                                } label: {
+                                    Label("Edit Exercise", systemImage: "pencil")
+                                }
                             } label: {
-                                Label("Start Exercise", systemImage: "play")
-                            }
+                                HStack {
+                                    SessionExerciseEntryView(exercise: exercise)
+                                    Spacer()
+                                }.contentShape(Rectangle())
+                            }.buttonStyle(.plain)
+                        } else {
                             Button {
                                 editExercise = (setIndex, exerciseIndex)
                             } label: {
-                                Label("Edit Exercise", systemImage: "pencil")
-                            }
-                        } label: {
-                            HStack {
-                                SessionExerciseEntryView(exercise: exercise)
-                                Spacer()
-                            }.contentShape(Rectangle())
-                        }.buttonStyle(.plain)
+                                HStack {
+                                    SessionExerciseEntryView(exercise: exercise)
+                                    Spacer()
+                                }.contentShape(Rectangle())
+                            }.buttonStyle(.plain)
+                        }
                     }
                 } header: {
                     HStack {

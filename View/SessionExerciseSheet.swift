@@ -107,8 +107,16 @@ struct SessionExerciseSheet: View {
     func genericBaseView() -> some View {
         Section {
             TextField("Name", text: $generic.name)
-        } header: {
-            Text("Name")
+            Picker("Type", selection: $generic.dataType) {
+                ForEach(Routine.GenericSets.DataType.allCases, id: \.name) { type in
+                    Text(type.name).tag(type)
+                }
+            }
+            Toggle("Multi-Weight", isOn: .init(get: {
+                generic.multiWeight ?? false
+            }, set: { newValue in
+                generic.multiWeight = newValue
+            }))
         }
         Section {
             ForEach($generic.sets.enumerated(), id: \.offset) { offset, $set in
@@ -153,11 +161,6 @@ struct SessionExerciseSheet: View {
                         Image(systemName: "minus")
                     }.disabled(generic.sets.isEmpty)
                 }.buttonStyle(.plain)
-                Picker("Type", selection: $generic.dataType) {
-                    ForEach(Routine.GenericSets.DataType.allCases, id: \.name) { type in
-                        Text(type.name).tag(type)
-                    }
-                }.pickerStyle(.segmented)
                 Picker("", selection: $selectionType) {
                     ForEach(SelectionType.allCases, id: \.name) { type in
                         Text(type.name).tag(type)
