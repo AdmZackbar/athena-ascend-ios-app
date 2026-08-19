@@ -17,14 +17,14 @@ struct MainView: View {
     var body: some View {
         NavigationStack(path: $navigationStore.path) {
             List {
-                Section("Routines") {
-                    routinesView()
-                }
                 let activeSessions = sessions.filter({ $0.endTime == nil })
                 if !activeSessions.isEmpty {
                     Section("Active Sessions") {
                         sessionsView(sessions: activeSessions)
                     }
+                }
+                Section("Routines") {
+                    routinesView()
                 }
                 let oldSessions = sessions.filter({ $0.endTime != nil })
                 if !oldSessions.isEmpty {
@@ -71,6 +71,7 @@ struct MainView: View {
             } label: {
                 HStack {
                     Text(routine.name)
+                        .fontWeight(.semibold)
                     Spacer()
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
@@ -84,7 +85,15 @@ struct MainView: View {
                 navigationStore.push(ViewType.session(session: session))
             } label: {
                 HStack {
-                    Text(session.routine?.name ?? "Session \(session.startTime.formatted(date: .abbreviated, time: .omitted))")
+                    VStack(alignment: .leading) {
+                        if let routine = session.routine {
+                            Text(routine.name)
+                                .font(.subheadline)
+                                .italic()
+                        }
+                        Text(session.startTime.formatted(date: .long, time: .shortened))
+                            .fontWeight(.semibold)
+                    }
                     Spacer()
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)

@@ -77,34 +77,64 @@ struct RoutineSessionView: View {
     
     var body: some View {
         mainView()
-            .navigationTitle(session.routine?.name ?? "Session \(session.startTime.formatted(date: .abbreviated, time: .omitted))")
-            .navigationBarTitleDisplayMode(indices == nil ? .automatic : .inline)
+            .navigationTitle("Session Overview")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden()
             .background(computeBackground())
             .sheet(isPresented: $showSheet) {
-                NavigationStack {
-                    Form {
-                        TextField("Notes", text: $genericData.notes, axis: .vertical)
-                            .lineLimit(6)
-                    }.navigationTitle("Notes")
-                }.presentationDetents([.medium])
+                Form {
+                    TextField("Notes", text: $genericData.notes, axis: .vertical)
+                        .lineLimit(3...6)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                }.presentationDetents([.medium, .large])
             }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        if indices != nil {
-                            indices = nil
-                        } else if !hasData {
-                            modelContext.delete(session)
-                            dismiss()
-                        } else {
-                            dismiss()
+            .toolbar(content: buildToolbar)
+    }
+    
+    @ToolbarContentBuilder
+    func buildToolbar() -> some ToolbarContent {
+        if indices == nil {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Menu {
+                    if session.endTime == nil {
+                        Button {
+                            session.endTime = .now
+                        } label: {
+                            Label("Finish Session", systemImage: "checkmark")
                         }
-                    } label: {
-                        Label("Back", systemImage: "chevron.left")
+                    } else {
+                        Button {
+                            session.endTime = nil
+                        } label: {
+                            Label("Re-open Session", systemImage: "play")
+                        }
                     }
+                    
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                Button {
+                    next()
+                } label: {
+                    Label("Start", systemImage: "play")
                 }
             }
+        }
+        ToolbarItem(placement: .cancellationAction) {
+            Button {
+                if indices != nil {
+                    indices = nil
+                } else if !hasData {
+                    modelContext.delete(session)
+                    dismiss()
+                } else {
+                    dismiss()
+                }
+            } label: {
+                Label("Back", systemImage: "chevron.left")
+            }
+        }
     }
     
     func computeBackground() -> some ShapeStyle {
@@ -149,45 +179,60 @@ struct RoutineSessionView: View {
                 maxHangExerciseView(s)
             }
         } else {
-            // TODO distinguish between start and end
             landingPage()
         }
     }
     
     @ViewBuilder
     func landingPage() -> some View {
-        if !session.sets.isEmpty {
-            VStack {
-                Form {
-                    ForEach(session.sets.enumerated(), id: \.offset) { offset, set in
-                        let setIndex = offset
-                        Section {
-                            ForEach(set.exercises.enumerated(), id: \.offset) { offset, exercise in
-                                let exerciseIndex = offset
-                                Button {
-                                    updateIndices(routineSetIndex: setIndex, setExerciseIndex: exerciseIndex, exerciseSetIndex: 0)
-                                } label: {
-                                    HStack {
-                                        exerciseEntryView(exercise)
-                                        Spacer()
-                                    }.contentShape(Rectangle())
-                                }.buttonStyle(.plain)
-                            }
-                        } header: {
-                            HStack {
-                                Text(set.name)
-                                Spacer()
-                                Text("\(set.restTime)s Rest")
-                            }
-                        }
+        Form {
+            Section {
+                DatePicker("Start:", selection: $session.startTime, displayedComponents: [.date, .hourAndMinute])
+                if session.endTime == nil && hasData {
+                    Button {
+                        session.endTime = .now
+                        dismiss()
+                    } label: {
+                        Label("Finish Session", systemImage: "checkmark")
                     }
+                } else if hasData {
+                    DatePicker("End:", selection: .init(get: {
+                        session.endTime ?? .now
+                    }, set: { newValue in
+                        session.endTime = newValue
+                    }), displayedComponents: [.date, .hourAndMinute])
                 }
-                Button("Start") {
-                    next()
+                TextField("Notes", text: $session.notes, axis: .vertical)
+                    .lineLimit(3...9)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.sentences)
+            } header: {
+                if let routine = session.routine {
+                    Text(routine.name)
                 }
             }
-        } else {
-            Text("No Sets!")
+            ForEach(session.sets.enumerated(), id: \.offset) { offset, set in
+                let setIndex = offset
+                Section {
+                    ForEach(set.exercises.enumerated(), id: \.offset) { offset, exercise in
+                        let exerciseIndex = offset
+                        Button {
+                            updateIndices(routineSetIndex: setIndex, setExerciseIndex: exerciseIndex, exerciseSetIndex: 0)
+                        } label: {
+                            HStack {
+                                exerciseEntryView(exercise)
+                                Spacer()
+                            }.contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                    }
+                } header: {
+                    HStack {
+                        Text(set.name)
+                        Spacer()
+                        Text("\(set.restTime)s Rest")
+                    }
+                }
+            }
         }
     }
     
