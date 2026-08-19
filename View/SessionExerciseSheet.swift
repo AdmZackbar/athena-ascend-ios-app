@@ -10,86 +10,206 @@ import SwiftUI
 struct SessionExerciseSheet: View {
     @Environment(\.dismiss) var dismiss
     
+    typealias SelectionType = RoutineEditView.EditGenericSetsSheet.SelectionType
+    
     @Binding var exercise: Session.Exercise
     @State private var editType: EditType = .Exercise
-    @State private var repeater: Routine.RepeaterSets
-    @State private var repeaterData: [Session.RepeaterSet]
+    @State private var selectionType: SelectionType = .single
+    @State private var generic: Routine.GenericSets = .init()
+    @State private var repeater: Routine.RepeaterSets = .init()
+    @State private var maxHang: Routine.MaxHangSets = .init()
+    @State private var data: [RoutineSessionView.GenericDataSet]
     @State private var notes: String
     
     init(exercise: Binding<Session.Exercise>) {
         self._exercise = exercise
         switch exercise.wrappedValue {
+        case .generic(let d):
+            generic = d.expected
+            data = d.actual.map({ .init($0, type: d.expected.dataType) })
+            notes = d.notes
         case .repeater(let d):
             repeater = d.expected
-            repeaterData = d.actual
+            data = d.actual.map({ .init($0) })
             notes = d.notes
-        default:
-            repeater = .init()
-            repeaterData = []
-            notes = ""
+        case .maxHang(let d):
+            maxHang = d.expected
+            data = d.actual.map({ .init($0) })
+            notes = d.notes
         }
     }
     
     var body: some View {
         NavigationStack {
             Form {
-                switch editType {
-                case .Exercise:
-                    switch exercise {
-                    case .repeater(_):
-                        repeaterExerciseView()
-                    default:
-                        Text("TODO")
-                    }
-                case .Data:
-                    switch exercise {
-                    case .repeater(_):
-                        repeaterDataView()
-                    default:
-                        Text("TODO")
-                    }
+                switch exercise {
+                case .generic(_):
+                    genericView()
+                case .repeater(_):
+                    repeaterView()
+                case .maxHang(_):
+                    maxHangView()
                 }
                 
             }.navigationTitle("Edit Exercise")
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationBarBackButtonHidden()
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        Picker("", selection: $editType) {
-                            ForEach(EditType.allCases, id: \.rawValue) { type in
-                                Text(type.rawValue).tag(type)
-                            }
-                        }.pickerStyle(.segmented)
-                    }
-                    ToolbarItem(placement: .primaryAction) {
-                        Button(action: save) {
-                            Label("Save", systemImage: "checkmark")
-                        }
-                    }
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button {
-                            dismiss()
-                        } label: {
-                            Label("Back", systemImage: "chevron.left")
-                        }
-                    }
-                }
+                .toolbar(content: toolbarContent)
         }.presentationDetents([.medium, .large])
+    }
+    
+    @ToolbarContentBuilder
+    func toolbarContent() -> some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            Picker("", selection: $editType) {
+                ForEach(EditType.allCases, id: \.rawValue) { type in
+                    Text(type.rawValue).tag(type)
+                }
+            }.pickerStyle(.segmented)
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button(action: save) {
+                Label("Save", systemImage: "checkmark")
+            }
+        }
+        ToolbarItem(placement: .cancellationAction) {
+            Button {
+                dismiss()
+            } label: {
+                Label("Back", systemImage: "chevron.left")
+            }
+        }
     }
     
     func save() {
         switch exercise {
+        case .generic(_):
+            exercise = .generic(.init(expected: generic, actual: data.map({ $0.toGeneric(generic.dataType) }), notes: notes))
         case .repeater(_):
-            exercise = .repeater(.init(expected: repeater, actual: repeaterData, notes: notes))
-        default:
-            // TODO
-            break
+            exercise = .repeater(.init(expected: repeater, actual: data.map({ $0.toRepeater() }), notes: notes))
+        case .maxHang(_):
+            exercise = .maxHang(.init(expected: maxHang, actual: data.map({ $0.toMaxHang() }), notes: notes))
         }
         dismiss()
     }
     
     @ViewBuilder
-    func repeaterExerciseView() -> some View {
+    func genericView() -> some View {
+        switch editType {
+        case .Exercise:
+            genericBaseView()
+        case .Data:
+            genericDataView()
+        }
+    }
+    
+    @ViewBuilder
+    func genericBaseView() -> some View {
+        Section {
+            TextField("Name", text: $generic.name)
+        } header: {
+            Text("Name")
+        }
+        Section {
+            ForEach($generic.sets.enumerated(), id: \.offset) { offset, $set in
+                switch selectionType {
+                case .single:
+                    Stepper(value: .init(get: {
+                        $set.wrappedValue.min
+                    }, set: { newValue in
+                        $set.wrappedValue.min = newValue
+                        $set.wrappedValue.max = newValue
+                    }), in: 1...100, step: 1) {
+                        Text("\(set.min) \(generic.setDetailText)")
+                    }
+                case .range:
+                    HStack {
+                        Stepper(value: $set.min, in: 1...100, step: 1) {
+                            Text("\(set.min) \(generic.setDetailText)")
+                        }
+                        Stepper(value: $set.max, in: 1...100, step: 1) {
+                            Text("\(set.max) \(generic.setDetailText)")
+                        }
+                    }
+                }
+            }
+        } header: {
+            VStack {
+                HStack(spacing: 16) {
+                    Text("Sets")
+                    Spacer()
+                    Button {
+                        if let last = generic.sets.last {
+                            generic.sets.append(.init(min: last.min, max: last.max))
+                        } else {
+                            generic.sets.append(.init())
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    Button {
+                        generic.sets.removeLast()
+                    } label: {
+                        Image(systemName: "minus")
+                    }.disabled(generic.sets.isEmpty)
+                }.buttonStyle(.plain)
+                Picker("Type", selection: $generic.dataType) {
+                    ForEach(Routine.GenericSets.DataType.allCases, id: \.name) { type in
+                        Text(type.name).tag(type)
+                    }
+                }.pickerStyle(.segmented)
+                Picker("", selection: $selectionType) {
+                    ForEach(SelectionType.allCases, id: \.name) { type in
+                        Text(type.name).tag(type)
+                    }
+                }.pickerStyle(.segmented)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    func genericDataView() -> some View {
+        Section {
+            ForEach($data.enumerated(), id: \.offset) { offset, $set in
+                VStack {
+                    HStack {
+                        Stepper("\(set.num) \(generic.setDetailText)", value: $set.num, in: 0...30, step: 1)
+                        Stepper(set.weight.lbsFormat, value: $set.weight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
+                    }
+                    TextField("Notes", text: $set.notes, axis: .vertical)
+                        .lineLimit(1...3)
+                }
+            }
+        } header: {
+            HStack {
+                Text("Sets")
+                Spacer()
+                Button("Add") {
+                    data.append(.init())
+                }.disabled(data.count >= generic.sets.count)
+                Button("Remove") {
+                    data.removeLast()
+                }.disabled(data.isEmpty)
+            }
+        }
+        Section("Notes") {
+            TextField("optional", text: $notes, axis: .vertical)
+                .lineLimit(3...6)
+        }
+    }
+    
+    @ViewBuilder
+    func repeaterView() -> some View {
+        switch editType {
+        case .Exercise:
+            repeaterBaseView()
+        case .Data:
+            repeaterDataView()
+        }
+    }
+    
+    @ViewBuilder
+    func repeaterBaseView() -> some View {
         Section {
             TextField("Tag", text: $repeater.tag)
         } header: {
@@ -128,8 +248,8 @@ struct SessionExerciseSheet: View {
                 }
                 Button {
                     repeater.sets.removeLast()
-                    if repeaterData.count > repeater.sets.count {
-                        repeaterData.removeLast()
+                    if data.count > repeater.sets.count {
+                        data.removeLast()
                     }
                 } label: {
                     Image(systemName: "minus")
@@ -141,10 +261,10 @@ struct SessionExerciseSheet: View {
     @ViewBuilder
     func repeaterDataView() -> some View {
         Section {
-            ForEach($repeaterData.enumerated(), id: \.offset) { offset, $set in
+            ForEach($data.enumerated(), id: \.offset) { offset, $set in
                 VStack {
                     HStack {
-                        Stepper("\(set.numReps) reps", value: $set.numReps, in: 0...30, step: 1)
+                        Stepper("\(set.num) reps", value: $set.num, in: 0...30, step: 1)
                         Stepper(set.weight.lbsFormat, value: $set.weight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
                     }
                     TextField("Notes", text: $set.notes, axis: .vertical)
@@ -156,11 +276,111 @@ struct SessionExerciseSheet: View {
                 Text("Sets")
                 Spacer()
                 Button("Add") {
-                    repeaterData.append(.init())
-                }.disabled(repeaterData.count >= repeater.sets.count)
+                    data.append(.init())
+                }.disabled(data.count >= repeater.sets.count)
                 Button("Remove") {
-                    repeaterData.removeLast()
-                }.disabled(repeaterData.isEmpty)
+                    data.removeLast()
+                }.disabled(data.isEmpty)
+            }
+        }
+        Section("Notes") {
+            TextField("optional", text: $notes, axis: .vertical)
+                .lineLimit(3...6)
+        }
+    }
+    
+    @ViewBuilder
+    func maxHangView() -> some View {
+        switch editType {
+        case .Exercise:
+            maxHangBaseView()
+        case .Data:
+            maxHangDataView()
+        }
+    }
+    
+    @ViewBuilder
+    func maxHangBaseView() -> some View {
+        Section {
+            TextField("Tag", text: $maxHang.tag)
+        }
+        Section {
+            ForEach($maxHang.sets.filter({ $0.wrappedValue.side == .left }).enumerated(), id: \.offset) { offset, $set in
+                HStack {
+                    Stepper("\(set.target)s", value: $set.target, in: 0...30)
+                    Stepper(value: $set.weight, in: -200...200, step: 5) {
+                        HStack {
+                            TextField("", value: $set.weight, format: .number.precision(.fractionLength(0...2)))
+                                .keyboardType(.decimalPad)
+                            Text("lbs")
+                        }
+                    }
+                }
+            }
+        } header: {
+            HStack(spacing: 16) {
+                Text("Left")
+                Spacer()
+                Button {
+                    if let left = maxHang.sets.filter({ $0.side == .left }).last {
+                        maxHang.sets.append(.init(side: .left, target: left.target, weight: left.weight))
+                    } else {
+                        maxHang.sets.append(.init(side: .left))
+                    }
+                    if let right = maxHang.sets.filter({ $0.side == .right }).last {
+                        maxHang.sets.append(.init(side: .right, target: right.target, weight: right.weight))
+                    } else {
+                        maxHang.sets.append(.init(side: .right))
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                }
+                Button {
+                    maxHang.sets.removeLast(2)
+                } label: {
+                    Image(systemName: "minus")
+                }.disabled(maxHang.sets.isEmpty)
+            }.buttonStyle(.plain)
+        }
+        Section("Right") {
+            ForEach($maxHang.sets.filter({ $0.wrappedValue.side == .right }).enumerated(), id: \.offset) { offset, $set in
+                HStack {
+                    Stepper("\(set.target)s", value: $set.target, in: 0...30)
+                    Stepper(value: $set.weight, in: -200...200, step: 5) {
+                        HStack {
+                            TextField("", value: $set.weight, format: .number.precision(.fractionLength(0...2)))
+                                .keyboardType(.decimalPad)
+                            Text("lbs")
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    func maxHangDataView() -> some View {
+        Section {
+            ForEach($data.enumerated(), id: \.offset) { offset, $set in
+                VStack {
+                    HStack {
+                        Stepper("\(set.num)s", value: $set.num, in: 0...30, step: 1)
+                        Stepper(set.weight.lbsFormat, value: $set.weight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
+                    }
+                    TextField("Notes", text: $set.notes, axis: .vertical)
+                        .lineLimit(1...3)
+                }
+            }
+        } header: {
+            HStack {
+                Text("Sets")
+                Spacer()
+                Button("Add") {
+                    data.append(.init())
+                }.disabled(data.count >= maxHang.sets.count)
+                Button("Remove") {
+                    data.removeLast()
+                }.disabled(data.isEmpty)
             }
         }
         Section("Notes") {
@@ -171,5 +391,75 @@ struct SessionExerciseSheet: View {
     
     enum EditType: String, CaseIterable, Codable, Hashable, Equatable {
         case Exercise, Data
+    }
+}
+
+#Preview("Generic") {
+    @Previewable @State var exercise: Session.Exercise = .generic(.init(expected: .init(name: "Barbell Bench Press", dataType: .repWeight, sets: [
+        .init(num: 10),
+        .init(num: 8),
+        .init(num: 6),
+        .init(min: 3, max: 5),
+    ]), actual: [
+        .init(numReps: 10, weight: 80),
+        .init(numReps: 8, weight: 90),
+        .init(numReps: 6, weight: 100, notes: "Test"),
+        .init(numReps: 4, weight: 120, notes: "Test again"),
+    ], notes: "Light work baybeeee"))
+    @Previewable @State var showSheet = false
+    Form {
+        Button {
+            showSheet = true
+        } label: {
+            SessionExerciseEntryView(exercise: exercise)
+        }.buttonStyle(.plain)
+    }.sheet(isPresented: $showSheet) {
+        SessionExerciseSheet(exercise: $exercise)
+    }
+}
+
+#Preview("Repeater") {
+    @Previewable @State var exercise: Session.Exercise = .repeater(.init(expected: .init(tag: "HC 15mm", sets: [
+        .init(numReps: 7),
+        .init(numReps: 6, weight: 10),
+        .init(numReps: 5, weight: 20)
+    ]), actual: [
+        .init(numReps: 6, notes: "Tricky"),
+        .init(numReps: 5, weight: 5),
+        .init(numReps: 4, weight: 10)
+    ], notes: "Test notes for these repeaters"))
+    @Previewable @State var showSheet = false
+    Form {
+        Button {
+            showSheet = true
+        } label: {
+            SessionExerciseEntryView(exercise: exercise)
+        }.buttonStyle(.plain)
+    }.sheet(isPresented: $showSheet) {
+        SessionExerciseSheet(exercise: $exercise)
+    }
+}
+
+#Preview("Max Hang") {
+    @Previewable @State var exercise: Session.Exercise = .maxHang(.init(expected: .init(tag: "BM Middle", sets: [
+        .init(side: .left, target: 10, weight: 35),
+        .init(side: .right, target: 10, weight: 40),
+        .init(side: .left, target: 8, weight: 40),
+        .init(side: .right, target: 8, weight: 45),
+    ]), actual: [
+        .init(side: .left, target: 10, weight: 35),
+        .init(side: .right, target: 9, weight: 40, notes: "Too much"),
+        .init(side: .left, target: 6, weight: 40),
+        .init(side: .right, target: 5, weight: 50, notes: "EZ"),
+    ], notes: "Why am i doing this"))
+    @Previewable @State var showSheet = false
+    Form {
+        Button {
+            showSheet = true
+        } label: {
+            SessionExerciseEntryView(exercise: exercise)
+        }.buttonStyle(.plain)
+    }.sheet(isPresented: $showSheet) {
+        SessionExerciseSheet(exercise: $exercise)
     }
 }

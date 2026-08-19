@@ -893,6 +893,23 @@ struct RoutineSessionView: View {
         var weight: Double
         var notes: String
         
+        init(_ data: Session.GenericDataSet, type: Routine.GenericSets.DataType) {
+            switch type {
+            case .rep, .repWeight:
+                self.init(num: data.numReps ?? 1, weight: data.weight ?? 0, notes: data.notes)
+            case .time, .timeWeight:
+                self.init(num: data.time ?? 1, weight: data.weight ?? 0, notes: data.notes)
+            }
+        }
+        
+        init(_ data: Session.RepeaterSet) {
+            self.init(num: data.numReps, weight: data.weight, notes: data.notes)
+        }
+        
+        init(_ data: Session.MaxHangSet) {
+            self.init(side: data.side, num: data.target, weight: data.weight, notes: data.notes)
+        }
+        
         init(side: Routine.Side = .both, num: Int = 1, weight: Double = 0.0, notes: String = "") {
             self.side = side
             self.num = num
@@ -903,13 +920,13 @@ struct RoutineSessionView: View {
         func toGeneric(_ type: Routine.GenericSets.DataType) -> Session.GenericDataSet {
             switch type {
             case .rep:
-                return .init(numReps: num)
+                return .init(numReps: num, notes: notes)
             case .repWeight:
-                return .init(numReps: num, weight: weight)
+                return .init(numReps: num, weight: weight, notes: notes)
             case .time:
-                return .init(time: num)
+                return .init(time: num, notes: notes)
             case .timeWeight:
-                return .init(weight: weight, time: num)
+                return .init(weight: weight, time: num, notes: notes)
             }
         }
         

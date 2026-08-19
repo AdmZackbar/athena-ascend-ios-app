@@ -196,6 +196,15 @@ struct SessionExerciseEntryView: View {
                 .init(numReps: 6, weight: 100, notes: "Test"),
                 .init(numReps: 4, weight: 120, notes: "Test again"),
             ], notes: "Light work baybeeee")))
+            SessionExerciseEntryView(exercise: .generic(.init(expected: .init(name: "Weighted Kettlebell Carries", dataType: .timeWeight, sets: [
+                .init(num: 15),
+                .init(num: 15),
+                .init(num: 15),
+            ]), actual: [
+                .init(weight: 80, time: 10),
+                .init(weight: 90, time: 8),
+                .init(weight: 100, time: 6),
+            ], notes: "rough")))
         }
         Section("Repeaters") {
             SessionExerciseEntryView(exercise: .repeater(.init(expected: .init(tag: "HC 15mm", sets: [
