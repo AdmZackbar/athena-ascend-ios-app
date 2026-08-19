@@ -185,7 +185,8 @@ struct SessionExerciseSheet: View {
                 Text("Sets")
                 Spacer()
                 Button("Add") {
-                    data.append(.init())
+                    let expected = generic.sets[data.count]
+                    data.append(.init(num: expected.avg, weight: data.last?.weight ?? 0))
                 }.disabled(data.count >= generic.sets.count)
                 Button("Remove") {
                     data.removeLast()
@@ -276,7 +277,8 @@ struct SessionExerciseSheet: View {
                 Text("Sets")
                 Spacer()
                 Button("Add") {
-                    data.append(.init())
+                    let expected = repeater.sets[data.count]
+                    data.append(.init(num: expected.numReps, weight: expected.weight))
                 }.disabled(data.count >= repeater.sets.count)
                 Button("Remove") {
                     data.removeLast()
@@ -364,7 +366,7 @@ struct SessionExerciseSheet: View {
             ForEach($data.enumerated(), id: \.offset) { offset, $set in
                 VStack {
                     HStack {
-                        Stepper("\(set.num)s", value: $set.num, in: 0...30, step: 1)
+                        Stepper("\(set.side.abbreviation) \(set.num)s", value: $set.num, in: 0...30, step: 1)
                         Stepper(set.weight.lbsFormat, value: $set.weight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
                     }
                     TextField("Notes", text: $set.notes, axis: .vertical)
@@ -376,9 +378,13 @@ struct SessionExerciseSheet: View {
                 Text("Sets")
                 Spacer()
                 Button("Add") {
-                    data.append(.init())
+                    let left = maxHang.sets[data.count]
+                    data.append(.init(side: left.side, num: left.target, weight: left.weight))
+                    let right = maxHang.sets[data.count]
+                    data.append(.init(side: right.side, num: right.target, weight: right.weight))
                 }.disabled(data.count >= maxHang.sets.count)
                 Button("Remove") {
+                    data.removeLast()
                     data.removeLast()
                 }.disabled(data.isEmpty)
             }

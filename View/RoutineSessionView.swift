@@ -234,21 +234,26 @@ struct RoutineSessionView: View {
                 Section {
                     ForEach(set.exercises.enumerated(), id: \.offset) { offset, exercise in
                         let exerciseIndex = offset
-                        Button {
-                            updateIndices(routineSetIndex: setIndex, setExerciseIndex: exerciseIndex, exerciseSetIndex: 0)
+                        Menu {
+                            Button {
+                                // Make sure timer is reset
+                                stopAndResetTimer()
+                                // Go to exercise
+                                updateIndices(routineSetIndex: setIndex, setExerciseIndex: exerciseIndex, exerciseSetIndex: 0)
+                            } label: {
+                                Label("Start Exercise", systemImage: "play")
+                            }
+                            Button {
+                                editExercise = (setIndex, exerciseIndex)
+                            } label: {
+                                Label("Edit Exercise", systemImage: "pencil")
+                            }
                         } label: {
                             HStack {
                                 SessionExerciseEntryView(exercise: exercise)
                                 Spacer()
                             }.contentShape(Rectangle())
                         }.buttonStyle(.plain)
-                            .contextMenu {
-                                Button {
-                                    editExercise = (setIndex, exerciseIndex)
-                                } label: {
-                                    Label("Edit Main Details", systemImage: "pencil")
-                                }
-                            }
                     }
                 } header: {
                     HStack {
@@ -926,7 +931,7 @@ struct RoutineSessionView: View {
             case .time:
                 return .init(time: num, notes: notes)
             case .timeWeight:
-                return .init(weight: weight, time: num, notes: notes)
+                return .init(time: num, weight: weight, notes: notes)
             }
         }
         

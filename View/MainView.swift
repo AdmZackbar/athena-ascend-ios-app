@@ -17,7 +17,7 @@ struct MainView: View {
     var body: some View {
         NavigationStack(path: $navigationStore.path) {
             List {
-                let activeSessions = sessions.filter({ $0.endTime == nil })
+                let activeSessions = sessions.filter({ $0.endTime == nil }).sorted(by: { $0.startTime > $1.startTime })
                 if !activeSessions.isEmpty {
                     Section("Active Sessions") {
                         sessionsView(sessions: activeSessions)
@@ -26,7 +26,7 @@ struct MainView: View {
                 Section("Routines") {
                     routinesView()
                 }
-                let oldSessions = sessions.filter({ $0.endTime != nil })
+                let oldSessions = sessions.filter({ $0.endTime != nil }).sorted(by: { $0.startTime > $1.startTime })
                 if !oldSessions.isEmpty {
                     Section("Previous Sessions") {
                         sessionsView(sessions: oldSessions)
@@ -47,7 +47,7 @@ struct MainView: View {
     
     @ViewBuilder
     private func routinesView() -> some View {
-        ForEach(routines) { routine in
+        ForEach(routines.sorted(by: { $0.name < $1.name })) { routine in
             Menu {
                 Button {
                     let session = Session(sets: routine.sets.map(Session.ExerciseSet.init))

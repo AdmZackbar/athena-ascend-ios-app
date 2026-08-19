@@ -201,9 +201,9 @@ struct SessionExerciseEntryView: View {
                 .init(num: 15),
                 .init(num: 15),
             ]), actual: [
-                .init(weight: 80, time: 10),
-                .init(weight: 90, time: 8),
-                .init(weight: 100, time: 6),
+                .init(time: 10, weight: 80),
+                .init(time: 8, weight: 90),
+                .init(time: 6, weight: 100),
             ], notes: "rough")))
         }
         Section("Repeaters") {

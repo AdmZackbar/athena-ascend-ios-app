@@ -77,11 +77,11 @@ extension SchemaV1 {
         
         struct GenericDataSet: Codable, Hashable, Equatable {
             var numReps: Int?
-            var weight: Double?
             var time: Int?
+            var weight: Double?
             var notes: String
             
-            init(numReps: Int? = nil, weight: Double? = nil, time: Int? = nil, notes: String = "") {
+            init(numReps: Int? = nil, time: Int? = nil, weight: Double? = nil, notes: String = "") {
                 self.numReps = numReps
                 self.weight = weight
                 self.time = time
