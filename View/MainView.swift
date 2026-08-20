@@ -34,7 +34,12 @@ struct MainView: View {
                 }
             }.navigationTitle("Zach Wassynger")
                 .toolbar {
-                    ToolbarItem {
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        Button {
+                            navigationStore.push(ViewType.repeaters)
+                        } label: {
+                            Label("View Repeaters", systemImage: "magnifyingglass")
+                        }
                         Button {
                             navigationStore.push(ViewType.routineAdd)
                         } label: {
@@ -67,6 +72,7 @@ struct MainView: View {
                 } label: {
                     Label("Edit", systemImage: "pencil")
                 }
+                Divider()
                 Button(role: .destructive) {
                     withAnimation {
                         modelContext.delete(routine)
@@ -125,6 +131,8 @@ struct MainView: View {
             RoutineView(routine: routine)
         case .session(let session):
             RoutineSessionView(session: session)
+        case .repeaters:
+            RepeaterOverview()
         }
     }
 }
@@ -134,6 +142,7 @@ enum ViewType: Hashable {
     case routineEdit(routine: Routine)
     case routineView(routine: Routine)
     case session(session: Session)
+    case repeaters
 }
 
 #Preview(traits: .modifier(TestDataModifier())) {
