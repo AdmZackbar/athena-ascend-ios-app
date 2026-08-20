@@ -41,6 +41,7 @@ struct RoutineSessionView: View {
     @State private var elapsedMilliseconds: Int = 0
     @State private var cancellable: Cancellable?
     @State private var allowTimerNext: Bool = true
+    @State private var showNext: Bool = false
     @State private var genericData: GenericDataSet = .init()
     @State private var showSheet: Bool = false
     @State private var editExercise: (Int, Int)? = nil
@@ -165,19 +166,25 @@ struct RoutineSessionView: View {
     
     @ViewBuilder
     func mainView() -> some View {
-        if let indices {
-            switch indices.details {
-            case .generic:
-                genericExerciseView()
-            case .repeater(let s, let rep):
-                switch s {
-                case .done:
-                    repeaterRestView()
+        if let currentExercise {
+            switch currentExercise {
+            case .generic(let data):
+                genericExerciseView(data)
+            case .repeater(let data):
+                // TODO
+                switch indices?.details {
+                case .repeater(let s, let reps):
+                    switch s {
+                    case .done:
+                        repeaterRestView()
+                    default:
+                        repeaterMainView(state: s, rep: reps)
+                    }
                 default:
-                    repeaterMainView(state: s, rep: rep)
+                    Text("TODO FIX ME")
                 }
-            case .maxHang(let s):
-                maxHangExerciseView(s)
+            case .maxHang(let data):
+                maxHangExerciseView(data)
             }
         } else {
             landingPage()
@@ -289,8 +296,74 @@ struct RoutineSessionView: View {
     }
     
     @ViewBuilder
-    func genericExerciseView() -> some View {
-        restAndRecordView()
+    func genericExerciseView(_ data: Session.GenericData) -> some View {
+        let exerciseIndex = indices!.exerciseSetIndex
+        VStack(alignment: .leading) {
+            Text(data.expected.name)
+                .font(.title)
+                .bold()
+            HStack {
+                Text("Set \(exerciseIndex + 1)/\(data.expected.sets.count)")
+                Spacer()
+                Text("\(data.expected.sets[exerciseIndex].text) \(data.expected.setDetailText)")
+            }.font(.title2)
+                .fontWeight(.semibold)
+            if !showNext {
+                Button("Complete") {
+                    showNext = true
+                    startTimer()
+                }.buttonStyle(.borderedProminent)
+            } else {
+                VStack {
+                    Stepper(value: $genericData.num, in: 0...100) {
+                        Text("\(genericData.num) \(data.expected.setDetailText)")
+                    }
+                    switch data.expected.dataType {
+                    case .repWeight, .timeWeight:
+                        Stepper(value: $genericData.weight, in: -200...200, step: 5) {
+                            HStack {
+                                TextField("", value: $genericData.weight, format: .number.precision(.fractionLength(0...2)))
+                                    .keyboardType(.decimalPad)
+                                Text("lbs")
+                            }
+                        }
+                    default:
+                        EmptyView()
+                    }
+                }.font(.title2)
+                    .fontWeight(.semibold)
+                    .frame(width: 240)
+                Button {
+                    showSheet = true
+                } label: {
+                    if genericData.notes.isEmpty {
+                        Text("Add Notes...")
+                    } else {
+                        Text(genericData.notes)
+                    }
+                }.buttonStyle(.plain)
+                    .font(.body)
+                    .italic()
+                timerView(text: "Rest")
+                    .padding()
+            }
+            Spacer()
+            if showNext {
+                HStack {
+                    Button("Prev") {
+                        // Don't save when going back
+                        prev()
+                    }.buttonStyle(.borderedProminent)
+                    Spacer()
+                    Button("Next") {
+                        // Save before continuing
+                        saveData(indices!)
+                        next()
+                    }.buttonStyle(.borderedProminent)
+                }
+            }
+        }.font(.title)
+            .padding()
     }
     
     @ViewBuilder
@@ -437,15 +510,9 @@ struct RoutineSessionView: View {
     }
     
     @ViewBuilder
-    func maxHangExerciseView(_ state: MaxHangState) -> some View {
-        switch state {
-        case .ready:
-            maxHangView("Get Ready")
-        case .on:
-            maxHangView("On")
-        case .done:
-            restAndRecordView()
-        }
+    func maxHangExerciseView(_ data: Session.MaxHangData) -> some View {
+        // TODO
+        restAndRecordView()
     }
     
     @ViewBuilder
@@ -831,7 +898,8 @@ struct RoutineSessionView: View {
     func setIndices(_ indices: ExerciseIndices?) {
         // Make sure timer is reset
         stopAndResetTimer()
-        // Reset flag
+        // Reset flags
+        showNext = false
         allowTimerNext = {
             switch indices?.details {
             case .generic:
@@ -857,15 +925,35 @@ struct RoutineSessionView: View {
         let exercise = set.exercises[indices.setExerciseIndex]
         switch exercise {
         case .generic(let d):
-            genericData = .init(num: d.expected.sets[indices.exerciseSetIndex].avg)
+            if indices.exerciseSetIndex < d.actual.count {
+                // Load from current data
+                genericData = .init(d.actual[indices.exerciseSetIndex], type: d.expected.dataType)
+                // Can set this flag to true since we have entered data
+                showNext = true
+            } else {
+                // Load from expected
+                genericData = .init(num: d.expected.sets[indices.exerciseSetIndex].avg)
+            }
         case .repeater(let d):
             startTimer()
-            let expected = d.expected.sets[indices.exerciseSetIndex]
-            genericData = .init(num: expected.numReps, weight: expected.weight)
+            if indices.exerciseSetIndex < d.actual.count {
+                // Load from current data
+                genericData = .init(d.actual[indices.exerciseSetIndex])
+            } else {
+                // Load from expected
+                let expected = d.expected.sets[indices.exerciseSetIndex]
+                genericData = .init(num: expected.numReps, weight: expected.weight)
+            }
         case .maxHang(let d):
             startTimer()
-            let expected = d.expected.sets[indices.exerciseSetIndex]
-            genericData = .init(side: expected.side, num: expected.target, weight: expected.weight)
+            if indices.exerciseSetIndex < d.actual.count {
+                // Load from current data
+                genericData = .init(d.actual[indices.exerciseSetIndex])
+            } else {
+                // Load from expected
+                let expected = d.expected.sets[indices.exerciseSetIndex]
+                genericData = .init(side: expected.side, num: expected.target, weight: expected.weight)
+            }
         }
         // Finally, set indices
         self.indices = indices
