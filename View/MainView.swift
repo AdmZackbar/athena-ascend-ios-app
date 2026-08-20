@@ -58,6 +58,11 @@ struct MainView: View {
                     Label("Start Session", systemImage: "plus")
                 }
                 Button {
+                    navigationStore.push(ViewType.routineView(routine: routine))
+                } label: {
+                    Label("View Data", systemImage: "magnifyingglass")
+                }
+                Button {
                     navigationStore.push(ViewType.routineEdit(routine: routine))
                 } label: {
                     Label("Edit", systemImage: "pencil")
@@ -116,6 +121,8 @@ struct MainView: View {
             RoutineEditView()
         case .routineEdit(let routine):
             RoutineEditView(routine: routine)
+        case .routineView(let routine):
+            RoutineView(routine: routine)
         case .session(let session):
             RoutineSessionView(session: session)
         }
@@ -125,6 +132,7 @@ struct MainView: View {
 enum ViewType: Hashable {
     case routineAdd
     case routineEdit(routine: Routine)
+    case routineView(routine: Routine)
     case session(session: Session)
 }
 

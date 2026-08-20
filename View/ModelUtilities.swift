@@ -7,6 +7,16 @@
 
 import Foundation
 
+extension Double {
+    var lbsFormat: String {
+        return "\(self.formatted(.number.precision(.fractionLength(0...2)))) lb"
+    }
+}
+
+// ******* //
+// ROUTINE //
+// ******* //
+
 extension Routine.Order {
     var name: String {
         switch self {
@@ -45,6 +55,33 @@ extension Routine.GenericSets.DataType {
     }
 }
 
+
+// ******* //
+// SESSION //
+// ******* //
+
+extension Session {
+    var finished: Bool {
+        endTime != nil
+    }
+    
+    func getExercises(exercise: Routine.Exercise) -> [Session.Exercise] {
+        switch exercise {
+        case .generic(let expectedData):
+            return sets.flatMap({ $0.exercises }).filter({ $0.isBasedOn(expectedData) })
+        case .repeater(let expectedData):
+            return sets.flatMap({ $0.exercises }).filter({ $0.isBasedOn(expectedData) })
+        case .maxHang(let expectedData):
+            return sets.flatMap({ $0.exercises }).filter({ $0.isBasedOn(expectedData) })
+        }
+    }
+}
+
+
+// ********* //
+// EXERCISES //
+// ********* //
+
 extension Routine.Exercise {
     // TODO
     var description: String {
@@ -81,13 +118,18 @@ extension Routine.Exercise {
     }
 }
 
-extension Session {
-    var finished: Bool {
-        endTime != nil
-    }
-}
-
 extension Session.Exercise {
+    var hasData: Bool {
+        switch self {
+        case .generic(let d):
+            return !d.actual.isEmpty
+        case .repeater(let d):
+            return !d.actual.isEmpty
+        case .maxHang(let d):
+            return !d.actual.isEmpty
+        }
+    }
+    
     // TODO
     var description: String {
         switch self {
@@ -121,11 +163,48 @@ extension Session.Exercise {
             return "\(d.expected.tag) (\(setIndex + 1)/\(numSets)): \(d.expected.sets[setIndex].text)"
         }
     }
-}
-
-extension Double {
-    var lbsFormat: String {
-        return "\(self.formatted(.number.precision(.fractionLength(0...2)))) lb"
+    
+    func isBasedOn(_ basis: Routine.Exercise) -> Bool {
+        switch basis {
+        case .generic(let data):
+            return isBasedOn(data)
+        case .repeater(let data):
+            return isBasedOn(data)
+        case .maxHang(let data):
+            return isBasedOn(data)
+        }
+    }
+    
+    func isBasedOn(_ basis: Routine.GenericSets) -> Bool {
+        switch self {
+        case .generic(let sessionData):
+            // Only compare based on name
+            return basis.name == sessionData.expected.name
+        default:
+            return false
+        }
+    }
+    
+    func isBasedOn(_ basis: Routine.RepeaterSets) -> Bool {
+        switch self {
+        case .repeater(let sessionData):
+            // Check tag and time on/off
+            return basis.tag == sessionData.expected.tag &&
+                   basis.timeOn == sessionData.expected.timeOn &&
+                   basis.timeOff == sessionData.expected.timeOff
+        default:
+            return false
+        }
+    }
+    
+    func isBasedOn(_ basis: Routine.MaxHangSets) -> Bool {
+        switch self {
+        case .maxHang(let sessionData):
+            // Only compare based on tag
+            return basis.tag == sessionData.expected.tag
+        default:
+            return false
+        }
     }
 }
 
@@ -145,19 +224,6 @@ extension Routine.GenericSet {
     
     var avg: Int {
         return min + ((max - min) / 2)
-    }
-}
-
-extension Session.Exercise {
-    var hasData: Bool {
-        switch self {
-        case .generic(let d):
-            return !d.actual.isEmpty
-        case .repeater(let d):
-            return !d.actual.isEmpty
-        case .maxHang(let d):
-            return !d.actual.isEmpty
-        }
     }
 }
 
