@@ -50,7 +50,8 @@ struct MainView: View {
         ForEach(routines.sorted(by: { $0.name < $1.name })) { routine in
             Menu {
                 Button {
-                    let session = Session(sets: routine.sets.map(Session.ExerciseSet.init))
+                    let recentBodyWeight = sessions.sorted(by: { $0.startTime > $1.startTime }).first?.bodyWeight
+                    let session = Session(sets: routine.sets.map(Session.ExerciseSet.init), bodyWeight: recentBodyWeight ?? 160)
                     routine.sessions.append(session)
                     navigationStore.push(ViewType.session(session: session))
                 } label: {
