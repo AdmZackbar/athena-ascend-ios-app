@@ -79,6 +79,35 @@ struct TestDataModifier: PreviewModifier {
                 ]))
             ], restTime: 15, order: .bfs)
         ])
+        let session = Session(startTime: .now.addingTimeInterval(-3600), endTime: .now, sets: routine.sets.map({ .init(base: $0) }), bodyWeight: 155, standoutSong: .init(name: "Permanent", artist: "A Day to Remember"))
+        session.sets.indices.forEach({ setIndex in
+            session.sets[setIndex].exercises.indices.forEach { exIndex in
+                let newExercise: Session.Exercise = {
+                    switch session.sets[setIndex].exercises[exIndex] {
+                    case .generic(let d):
+                        var actual: [Session.GenericDataSet] = []
+                        for exSet in d.expected.sets {
+                            actual.append(.init(numReps: Int.random(in: exSet.min...exSet.max), weight: Double(Int.random(in: 0...12) * 5)))
+                        }
+                        return .generic(.init(expected: d.expected, actual: actual))
+                    case .repeater(let d):
+                        var actual: [Session.RepeaterSet] = []
+                        for exSet in d.expected.sets {
+                            actual.append(.init(numReps: Int.random(in: (exSet.numReps - 2)...exSet.numReps), weight: Double(Int.random(in: -8...8) * 5)))
+                        }
+                        return .repeater(.init(expected: d.expected, actual: actual))
+                    case .maxHang(let d):
+                        var actual: [Session.MaxHangSet] = []
+                        for exSet in d.expected.sets {
+                            actual.append(.init(side: exSet.side, target: Int.random(in: 3...10), weight: Double(Int.random(in: 0...6) * 5)))
+                        }
+                        return .maxHang(.init(expected: d.expected, actual: actual))
+                    }
+                }()
+                session.sets[setIndex].exercises[exIndex] = newExercise
+            }
+        })
+        routine.sessions.append(session)
         container.mainContext.insert(routine)
     }
     
