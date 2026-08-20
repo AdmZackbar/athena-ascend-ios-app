@@ -18,12 +18,16 @@ extension SchemaV1 {
         var endTime: Date? = nil
         var sets: [ExerciseSet] = []
         var notes: String = ""
+        var bodyWeight: Double = 160
+        var standoutSong: Song? = nil
         
-        init(startTime: Date = .now, endTime: Date? = nil, sets: [ExerciseSet] = [], notes: String = "") {
+        init(startTime: Date = .now, endTime: Date? = nil, sets: [ExerciseSet] = [], notes: String = "", bodyWeight: Double = 160, standoutSong: Song? = nil) {
             self.startTime = startTime
             self.endTime = endTime
             self.sets = sets
             self.notes = notes
+            self.bodyWeight = bodyWeight
+            self.standoutSong = standoutSong
         }
         
         struct ExerciseSet: Codable, Hashable, Equatable {
@@ -143,6 +147,16 @@ extension SchemaV1 {
                 self.target = target
                 self.weight = weight
                 self.notes = notes
+            }
+        }
+        
+        struct Song: Codable, Hashable, Equatable {
+            var name: String
+            var artist: String
+            
+            init(name: String = "", artist: String = "") {
+                self.name = name
+                self.artist = artist
             }
         }
     }

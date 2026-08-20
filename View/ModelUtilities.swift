@@ -81,6 +81,12 @@ extension Routine.Exercise {
     }
 }
 
+extension Session {
+    var finished: Bool {
+        endTime != nil
+    }
+}
+
 extension Session.Exercise {
     // TODO
     var description: String {

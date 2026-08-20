@@ -43,8 +43,8 @@ struct RoutineSessionView: View {
     @State private var allowTimerNext: Bool = true
     @State private var showNext: Bool = false
     @State private var genericData: GenericDataSet = .init()
-    @State private var showSheet: Bool = false
-    @State private var editExercise: (Int, Int)? = nil
+    @State private var sheetType: SheetType? = nil
+    @State private var song: Session.Song = .init()
     
     init(session: Session) {
         self.session = session
@@ -56,32 +56,72 @@ struct RoutineSessionView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden()
             .background(computeBackground())
-            .sheet(isPresented: $showSheet) {
-                Form {
-                    TextField("Notes", text: $genericData.notes, axis: .vertical)
-                        .lineLimit(3...6)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }.presentationDetents([.medium, .large])
-            }
-            .sheet(isPresented: .init(get: {
-                editExercise != nil
-            }, set: { newValue in
-                if !newValue {
-                    editExercise = nil
-                }
-            })) {
-                if let editExercise {
+            .sheet(item: $sheetType) { t in
+                switch t {
+                case .exercise(let setIndex, let exerciseIndex):
                     SessionExerciseSheet(exercise: .init(get: {
-                        session.sets[editExercise.0].exercises[editExercise.1]
+                        session.sets[setIndex].exercises[exerciseIndex]
                     }, set: { newValue in
-                        session.sets[editExercise.0].exercises[editExercise.1] = newValue
+                        session.sets[setIndex].exercises[exerciseIndex] = newValue
+                    }), showing: .init(get: {
+                        switch sheetType {
+                        case .exercise(_, _):
+                            return true
+                        default:
+                            return false
+                        }
+                    }, set: { newValue in
+                        if !newValue {
+                            sheetType = nil
+                        }
                     }))
-                } else {
-                    Text("TODO FIX ME")
+                case .notes:
+                    Form {
+                        TextField("Notes", text: $genericData.notes, axis: .vertical)
+                            .lineLimit(3...6)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }.presentationDetents([.medium, .large])
+                case .song:
+                    editSongSheet()
                 }
             }
             .toolbar(content: buildToolbar)
+    }
+    
+    @ViewBuilder
+    func editSongSheet() -> some View {
+        NavigationStack {
+            Form {
+                Section("Song") {
+                    TextField("Name", text: $song.name)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.words)
+                    TextField("Artist", text: $song.artist)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.words)
+                }
+            }.navigationTitle("Edit Standout Song")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(role: .destructive) {
+                            session.standoutSong = nil
+                            sheetType = nil
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            session.standoutSong = song
+                            sheetType = nil
+                        } label: {
+                            Label("Save", systemImage: "checkmark")
+                        }.disabled(song.name.isEmpty || song.artist.isEmpty)
+                    }
+                }
+        }.presentationDetents([.medium, .large])
     }
     
     @ToolbarContentBuilder
@@ -89,13 +129,19 @@ struct RoutineSessionView: View {
         if indices == nil {
             ToolbarItemGroup(placement: .primaryAction) {
                 Menu {
-                    if session.endTime == nil {
+                    if !session.finished {
                         Button {
                             session.endTime = .now
                         } label: {
                             Label("Finish Session", systemImage: "checkmark")
                         }
                     } else {
+                        Button {
+                            song = session.standoutSong ?? .init()
+                            sheetType = .song
+                        } label: {
+                            Label("Edit Standout Song", systemImage: "music.note")
+                        }
                         Button {
                             session.endTime = nil
                         } label: {
@@ -111,7 +157,7 @@ struct RoutineSessionView: View {
                 } label: {
                     Label("Edit", systemImage: "pencil")
                 }
-                if session.endTime == nil {
+                if !session.finished {
                     Button {
                         next()
                     } label: {
@@ -196,7 +242,7 @@ struct RoutineSessionView: View {
         Form {
             Section {
                 DatePicker("Start:", selection: $session.startTime, displayedComponents: [.date, .hourAndMinute])
-                if session.endTime == nil && hasData {
+                if !session.finished && hasData {
                     Button {
                         session.endTime = .now
                         dismiss()
@@ -210,6 +256,11 @@ struct RoutineSessionView: View {
                         session.endTime = newValue
                     }), displayedComponents: [.date, .hourAndMinute])
                 }
+                Stepper(value: $session.bodyWeight, in: 0...1000, step: 1) {
+                    HStack {
+                        Text("Body Weight: \(session.bodyWeight.lbsFormat)")
+                    }
+                }
                 TextField("Notes", text: $session.notes, axis: .vertical)
                     .lineLimit(3...9)
                     .autocorrectionDisabled()
@@ -219,12 +270,24 @@ struct RoutineSessionView: View {
                     Text(routine.name)
                 }
             }
+            if let song = session.standoutSong {
+                Section("Standout Song") {
+                    VStack(alignment: .leading) {
+                        Text(song.artist)
+                            .font(.subheadline)
+                            .italic()
+                        Text(song.name)
+                            .font(.headline)
+                            .bold()
+                    }
+                }
+            }
             ForEach(session.sets.enumerated(), id: \.offset) { offset, set in
                 let setIndex = offset
                 Section {
                     ForEach(set.exercises.enumerated(), id: \.offset) { offset, exercise in
                         let exerciseIndex = offset
-                        if session.endTime == nil {
+                        if !session.finished {
                             Menu {
                                 Button {
                                     // Go to exercise
@@ -233,7 +296,7 @@ struct RoutineSessionView: View {
                                     Label("Start Exercise", systemImage: "play")
                                 }
                                 Button {
-                                    editExercise = (setIndex, exerciseIndex)
+                                    sheetType = .exercise(setIndex: setIndex, exerciseIndex: exerciseIndex)
                                 } label: {
                                     Label("Edit Exercise", systemImage: "pencil")
                                 }
@@ -245,7 +308,7 @@ struct RoutineSessionView: View {
                             }.buttonStyle(.plain)
                         } else {
                             Button {
-                                editExercise = (setIndex, exerciseIndex)
+                                sheetType = .exercise(setIndex: setIndex, exerciseIndex: exerciseIndex)
                             } label: {
                                 HStack {
                                     SessionExerciseEntryView(exercise: exercise)
@@ -334,7 +397,7 @@ struct RoutineSessionView: View {
                     .fontWeight(.semibold)
                     .frame(width: 240)
                 Button {
-                    showSheet = true
+                    sheetType = .notes
                 } label: {
                     if genericData.notes.isEmpty {
                         Text("Add Notes...")
@@ -481,7 +544,7 @@ struct RoutineSessionView: View {
                 }.font(.title2)
                     .bold()
                 Button {
-                    showSheet = true
+                    sheetType = .notes
                 } label: {
                     HStack {
                         Text(genericData.notes.isEmpty ? "Add Notes..." : genericData.notes)
@@ -564,7 +627,7 @@ struct RoutineSessionView: View {
                     EmptyView()
                 }
                 Button {
-                    showSheet = true
+                    sheetType = .notes
                 } label: {
                     HStack {
                         Text(genericData.notes.isEmpty ? "Add Notes..." : genericData.notes)
@@ -592,7 +655,7 @@ struct RoutineSessionView: View {
                     }
                 }
                 Button {
-                    showSheet = true
+                    sheetType = .notes
                 } label: {
                     HStack {
                         Text(genericData.notes.isEmpty ? "Add Notes..." : genericData.notes)
@@ -620,7 +683,7 @@ struct RoutineSessionView: View {
                     }
                 }
                 Button {
-                    showSheet = true
+                    sheetType = .notes
                 } label: {
                     HStack {
                         Text(genericData.notes.isEmpty ? "Add Notes..." : genericData.notes)
@@ -1142,6 +1205,23 @@ struct RoutineSessionView: View {
         case generic
         case repeater(_ state: RepeaterState, reps: Int)
         case maxHang(_ state: MaxHangState)
+    }
+    
+    enum SheetType: Identifiable, Codable, Hashable, Equatable {
+        var id: String {
+            switch self {
+            case .exercise(let setIndex, let exerciseIndex):
+                "ex-\(setIndex)-\(exerciseIndex)"
+            case .notes:
+                "notes"
+            case .song:
+                "song"
+            }
+        }
+        
+        case exercise(setIndex: Int, exerciseIndex: Int)
+        case notes
+        case song
     }
     
     enum RepeaterState: Codable, Hashable, Equatable {

@@ -8,11 +8,10 @@
 import SwiftUI
 
 struct SessionExerciseSheet: View {
-    @Environment(\.dismiss) var dismiss
-    
     typealias SelectionType = RoutineEditView.EditGenericSetsSheet.SelectionType
     
     @Binding var exercise: Session.Exercise
+    @Binding var showing: Bool
     @State private var editType: EditType = .Exercise
     @State private var selectionType: SelectionType = .single
     @State private var generic: Routine.GenericSets = .init()
@@ -21,8 +20,9 @@ struct SessionExerciseSheet: View {
     @State private var data: [RoutineSessionView.GenericDataSet]
     @State private var notes: String
     
-    init(exercise: Binding<Session.Exercise>) {
+    init(exercise: Binding<Session.Exercise>, showing: Binding<Bool>) {
         self._exercise = exercise
+        self._showing = showing
         switch exercise.wrappedValue {
         case .generic(let d):
             generic = d.expected
@@ -74,7 +74,7 @@ struct SessionExerciseSheet: View {
         }
         ToolbarItem(placement: .cancellationAction) {
             Button {
-                dismiss()
+                showing = false
             } label: {
                 Label("Back", systemImage: "chevron.left")
             }
@@ -90,7 +90,7 @@ struct SessionExerciseSheet: View {
         case .maxHang(_):
             exercise = .maxHang(.init(expected: maxHang, actual: data.map({ $0.toMaxHang() }), notes: notes))
         }
-        dismiss()
+        showing = false
     }
     
     @ViewBuilder
@@ -423,7 +423,7 @@ struct SessionExerciseSheet: View {
             SessionExerciseEntryView(exercise: exercise)
         }.buttonStyle(.plain)
     }.sheet(isPresented: $showSheet) {
-        SessionExerciseSheet(exercise: $exercise)
+        SessionExerciseSheet(exercise: $exercise, showing: $showSheet)
     }
 }
 
@@ -445,7 +445,7 @@ struct SessionExerciseSheet: View {
             SessionExerciseEntryView(exercise: exercise)
         }.buttonStyle(.plain)
     }.sheet(isPresented: $showSheet) {
-        SessionExerciseSheet(exercise: $exercise)
+        SessionExerciseSheet(exercise: $exercise, showing: $showSheet)
     }
 }
 
@@ -469,6 +469,6 @@ struct SessionExerciseSheet: View {
             SessionExerciseEntryView(exercise: exercise)
         }.buttonStyle(.plain)
     }.sheet(isPresented: $showSheet) {
-        SessionExerciseSheet(exercise: $exercise)
+        SessionExerciseSheet(exercise: $exercise, showing: $showSheet)
     }
 }
