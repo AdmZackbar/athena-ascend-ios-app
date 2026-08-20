@@ -15,10 +15,12 @@ struct RoutineSessionView: View {
     
     let readyTime: Duration = .seconds(10)
     
+    /// If true, data has been collected in some form for the session
     var hasData: Bool {
-        session.sets.contains(where: { $0.exercises.contains(where: \.hasData) })
+        !session.notes.isEmpty || session.sets.contains(where: { $0.exercises.contains(where: \.hasData) })
     }
     
+    /// The current exercise, based on the current state of the indices field
     var currentExercise: Session.Exercise? {
         if let indices {
             return session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex]
@@ -26,6 +28,8 @@ struct RoutineSessionView: View {
         return nil
     }
     
+    /// The exercise that will be moved to next, if applicable.
+    /// Can be the same as the current exercise if the state of the exercise is different
     var nextExercise: Session.Exercise? {
         if let nextIndices = nextIndices() {
             return session.sets[nextIndices.routineSetIndex].exercises[nextIndices.setExerciseIndex]
@@ -33,18 +37,32 @@ struct RoutineSessionView: View {
         return nil
     }
     
+    /// The main session of the view. Is a state to allow for easy edits to notes, sets, etc.
     @State private var session: Session
+    /// The state variable. Determines which exercise and set is currently displayed.
+    /// If nil, we are not in progress and the home page is shown.
+    /// Also contains details to determine state within each exercise
     @State private var indices: ExerciseIndices? = nil
+    /// Set to the start time of the timer (in seconds)
     @State private var timerDuration: Duration = .seconds(0)
+    /// Tracks how many seconds have passed for the current timer
     @State private var elapsedSeconds: Duration = .seconds(0)
-    // For better interactivity precision
+    /// For better interactivity precision
     @State private var elapsedMilliseconds: Int = 0
+    /// The current timer, if in use
     @State private var cancellable: Cancellable?
+    /// If true, the timer is allowed to modify the state when it finishes
     @State private var allowTimerNext: Bool = true
+    /// If true, data entry should be shown (in addition to prev/next buttons)
     @State private var showNext: Bool = false
+    /// Contains data in an indeterminate state that is loaded to and saved from for the current exercise
     @State private var genericData: GenericDataSet = .init()
+    /// The current sheet that should be shown - if nil, nothing is shown
     @State private var sheetType: SheetType? = nil
+    /// Used for editing song details
     @State private var song: Session.Song = .init()
+    /// If true, the delete alert should be shown
+    @State private var showAlert: Bool = false
     
     init(session: Session) {
         self.session = session
@@ -52,12 +70,29 @@ struct RoutineSessionView: View {
     
     var body: some View {
         mainView()
-            .navigationTitle("Session Overview")
+            .navigationTitle(session.startTime.formatted(date: .numeric, time: .shortened))
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden()
             .background(computeBackground())
+            .alert("Are you sure you want to delete this session?", isPresented: $showAlert, actions: {
+                Button(role: .destructive) {
+                    modelContext.delete(session)
+                    dismiss()
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            })
             .sheet(item: $sheetType) { t in
                 switch t {
+                case .date:
+                    Form {
+                        DatePicker("Start:", selection: $session.startTime, displayedComponents: [.date, .hourAndMinute])
+                        DatePicker("End:", selection: .init(get: {
+                            session.endTime ?? .now
+                        }, set: { newValue in
+                            session.endTime = newValue
+                        }), displayedComponents: [.date, .hourAndMinute])
+                    }.presentationDetents([.medium])
                 case .exercise(let setIndex, let exerciseIndex):
                     SessionExerciseSheet(exercise: .init(get: {
                         session.sets[setIndex].exercises[exerciseIndex]
@@ -137,6 +172,11 @@ struct RoutineSessionView: View {
                         }
                     } else {
                         Button {
+                            sheetType = .date
+                        } label: {
+                            Label("Edit Start/End Date", systemImage: "calendar")
+                        }
+                        Button {
                             song = session.standoutSong ?? .init()
                             sheetType = .song
                         } label: {
@@ -148,9 +188,9 @@ struct RoutineSessionView: View {
                             Label("Re-open Session", systemImage: "play")
                         }
                     }
+                    Divider()
                     Button(role: .destructive) {
-                        modelContext.delete(session)
-                        dismiss()
+                        showAlert = true
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
@@ -232,30 +272,17 @@ struct RoutineSessionView: View {
             case .maxHang(let data):
                 maxHangExerciseView(data)
             }
+        } else if session.finished {
+            closedHomePage()
         } else {
-            landingPage()
+            activeHomePage()
         }
     }
     
-    @ViewBuilder
-    func landingPage() -> some View {
+    func activeHomePage() -> some View {
         Form {
             Section {
                 DatePicker("Start:", selection: $session.startTime, displayedComponents: [.date, .hourAndMinute])
-                if !session.finished && hasData {
-                    Button {
-                        session.endTime = .now
-                        dismiss()
-                    } label: {
-                        Label("Finish Session", systemImage: "checkmark")
-                    }
-                } else if hasData {
-                    DatePicker("End:", selection: .init(get: {
-                        session.endTime ?? .now
-                    }, set: { newValue in
-                        session.endTime = newValue
-                    }), displayedComponents: [.date, .hourAndMinute])
-                }
                 Stepper(value: $session.bodyWeight, in: 0...1000, step: 1) {
                     HStack {
                         Text("Body Weight: \(session.bodyWeight.lbsFormat)")
@@ -265,96 +292,116 @@ struct RoutineSessionView: View {
                     .lineLimit(3...9)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.sentences)
+                if hasData {
+                    Button {
+                        session.endTime = .now
+                        dismiss()
+                    } label: {
+                        Label("Finish Session", systemImage: "checkmark")
+                    }
+                }
             } header: {
                 if let routine = session.routine {
                     Text(routine.name)
                 }
             }
-            if let song = session.standoutSong {
-                Section("Standout Song") {
-                    VStack(alignment: .leading) {
-                        Text(song.artist)
-                            .font(.subheadline)
-                            .italic()
-                        Text(song.name)
-                            .font(.headline)
-                            .bold()
-                    }
-                }
-            }
-            ForEach(session.sets.enumerated(), id: \.offset) { offset, set in
-                let setIndex = offset
-                Section {
-                    ForEach(set.exercises.enumerated(), id: \.offset) { offset, exercise in
-                        let exerciseIndex = offset
-                        if !session.finished {
-                            Menu {
-                                Button {
-                                    // Go to exercise
-                                    setIndices(computeIndices(routineSetIndex: setIndex, setExerciseIndex: exerciseIndex))
-                                } label: {
-                                    Label("Start Exercise", systemImage: "play")
-                                }
-                                Button {
-                                    sheetType = .exercise(setIndex: setIndex, exerciseIndex: exerciseIndex)
-                                } label: {
-                                    Label("Edit Exercise", systemImage: "pencil")
-                                }
-                            } label: {
-                                HStack {
-                                    SessionExerciseEntryView(exercise: exercise)
-                                    Spacer()
-                                }.contentShape(Rectangle())
-                            }.buttonStyle(.plain)
-                        } else {
-                            Button {
-                                sheetType = .exercise(setIndex: setIndex, exerciseIndex: exerciseIndex)
-                            } label: {
-                                HStack {
-                                    SessionExerciseEntryView(exercise: exercise)
-                                    Spacer()
-                                }.contentShape(Rectangle())
-                            }.buttonStyle(.plain)
-                        }
-                    }
-                } header: {
-                    HStack {
-                        Text(set.name)
-                        Spacer()
-                        Text("\(set.restTime)s Rest")
-                    }
-                }
-            }
+            setSummaryView()
         }
     }
     
-    func saveData(_ indices: ExerciseIndices) {
-        let exercise = session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex]
-        switch exercise {
-        case .generic(let d):
-            var newActual: [Session.GenericDataSet] = d.actual
-            if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = genericData.toGeneric(d.expected.dataType)
-            } else {
-                newActual.append(genericData.toGeneric(d.expected.dataType))
+    @ViewBuilder
+    func closedHomePage() -> some View {
+        Form {
+            Section {
+                TextField("Notes", text: $session.notes, axis: .vertical)
+                    .lineLimit(4...8)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.sentences)
+                Button {
+                    song = session.standoutSong ?? .init()
+                    sheetType = .song
+                } label: {
+                    if let standoutSong = session.standoutSong {
+                        VStack(alignment: .leading) {
+                            Text("Standout Song")
+                                .bold()
+                            Text(standoutSong.artist)
+                                .font(.subheadline)
+                                .italic()
+                            Text(standoutSong.name)
+                                .font(.headline)
+                                .bold()
+                        }
+                    } else {
+                        Label("Choose Standout Song...", systemImage: "music.note")
+                    }
+                }.buttonStyle(.plain)
+            } header: {
+                VStack(alignment: .leading) {
+                    Text("Body Weight: \(session.bodyWeight.lbsFormat)")
+                        .font(.subheadline)
+                        .italic()
+                    HStack {
+                        if let routine = session.routine {
+                            Text(routine.name)
+                        } else {
+                            Text(session.startTime.formatted(date: .numeric, time: .shortened))
+                        }
+                        Spacer()
+                        if let endTime = session.endTime {
+                            Text(Duration.seconds(endTime.timeIntervalSince(session.startTime)).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
+                        }
+                    }
+                }
             }
-            session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .generic(.init(expected: d.expected, actual: newActual, notes: d.notes))
-        case .repeater(let d):
-            var newActual: [Session.RepeaterSet] = d.actual
-            if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = genericData.toRepeater()
-            } else {
-                newActual.append(genericData.toRepeater())
+            setSummaryView()
+        }
+    }
+    
+    @ViewBuilder
+    func setSummaryView() -> some View {
+        ForEach(session.sets.enumerated(), id: \.offset) { offset, set in
+            let setIndex = offset
+            Section {
+                ForEach(set.exercises.enumerated(), id: \.offset) { offset, exercise in
+                    let exerciseIndex = offset
+                    if !session.finished {
+                        Menu {
+                            Button {
+                                // Go to exercise
+                                setIndices(computeIndices(routineSetIndex: setIndex, setExerciseIndex: exerciseIndex))
+                            } label: {
+                                Label("Start Exercise", systemImage: "play")
+                            }
+                            Button {
+                                sheetType = .exercise(setIndex: setIndex, exerciseIndex: exerciseIndex)
+                            } label: {
+                                Label("Edit Exercise", systemImage: "pencil")
+                            }
+                        } label: {
+                            HStack {
+                                SessionExerciseEntryView(exercise: exercise)
+                                Spacer()
+                            }.contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                    } else {
+                        Button {
+                            sheetType = .exercise(setIndex: setIndex, exerciseIndex: exerciseIndex)
+                        } label: {
+                            HStack {
+                                SessionExerciseEntryView(exercise: exercise)
+                                Spacer()
+                            }.contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                    }
+                }
+            } header: {
+                HStack {
+                    Text(set.name)
+                    Spacer()
+                    Text("\(set.restTime)s Rest")
+                }
             }
-            session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .repeater(.init(expected: d.expected, actual: newActual, notes: d.notes))
-        case .maxHang(let d):
-            var newActual: [Session.MaxHangSet] = d.actual
-            if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = genericData.toMaxHang()
-            } else {
-                newActual.append(genericData.toMaxHang())
-            }
-            session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .maxHang(.init(expected: d.expected, actual: newActual, notes: d.notes))
         }
     }
     
@@ -747,6 +794,41 @@ struct RoutineSessionView: View {
             }
             Spacer()
         }.buttonStyle(.plain)
+    }
+    
+    
+    // ************** //
+    // DATA FUNCTIONS //
+    // ************** //
+    
+    func saveData(_ indices: ExerciseIndices) {
+        let exercise = session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex]
+        switch exercise {
+        case .generic(let d):
+            var newActual: [Session.GenericDataSet] = d.actual
+            if indices.exerciseSetIndex < d.actual.count {
+                newActual[indices.exerciseSetIndex] = genericData.toGeneric(d.expected.dataType)
+            } else {
+                newActual.append(genericData.toGeneric(d.expected.dataType))
+            }
+            session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .generic(.init(expected: d.expected, actual: newActual, notes: d.notes))
+        case .repeater(let d):
+            var newActual: [Session.RepeaterSet] = d.actual
+            if indices.exerciseSetIndex < d.actual.count {
+                newActual[indices.exerciseSetIndex] = genericData.toRepeater()
+            } else {
+                newActual.append(genericData.toRepeater())
+            }
+            session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .repeater(.init(expected: d.expected, actual: newActual, notes: d.notes))
+        case .maxHang(let d):
+            var newActual: [Session.MaxHangSet] = d.actual
+            if indices.exerciseSetIndex < d.actual.count {
+                newActual[indices.exerciseSetIndex] = genericData.toMaxHang()
+            } else {
+                newActual.append(genericData.toMaxHang())
+            }
+            session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .maxHang(.init(expected: d.expected, actual: newActual, notes: d.notes))
+        }
     }
     
     
@@ -1210,6 +1292,8 @@ struct RoutineSessionView: View {
     enum SheetType: Identifiable, Codable, Hashable, Equatable {
         var id: String {
             switch self {
+            case .date:
+                "date"
             case .exercise(let setIndex, let exerciseIndex):
                 "ex-\(setIndex)-\(exerciseIndex)"
             case .notes:
@@ -1219,6 +1303,7 @@ struct RoutineSessionView: View {
             }
         }
         
+        case date
         case exercise(setIndex: Int, exerciseIndex: Int)
         case notes
         case song
@@ -1259,7 +1344,7 @@ struct RingShape: Shape {
     NavigationStack {
         let routine = routines.first!
         let session: Session = {
-            let session = Session()
+            let session = Session(startTime: .now.addingTimeInterval(-700))
             session.routine = routine
             session.sets = routine.sets.map(Session.ExerciseSet.init)
             return session
