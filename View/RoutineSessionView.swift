@@ -37,12 +37,33 @@ struct RoutineSessionView: View {
         return nil
     }
     
+    /// The background color of the view
+    var background: some ShapeStyle {
+        switch exerciseState {
+        case .ready, .off:
+            return .ready
+        case .on:
+            return .active
+        case .rest:
+            return .rest
+        case .none:
+            return Color(uiColor: .systemGroupedBackground)
+        }
+    }
+    
+    /// If true, the timer is allowed to modify the state when it finishes
+    var allowTimerNext: Bool {
+        return exerciseState != .rest
+    }
+    
     /// The main session of the view. Is a state to allow for easy edits to notes, sets, etc.
     @State private var session: Session
     /// The state variable. Determines which exercise and set is currently displayed.
     /// If nil, we are not in progress and the home page is shown.
-    /// Also contains details to determine state within each exercise
     @State private var indices: ExerciseIndices? = nil
+    /// Contains additional state information about the current exercise
+    @State private var exerciseState: ExerciseState? = nil
+    @State private var repeaterRep: RepeaterRep = .zero
     /// Set to the start time of the timer (in seconds)
     @State private var timerDuration: Duration = .seconds(0)
     /// Tracks how many seconds have passed for the current timer
@@ -51,8 +72,6 @@ struct RoutineSessionView: View {
     @State private var elapsedMilliseconds: Int = 0
     /// The current timer, if in use
     @State private var cancellable: Cancellable?
-    /// If true, the timer is allowed to modify the state when it finishes
-    @State private var allowTimerNext: Bool = true
     /// If true, data entry should be shown (in addition to prev/next buttons)
     @State private var showNext: Bool = false
     /// Contains data in an indeterminate state that is loaded to and saved from for the current exercise
@@ -73,7 +92,7 @@ struct RoutineSessionView: View {
             .navigationTitle(session.startTime.formatted(date: .numeric, time: .shortened))
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden()
-            .background(computeBackground())
+            .background(background)
             .alert("Are you sure you want to delete this session?", isPresented: $showAlert, actions: {
                 Button(role: .destructive) {
                     modelContext.delete(session)
@@ -209,7 +228,7 @@ struct RoutineSessionView: View {
         ToolbarItem(placement: .cancellationAction) {
             Button {
                 if indices != nil {
-                    indices = nil
+                    setState(newIndices: nil)
                 } else if !hasData {
                     modelContext.delete(session)
                     dismiss()
@@ -222,34 +241,6 @@ struct RoutineSessionView: View {
         }
     }
     
-    func computeBackground() -> some ShapeStyle {
-        if let indices {
-            switch indices.details {
-            case .generic:
-                return .rest
-            case .repeater(let s, _):
-                switch s {
-                case .ready, .off:
-                    return .ready
-                case .on:
-                    return .active
-                case .done:
-                    return .rest
-                }
-            case .maxHang(let s):
-                switch s {
-                case .ready:
-                    return .ready
-                case .on:
-                    return .active
-                case .done:
-                    return .rest
-                }
-            }
-        }
-        return Color(uiColor: .systemGroupedBackground)
-    }
-    
     @ViewBuilder
     func mainView() -> some View {
         if let currentExercise {
@@ -258,16 +249,11 @@ struct RoutineSessionView: View {
                 genericExerciseView(data)
             case .repeater(let data):
                 // TODO
-                switch indices?.details {
-                case .repeater(let s, let reps):
-                    switch s {
-                    case .done:
-                        repeaterRestView()
-                    default:
-                        repeaterMainView(state: s, rep: reps)
-                    }
+                switch exerciseState {
+                case .rest:
+                    repeaterRestView()
                 default:
-                    Text("TODO FIX ME")
+                    repeaterMainView()
                 }
             case .maxHang(let data):
                 maxHangExerciseView(data)
@@ -369,7 +355,7 @@ struct RoutineSessionView: View {
                         Menu {
                             Button {
                                 // Go to exercise
-                                setIndices(computeIndices(routineSetIndex: setIndex, setExerciseIndex: exerciseIndex))
+                                setState(newIndices: .init(setIndex, exerciseIndex))
                             } label: {
                                 Label("Start Exercise", systemImage: "play")
                             }
@@ -477,20 +463,22 @@ struct RoutineSessionView: View {
     }
     
     @ViewBuilder
-    func repeaterMainView(state: RepeaterState, rep: Int) -> some View {
+    func repeaterMainView() -> some View {
         let text: String = {
-            switch state {
+            switch exerciseState {
             case .ready:
                 return "Get Ready"
             case .on:
                 return "On"
             case .off:
                 return "Off"
-            case .done:
-                return "Rest"
+            default:
+                return "N/A"
             }
         }()
         let setIndex = indices!.exerciseSetIndex
+        let currentRep = repeaterRep.current
+        let maxRep = repeaterRep.max
         VStack(alignment: .center, spacing: 8) {
             Spacer()
             if case .repeater(let d) = currentExercise {
@@ -510,7 +498,7 @@ struct RoutineSessionView: View {
                 HStack {
                     Text("Rep")
                     Spacer()
-                    Text("\(numReps - rep + (state != .on ? 0 : 1))/\(numReps)")
+                    Text("\(currentRep)/\(maxRep)")
                 }.font(.system(size: 30))
                     .fontWeight(.semibold)
             } else {
@@ -522,9 +510,7 @@ struct RoutineSessionView: View {
             timerView(text: text)
                 .padding()
             Button {
-                if let indices {
-                    setIndices(.init(routineSetIndex: indices.routineSetIndex, setExerciseIndex: indices.setExerciseIndex, exerciseSetIndex: indices.exerciseSetIndex, details: .repeater(.done, reps: 0)))
-                }
+                exerciseState = .rest
             } label: {
                 Text("Record Data")
             }
@@ -801,6 +787,39 @@ struct RoutineSessionView: View {
     // DATA FUNCTIONS //
     // ************** //
     
+    func loadData(_ indices: ExerciseIndices?) -> GenericDataSet {
+        guard let indices else { return .init() }
+        let exercise = session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex]
+        switch exercise {
+        case .generic(let d):
+            if indices.exerciseSetIndex < d.actual.count {
+                // Load from current data
+                return .init(d.actual[indices.exerciseSetIndex], type: d.expected.dataType)
+            } else {
+                // Load from expected
+                return .init(num: d.expected.sets[indices.exerciseSetIndex].avg)
+            }
+        case .repeater(let d):
+            if indices.exerciseSetIndex < d.actual.count {
+                // Load from current data
+                return .init(d.actual[indices.exerciseSetIndex])
+            } else {
+                // Load from expected
+                let expected = d.expected.sets[indices.exerciseSetIndex]
+                return .init(num: expected.numReps, weight: expected.weight)
+            }
+        case .maxHang(let d):
+            if indices.exerciseSetIndex < d.actual.count {
+                // Load from current data
+                return .init(d.actual[indices.exerciseSetIndex])
+            } else {
+                // Load from expected
+                let expected = d.expected.sets[indices.exerciseSetIndex]
+                return .init(side: expected.side, num: expected.target, weight: expected.weight)
+            }
+        }
+    }
+    
     func saveData(_ indices: ExerciseIndices) {
         let exercise = session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex]
         switch exercise {
@@ -836,25 +855,84 @@ struct RoutineSessionView: View {
     // CONTROL FLOW FUNCTIONS //
     // ********************** //
     
+    /// Updates state to a different exercise
+    func setState(newIndices: ExerciseIndices?) {
+        let newState = ExerciseState.ready
+        self.timerDuration = computeTimerDuration(indices: newIndices, exerciseState: newState)
+        self.genericData = loadData(newIndices)
+        self.exerciseState = newState
+        self.indices = newIndices
+        onStateChanged()
+    }
+    
+    /// Updates state for the same exerecise
+    func setState(newState: ExerciseState) {
+        self.timerDuration = computeTimerDuration(indices: indices, exerciseState: newState)
+        self.exerciseState = newState
+        onStateChanged()
+    }
+    
+    /// Housekeeping after changing exercises or exercise state
+    private func onStateChanged() {
+        // Update repeater rep
+        self.repeaterRep = nextRepeaterRep()
+        // Start timer if needed
+        switch currentExercise {
+        case .repeater(_), .maxHang(_):
+            startTimer()
+        default:
+            break
+        }
+    }
+    
+    /// Computes the next state of the repeater rep field
+    private func nextRepeaterRep() -> RepeaterRep {
+        switch currentExercise {
+        case .repeater(let d):
+            switch exerciseState {
+            case .ready:
+                return .init(max: d.expected.sets[indices!.exerciseSetIndex].numReps)
+            case .on:
+                return repeaterRep.next()
+            case .off:
+                return repeaterRep
+            default:
+                break
+            }
+        default:
+            break
+        }
+        return .zero
+    }
+    
     func prev() {
-        setIndices(prevIndices)
+        stopAndResetTimer()
+        if let newState = prevState() {
+            setState(newState: newState)
+        } else {
+            setState(newIndices: prevIndices)
+        }
+    }
+    
+    func prevState() -> ExerciseState? {
+        switch exerciseState {
+        case .rest:
+            return .ready
+        default:
+            return nil
+        }
     }
     
     var prevIndices: ExerciseIndices? {
         if let indices {
-            if let newIndices = tryPrevExercise(indices) {
-                // Stay on current exercise set, moving to new state
-                return newIndices
-            } else {
-                // Moving to new exercise set, exercise, or routine set
-                // Next exercise is determined by set order
-                let set = session.sets[indices.routineSetIndex]
-                switch set.order {
-                case .bfs:
-                    return getPrevBfs(indices)
-                case .dfs:
-                    return getPrevDfs(indices)
-                }
+            // Moving to new exercise set, exercise, or routine set
+            // Next exercise is determined by set order
+            let set = session.sets[indices.routineSetIndex]
+            switch set.order {
+            case .bfs:
+                return getPrevBfs(indices)
+            case .dfs:
+                return getPrevDfs(indices)
             }
         } else {
             // Can't go backward from start
@@ -863,28 +941,62 @@ struct RoutineSessionView: View {
     }
     
     func next(skip: Bool = false) {
-        setIndices(nextIndices(skip: skip))
+        stopAndResetTimer()
+        if let newState = nextState() {
+            setState(newState: newState)
+        } else {
+            setState(newIndices: nextIndices())
+        }
     }
     
-    func nextIndices(skip: Bool = false) -> ExerciseIndices? {
+    func nextState() -> ExerciseState? {
+        switch currentExercise {
+        case .generic(_):
+            switch exerciseState {
+            case .ready, .on, .off:
+                return .rest
+            case .rest, nil:
+                return nil
+            }
+        case .repeater(_):
+            switch exerciseState {
+            case .ready:
+                return .on
+            case .on:
+                return repeaterRep.hasNext ? .off : .rest
+            case .off:
+                return .on
+            case .rest, nil:
+                return nil
+            }
+        case .maxHang(_):
+            switch exerciseState {
+            case .ready:
+                return .on
+            case .on, .off:
+                return .rest
+            case .rest, nil:
+                return nil
+            }
+        case nil:
+            return nil
+        }
+    }
+    
+    func nextIndices() -> ExerciseIndices? {
         if let indices {
-            if !skip, let newIndices = tryNextExercise(indices) {
-                // Stay on current exercise set, moving to new state
-                return newIndices
-            } else {
-                // Moving to new exercise set, exercise, or routine set
-                // Next exercise is determined by set order
-                let set = session.sets[indices.routineSetIndex]
-                switch set.order {
-                case .bfs:
-                    return getNextBfs(indices)
-                case .dfs:
-                    return getNextDfs(indices)
-                }
+            // Moving to new exercise set, exercise, or routine set
+            // Next exercise is determined by set order
+            let set = session.sets[indices.routineSetIndex]
+            switch set.order {
+            case .bfs:
+                return getNextBfs(indices)
+            case .dfs:
+                return getNextDfs(indices)
             }
         } else {
             // Start at beginning
-            return computeIndices()
+            return .init()
         }
     }
     
@@ -894,7 +1006,7 @@ struct RoutineSessionView: View {
         // First check behind
         for i in (0..<indices.setExerciseIndex).reversed() {
             if targetIndex < set.exercises[i].numSets {
-                return computeIndices(routineSetIndex: indices.routineSetIndex, setExerciseIndex: i, exerciseSetIndex: targetIndex)
+                return .init(indices.routineSetIndex, i, targetIndex)
             }
         }
         targetIndex -= 1
@@ -905,10 +1017,10 @@ struct RoutineSessionView: View {
         // Then loop back around to 0 for the next set
         for i in (0..<set.exercises.count).reversed() {
             if targetIndex < set.exercises[i].numSets {
-                return computeIndices(routineSetIndex: indices.routineSetIndex, setExerciseIndex: i, exerciseSetIndex: targetIndex)
+                return .init(indices.routineSetIndex, i, targetIndex)
             }
         }
-        // Finish screen
+        // Start screen
         return nil
     }
     
@@ -918,20 +1030,20 @@ struct RoutineSessionView: View {
         // First check ahead
         for i in (indices.setExerciseIndex + 1)..<set.exercises.count {
             if targetIndex < set.exercises[i].numSets {
-                return computeIndices(routineSetIndex: indices.routineSetIndex, setExerciseIndex: i, exerciseSetIndex: targetIndex)
+                return .init(indices.routineSetIndex, i, targetIndex)
             }
         }
         targetIndex += 1
         // Then loop back around from 0 for the next set
         for i in 0..<set.exercises.count {
             if targetIndex < set.exercises[i].numSets {
-                return computeIndices(routineSetIndex: indices.routineSetIndex, setExerciseIndex: i, exerciseSetIndex: targetIndex)
+                return .init(indices.routineSetIndex, i, targetIndex)
             }
         }
         // No other exercises go this high
         if indices.routineSetIndex < session.sets.count - 1 {
             // Move to next routine set
-            return computeIndices(routineSetIndex: indices.routineSetIndex + 1)
+            return .init(indices.routineSetIndex + 1)
         }
         // Finish screen
         return nil
@@ -940,13 +1052,13 @@ struct RoutineSessionView: View {
     func getPrevDfs(_ indices: ExerciseIndices) -> ExerciseIndices? {
         if indices.exerciseSetIndex > 0 {
             // Prev set within the exercise
-            return computeIndices(routineSetIndex: indices.routineSetIndex, setExerciseIndex: indices.setExerciseIndex, exerciseSetIndex: indices.exerciseSetIndex - 1)
+            return .init(indices.routineSetIndex, indices.setExerciseIndex, indices.exerciseSetIndex - 1)
         } else if indices.setExerciseIndex > 0 {
             // Next exercise within the routine set
-            return computeIndices(routineSetIndex: indices.routineSetIndex, setExerciseIndex: indices.setExerciseIndex - 1)
+            return .init(indices.routineSetIndex, indices.setExerciseIndex - 1)
         } else if indices.routineSetIndex > 0 {
             // Next set wtihin the routine
-            return computeIndices(routineSetIndex: indices.routineSetIndex - 1)
+            return .init(indices.routineSetIndex - 1)
         } else {
             // Finish screen
             return nil
@@ -958,150 +1070,17 @@ struct RoutineSessionView: View {
         let exercise = set.exercises[indices.setExerciseIndex]
         if indices.exerciseSetIndex < exercise.numSets - 1 {
             // Next set within the exercise
-            return computeIndices(routineSetIndex: indices.routineSetIndex, setExerciseIndex: indices.setExerciseIndex, exerciseSetIndex: indices.exerciseSetIndex + 1)
+            return .init(indices.routineSetIndex, indices.setExerciseIndex, indices.exerciseSetIndex + 1)
         } else if indices.setExerciseIndex < set.exercises.count - 1 {
             // Next exercise within the routine set
-            return computeIndices(routineSetIndex: indices.routineSetIndex, setExerciseIndex: indices.setExerciseIndex + 1)
+            return .init(indices.routineSetIndex, indices.setExerciseIndex + 1)
         } else if indices.routineSetIndex < session.sets.count - 1 {
             // Next set wtihin the routine
-            return computeIndices(routineSetIndex: indices.routineSetIndex + 1)
+            return .init(indices.routineSetIndex + 1)
         } else {
             // Finish screen
             return nil
         }
-    }
-    
-    func tryPrevExercise(_ indices: ExerciseIndices) -> ExerciseIndices? {
-        switch indices.details {
-        case .generic:
-            return nil
-        case .repeater(let s, _):
-            switch s {
-            case .ready:
-                return nil
-            default:
-                if case .repeater(let d) = currentExercise {
-                    return .init(baseIndices: indices, details: .repeater(.ready, reps: d.expected.sets[indices.exerciseSetIndex].numReps))
-                } else {
-                    return nil
-                }
-            }
-        case .maxHang(let s):
-            switch s {
-            case .ready:
-                return nil
-            default:
-                return .init(baseIndices: indices, details: .maxHang(.ready))
-            }
-        }
-    }
-    
-    func tryNextExercise(_ indices: ExerciseIndices) -> ExerciseIndices? {
-        switch indices.details {
-        case .generic:
-            return nil
-        case .repeater(let s, let reps):
-            switch s {
-            case .ready:
-                return .init(baseIndices: indices, details: .repeater(.on, reps: reps))
-            case .on:
-                if reps > 1 {
-                    return .init(baseIndices: indices, details: .repeater(.off, reps: reps - 1))
-                } else {
-                    return .init(baseIndices: indices, details: .repeater(.done, reps: 0))
-                }
-            case .off:
-                return .init(baseIndices: indices, details: .repeater(.on, reps: reps))
-            case .done:
-                return nil
-            }
-        case .maxHang(let s):
-            switch s {
-            case .ready:
-                return .init(baseIndices: indices, details: .maxHang(.on))
-            case .on:
-                return .init(baseIndices: indices, details: .maxHang(.done))
-            case .done:
-                return nil
-            }
-        }
-    }
-    
-    func computeIndices(routineSetIndex: Int = 0, setExerciseIndex: Int = 0, exerciseSetIndex: Int = 0) -> ExerciseIndices {
-        let set = session.sets[routineSetIndex]
-        let exercise = set.exercises[setExerciseIndex]
-        switch exercise {
-        case .generic(_):
-            return.init(routineSetIndex: routineSetIndex, setExerciseIndex: setExerciseIndex, exerciseSetIndex: exerciseSetIndex, details: .generic)
-        case .repeater(let d):
-            return .init(routineSetIndex: routineSetIndex, setExerciseIndex: setExerciseIndex, exerciseSetIndex: exerciseSetIndex, details: .repeater(.ready, reps: d.expected.sets[exerciseSetIndex].numReps))
-        case .maxHang(_):
-            return .init(routineSetIndex: routineSetIndex, setExerciseIndex: setExerciseIndex, exerciseSetIndex: exerciseSetIndex, details: .maxHang(.ready))
-        }
-    }
-    
-    func setIndices(_ indices: ExerciseIndices?) {
-        // Make sure timer is reset
-        stopAndResetTimer()
-        // Reset flags
-        showNext = false
-        allowTimerNext = {
-            switch indices?.details {
-            case .generic:
-                return false
-            case .repeater(let s, _):
-                return s != .done
-            case .maxHang(let s):
-                return s != .done
-            case nil:
-                return true
-            }
-        }()
-        // If going back to the home page, clear out duration and indices
-        guard let indices else {
-            self.timerDuration = .zero
-            self.indices = nil
-            return
-        }
-        // Update timer duration then indices
-        self.timerDuration = computeTimerDuration(indices)
-        // Load data (and start timer if needed)
-        let set = session.sets[indices.routineSetIndex]
-        let exercise = set.exercises[indices.setExerciseIndex]
-        switch exercise {
-        case .generic(let d):
-            if indices.exerciseSetIndex < d.actual.count {
-                // Load from current data
-                genericData = .init(d.actual[indices.exerciseSetIndex], type: d.expected.dataType)
-                // Can set this flag to true since we have entered data
-                showNext = true
-            } else {
-                // Load from expected
-                genericData = .init(num: d.expected.sets[indices.exerciseSetIndex].avg)
-            }
-        case .repeater(let d):
-            startTimer()
-            if indices.exerciseSetIndex < d.actual.count {
-                // Load from current data
-                genericData = .init(d.actual[indices.exerciseSetIndex])
-            } else {
-                // Load from expected
-                let expected = d.expected.sets[indices.exerciseSetIndex]
-                genericData = .init(num: expected.numReps, weight: expected.weight)
-            }
-        case .maxHang(let d):
-            startTimer()
-            if indices.exerciseSetIndex < d.actual.count {
-                // Load from current data
-                genericData = .init(d.actual[indices.exerciseSetIndex])
-            } else {
-                // Load from expected
-                let expected = d.expected.sets[indices.exerciseSetIndex]
-                genericData = .init(side: expected.side, num: expected.target, weight: expected.weight)
-            }
-        }
-        // Finally, set indices
-        self.indices = indices
     }
     
     
@@ -1178,31 +1157,29 @@ struct RoutineSessionView: View {
         }
     }
     
-    private func computeTimerDuration(_ indices: ExerciseIndices?) -> Duration {
+    private func computeTimerDuration(indices: ExerciseIndices?, exerciseState: ExerciseState?) -> Duration {
         guard let indices else { return .zero }
         let set = session.sets[indices.routineSetIndex]
         let exercise = set.exercises[indices.setExerciseIndex]
         switch exercise {
         case .repeater(let d):
-            guard case .repeater(let s, _) = indices.details else { return .zero }
-            switch s {
+            switch exerciseState {
             case .ready:
                 return readyTime
             case .on:
                 return .seconds(d.expected.timeOn)
             case .off:
                 return .seconds(d.expected.timeOff)
-            case .done:
+            case .rest, .none:
                 return .seconds(set.restTime)
             }
         case .maxHang(let d):
-            guard case .maxHang(let s) = indices.details else { return .zero }
-            switch s {
+            switch exerciseState {
             case .ready:
                 return readyTime
             case .on:
                 return .seconds(d.expected.sets[indices.exerciseSetIndex].target)
-            case .done:
+            case .rest, .off, .none:
                 return .seconds(set.restTime)
             }
         default:
@@ -1214,20 +1191,11 @@ struct RoutineSessionView: View {
         var routineSetIndex: Int
         var setExerciseIndex: Int
         var exerciseSetIndex: Int
-        var details: ExerciseDetails
         
-        init(routineSetIndex: Int, setExerciseIndex: Int, exerciseSetIndex: Int, details: ExerciseDetails) {
+        init(_ routineSetIndex: Int = 0, _ setExerciseIndex: Int = 0, _ exerciseSetIndex: Int = 0) {
             self.routineSetIndex = routineSetIndex
             self.setExerciseIndex = setExerciseIndex
             self.exerciseSetIndex = exerciseSetIndex
-            self.details = details
-        }
-        
-        init(baseIndices: ExerciseIndices, details: ExerciseDetails) {
-            self.routineSetIndex = baseIndices.routineSetIndex
-            self.setExerciseIndex = baseIndices.setExerciseIndex
-            self.exerciseSetIndex = baseIndices.exerciseSetIndex
-            self.details = details
         }
     }
     
@@ -1283,12 +1251,6 @@ struct RoutineSessionView: View {
         }
     }
     
-    enum ExerciseDetails: Codable, Hashable, Equatable {
-        case generic
-        case repeater(_ state: RepeaterState, reps: Int)
-        case maxHang(_ state: MaxHangState)
-    }
-    
     enum SheetType: Identifiable, Codable, Hashable, Equatable {
         var id: String {
             switch self {
@@ -1309,12 +1271,34 @@ struct RoutineSessionView: View {
         case song
     }
     
-    enum RepeaterState: Codable, Hashable, Equatable {
-        case ready, on, off, done
+    enum ExerciseState: Codable, Hashable, Equatable {
+        case ready
+        case on
+        case off
+        case rest
     }
     
-    enum MaxHangState: Codable, Hashable, Equatable {
-        case ready, on, done
+    struct RepeaterRep: Codable, Hashable, Equatable {
+        static let zero = RepeaterRep(max: 0)
+        
+        let current: Int
+        let max: Int
+        
+        init(current: Int = 0, max: Int) {
+            self.current = current
+            self.max = max
+        }
+        
+        var hasNext: Bool {
+            current < max
+        }
+        
+        func next() -> RepeaterRep {
+            if hasNext {
+                return .init(current: current + 1, max: max)
+            }
+            return self
+        }
     }
 }
 
