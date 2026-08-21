@@ -80,15 +80,30 @@ extension SchemaV1 {
         }
         
         struct GenericDataSet: Codable, Hashable, Equatable {
+            /// The number of reps in the set
+            /// If numRepsAlt is nil, used for both sides (if applicable)
+            /// If numRepsAlt is not nil, used for the left side
             var numReps: Int?
+            /// If not nil, used to store a different number of reps for the right side
+            var numRepsAlt: Int?
+            /// The amount of time on
             var time: Int?
+            /// See explanation in numReps for alt usage
+            var timeAlt: Int?
+            /// The amount of weight used in the set
             var weight: Double?
+            /// See explanation in numReps for alt usage
+            var weightAlt: Double?
+            /// Any additional details about the set
             var notes: String
             
-            init(numReps: Int? = nil, time: Int? = nil, weight: Double? = nil, notes: String = "") {
+            init(numReps: Int? = nil, numRepsAlt: Int? = nil, time: Int? = nil, timeAlt: Int? = nil, weight: Double? = nil, weightAlt: Double? = nil, notes: String = "") {
                 self.numReps = numReps
-                self.weight = weight
+                self.numRepsAlt = numRepsAlt
                 self.time = time
+                self.timeAlt = timeAlt
+                self.weight = weight
+                self.weightAlt = weightAlt
                 self.notes = notes
             }
         }

@@ -28,19 +28,9 @@ struct RoutineEditView: View {
                         Button {
                             editExercise = (set.id, exercise.id)
                         } label: {
-                            switch exercise.type {
-                            case .generic:
-                                genericView(exercise.generic)
-                                    .contentShape(Rectangle())
-                            case .repeater:
-                                repeaterView(exercise.repeater)
-                                    .contentShape(Rectangle())
-                            case .maxHang:
-                                maxHangView(exercise.maxHang)
-                                    .contentShape(Rectangle())
-                            }
+                            exerciseView(exercise)
+                                .contentShape(Rectangle())
                         }.buttonStyle(.plain)
-                        
                     }
                     Menu("Add Exercise") {
                         Button("Basic") {
@@ -58,27 +48,11 @@ struct RoutineEditView: View {
                             set.exercises.append(exercise)
                             editExercise = (set.id, exercise.id)
                         }
-                        Button("Copy Last") {
-                            var exercise: Item.Exercise {
-                                let last = set.exercises.last!
-                                switch last.type {
-                                case .generic:
-                                    return .init(.generic(last.generic))
-                                case .repeater:
-                                    return .init(.repeater(last.repeater))
-                                case .maxHang:
-                                    return .init(.maxHang(last.maxHang))
-                                }
-                            }
-                            set.exercises.append(exercise)
-                            // TODO why crash?
-//                            editExercise = (set.id, exercise.id)
-                        }.disabled(set.exercises.isEmpty)
                     }
                 } header: {
                     VStack {
                         TextField("Set Name", text: $set.name)
-                        Stepper(value: $set.restTime, in: 0...300, step: 30) {
+                        Stepper(value: $set.restTime, in: 0...300, step: 15) {
                             Text("Rest Time: \(set.restTime) s")
                         }
                         Picker("", selection: $set.order) {
@@ -135,12 +109,29 @@ struct RoutineEditView: View {
             }
     }
     
+    @ViewBuilder
+    private func exerciseView(_ exercise: Item.Exercise) -> some View {
+        switch exercise.type {
+        case .generic:
+            genericView(exercise.generic)
+        case .repeater:
+            repeaterView(exercise.repeater)
+        case .maxHang:
+            maxHangView(exercise.maxHang)
+        }
+    }
+    
     private func genericView(_ generic: Routine.GenericSets) -> some View {
         VStack(alignment: .leading) {
-            Text(generic.name)
-                .font(.title3)
-                .bold()
-            ForEach(generic.sets, id: \.hashValue) { set in
+            if !generic.name.isEmpty {
+                Text(generic.name)
+                    .font(.title3)
+                    .bold()
+            } else {
+                Text("No Name")
+                    .italic()
+            }
+            ForEach(generic.sets.enumerated(), id: \.offset) { offset, set in
                 Text("\(set.text) \(generic.setDetailText)")
             }.font(.subheadline)
                 .padding(.leading, 8)
@@ -151,13 +142,16 @@ struct RoutineEditView: View {
         HStack {
             VStack(alignment: .leading) {
                 HStack(alignment: .center) {
-                    Text("\(repeater.tag):")
-                        .font(.title3)
-                        .bold()
+                    if !repeater.tag.isEmpty {
+                        Text("\(repeater.tag):")
+                    } else {
+                        Text("No Tag")
+                            .italic()
+                            .bold(false)
+                    }
                     Text("\(repeater.timeOn)/\(repeater.timeOff) s")
-                        .bold()
-                }
-                ForEach(repeater.sets, id: \.hashValue) { set in
+                }.font(.title3).bold()
+                ForEach(repeater.sets.enumerated(), id: \.offset) { offset, set in
                     Text(set.text)
                 }.font(.subheadline)
                     .padding(.leading, 8)
@@ -168,28 +162,35 @@ struct RoutineEditView: View {
     
     private func maxHangView(_ maxHang: Routine.MaxHangSets) -> some View {
         VStack(alignment: .leading) {
-            Text(maxHang.tag)
-                .font(.title3)
-                .bold()
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("Left")
-                        .underline()
-                        .font(.headline)
-                    ForEach(maxHang.sets.filter({ $0.side == .left }), id: \.hashValue) { set in
-                        Text(set.text)
+            if !maxHang.tag.isEmpty {
+                Text("\(maxHang.tag):")
+                    .font(.title3)
+                    .bold()
+            } else {
+                Text("No Tag")
+                    .italic()
+            }
+            if !maxHang.sets.isEmpty {
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("Left")
+                            .underline()
+                            .font(.headline)
+                        ForEach(maxHang.sets.filter({ $0.side == .left }).enumerated(), id: \.offset) { offset, set in
+                            Text(set.text)
+                        }
                     }
-                }
-                Spacer()
-                VStack(alignment: .trailing) {
-                    Text("Right")
-                        .underline()
-                        .font(.headline)
-                    ForEach(maxHang.sets.filter({ $0.side == .right }), id: \.hashValue) { set in
-                        Text(set.text)
+                    Spacer()
+                    VStack(alignment: .trailing) {
+                        Text("Right")
+                            .underline()
+                            .font(.headline)
+                        ForEach(maxHang.sets.filter({ $0.side == .right }).enumerated(), id: \.offset) { offset, set in
+                            Text(set.text)
+                        }
                     }
-                }
-            }.font(.subheadline)
+                }.font(.subheadline)
+            }
         }
     }
     
@@ -206,11 +207,12 @@ struct RoutineEditView: View {
                             Text(type.name).tag(type)
                         }
                     }
-                    Toggle("Multi-Weight", isOn: .init(get: {
-                        item.multiWeight ?? false
-                    }, set: { newValue in
-                        item.multiWeight = newValue
-                    }))
+                    Picker("Sided-ness", selection: $item.sideType) {
+                        Text("None").tag(nil as Routine.GenericSets.SideType?)
+                        ForEach(Routine.GenericSets.SideType.allCases, id: \.name) { type in
+                            Text(type.name).tag(type as Routine.GenericSets.SideType?)
+                        }
+                    }
                 }
                 Section {
                     ForEach($item.sets.enumerated(), id: \.offset) { offset, $set in

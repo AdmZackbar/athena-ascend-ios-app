@@ -12,13 +12,14 @@ struct SessionExerciseSheet: View {
     
     @Binding var exercise: Session.Exercise
     @Binding var showing: Bool
-    @State private var editType: EditType = .Exercise
+    @State private var editType: EditType = .Data
     @State private var selectionType: SelectionType = .single
     @State private var generic: Routine.GenericSets = .init()
     @State private var repeater: Routine.RepeaterSets = .init()
     @State private var maxHang: Routine.MaxHangSets = .init()
     @State private var data: [RoutineSessionView.GenericDataSet]
     @State private var notes: String
+    @State private var multiSide: Bool
     
     init(exercise: Binding<Session.Exercise>, showing: Binding<Bool>) {
         self._exercise = exercise
@@ -26,16 +27,19 @@ struct SessionExerciseSheet: View {
         switch exercise.wrappedValue {
         case .generic(let d):
             generic = d.expected
-            data = d.actual.map({ .init($0, type: d.expected.dataType) })
+            data = d.actual.map({ .init($0, format: d.expected) })
             notes = d.notes
+            multiSide = d.actual.contains(where: \.hasDiffSideData)
         case .repeater(let d):
             repeater = d.expected
             data = d.actual.map({ .init($0) })
             notes = d.notes
+            multiSide = false
         case .maxHang(let d):
             maxHang = d.expected
             data = d.actual.map({ .init($0) })
             notes = d.notes
+            multiSide = false
         }
     }
     
@@ -50,12 +54,11 @@ struct SessionExerciseSheet: View {
                 case .maxHang(_):
                     maxHangView()
                 }
-                
             }.navigationTitle("Edit Exercise")
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationBarBackButtonHidden()
                 .toolbar(content: toolbarContent)
-        }.presentationDetents([.medium, .large])
+        }.presentationDetents([.large])
     }
     
     @ToolbarContentBuilder
@@ -84,7 +87,7 @@ struct SessionExerciseSheet: View {
     func save() {
         switch exercise {
         case .generic(_):
-            exercise = .generic(.init(expected: generic, actual: data.map({ $0.toGeneric(generic.dataType) }), notes: notes))
+            exercise = .generic(.init(expected: generic, actual: data.map({ $0.toGeneric(generic) }), notes: notes))
         case .repeater(_):
             exercise = .repeater(.init(expected: repeater, actual: data.map({ $0.toRepeater() }), notes: notes))
         case .maxHang(_):
@@ -112,11 +115,12 @@ struct SessionExerciseSheet: View {
                     Text(type.name).tag(type)
                 }
             }
-            Toggle("Multi-Weight", isOn: .init(get: {
-                generic.multiWeight ?? false
-            }, set: { newValue in
-                generic.multiWeight = newValue
-            }))
+            Picker("Sided-ness", selection: $generic.sideType) {
+                Text("None").tag(nil as Routine.GenericSets.SideType?)
+                ForEach(Routine.GenericSets.SideType.allCases, id: \.name) { type in
+                    Text(type.name).tag(type as Routine.GenericSets.SideType?)
+                }
+            }
         }
         Section {
             ForEach($generic.sets.enumerated(), id: \.offset) { offset, $set in
@@ -175,25 +179,58 @@ struct SessionExerciseSheet: View {
         Section {
             ForEach($data.enumerated(), id: \.offset) { offset, $set in
                 VStack {
-                    HStack {
-                        Stepper("\(set.num) \(generic.setDetailText)", value: $set.num, in: 0...30, step: 1)
-                        Stepper(set.weight.lbsFormat, value: $set.weight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
+                    if generic.sideType == .independent && multiSide {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Stepper("\(set.numLeft) \(generic.setDetailText)", value: $set.numLeft, in: 0...30, step: 1)
+                                switch generic.dataType {
+                                case .repWeight, .timeWeight:
+                                    Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
+                                case .rep, .time:
+                                    EmptyView()
+                                }
+                            }
+                            VStack(alignment: .trailing, spacing: 16) {
+                                Stepper("\(set.numRight) \(generic.setDetailText)", value: $set.numRight, in: 0...30, step: 1)
+                                switch generic.dataType {
+                                case .repWeight, .timeWeight:
+                                    Stepper(set.weightRight.lbsFormat, value: $set.weightRight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
+                                case .rep, .time:
+                                    EmptyView()
+                                }
+                            }
+                        }
+                    } else {
+                        HStack {
+                            Stepper("\(set.numLeft) \(generic.setDetailText)", value: $set.numLeft, in: 0...30, step: 1)
+                            switch generic.dataType {
+                            case .repWeight, .timeWeight:
+                                Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
+                            case .rep, .time:
+                                EmptyView()
+                            }
+                        }
                     }
                     TextField("Notes", text: $set.notes, axis: .vertical)
                         .lineLimit(1...3)
                 }
             }
         } header: {
-            HStack {
-                Text("Sets")
-                Spacer()
-                Button("Add") {
-                    let expected = generic.sets[data.count]
-                    data.append(.init(num: expected.avg, weight: data.last?.weight ?? 0))
-                }.disabled(data.count >= generic.sets.count)
-                Button("Remove") {
-                    data.removeLast()
-                }.disabled(data.isEmpty)
+            VStack(alignment: .leading) {
+                if generic.sideType == .independent {
+                    Toggle("Different Side Values", isOn: $multiSide)
+                }
+                HStack {
+                    Text("Sets")
+                    Spacer()
+                    Button("Add") {
+                        let expected = generic.sets[data.count]
+                        data.append(.init(numLeft: expected.avg, weightLeft: data.last?.weightLeft))
+                    }.disabled(data.count >= generic.sets.count)
+                    Button("Remove") {
+                        data.removeLast()
+                    }.disabled(data.isEmpty)
+                }
             }
         }
         Section("Notes") {
@@ -268,8 +305,8 @@ struct SessionExerciseSheet: View {
             ForEach($data.enumerated(), id: \.offset) { offset, $set in
                 VStack {
                     HStack {
-                        Stepper("\(set.num) reps", value: $set.num, in: 0...30, step: 1)
-                        Stepper(set.weight.lbsFormat, value: $set.weight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
+                        Stepper("\(set.numLeft) reps", value: $set.numLeft, in: 0...30, step: 1)
+                        Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
                     }
                     TextField("Notes", text: $set.notes, axis: .vertical)
                         .lineLimit(1...3)
@@ -281,7 +318,7 @@ struct SessionExerciseSheet: View {
                 Spacer()
                 Button("Add") {
                     let expected = repeater.sets[data.count]
-                    data.append(.init(num: expected.numReps, weight: expected.weight))
+                    data.append(.init(numLeft: expected.numReps, weightLeft: expected.weight))
                 }.disabled(data.count >= repeater.sets.count)
                 Button("Remove") {
                     data.removeLast()
@@ -369,8 +406,8 @@ struct SessionExerciseSheet: View {
             ForEach($data.enumerated(), id: \.offset) { offset, $set in
                 VStack {
                     HStack {
-                        Stepper("\(set.side.abbreviation) \(set.num)s", value: $set.num, in: 0...30, step: 1)
-                        Stepper(set.weight.lbsFormat, value: $set.weight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
+                        Stepper("\(set.side.abbreviation) \(set.numLeft)s", value: $set.numLeft, in: 0...30, step: 1)
+                        Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
                     }
                     TextField("Notes", text: $set.notes, axis: .vertical)
                         .lineLimit(1...3)
@@ -382,9 +419,9 @@ struct SessionExerciseSheet: View {
                 Spacer()
                 Button("Add") {
                     let left = maxHang.sets[data.count]
-                    data.append(.init(side: left.side, num: left.target, weight: left.weight))
+                    data.append(.init(side: left.side, numLeft: left.target, weightLeft: left.weight))
                     let right = maxHang.sets[data.count]
-                    data.append(.init(side: right.side, num: right.target, weight: right.weight))
+                    data.append(.init(side: right.side, numLeft: right.target, weightLeft: right.weight))
                 }.disabled(data.count >= maxHang.sets.count)
                 Button("Remove") {
                     data.removeLast()
@@ -404,7 +441,7 @@ struct SessionExerciseSheet: View {
 }
 
 #Preview("Generic") {
-    @Previewable @State var exercise: Session.Exercise = .generic(.init(expected: .init(name: "Barbell Bench Press", dataType: .repWeight, sets: [
+    @Previewable @State var exercise: Session.Exercise = .generic(.init(expected: .init(name: "Barbell Bench Press", dataType: .repWeight, sideType: .independent, sets: [
         .init(num: 10),
         .init(num: 8),
         .init(num: 6),

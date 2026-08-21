@@ -61,23 +61,34 @@ extension SchemaV1 {
             var name: String
             /// The data type(s) contained in the sets
             var dataType: DataType
-            /// If true, the weight is used for both left and right sides
-            var multiWeight: Bool?
+            /// If nil, there is no sided-ness to the exercise: e.g. plank, barbell bench press
+            var sideType: SideType?
             /// The sets of the exercise in order
             var sets: [GenericSet]
             
-            init(name: String = "", dataType: DataType = .repWeight, multiWeight: Bool = false, sets: [GenericSet] = []) {
+            init(name: String = "", dataType: DataType = .repWeight, sideType: SideType? = nil, sets: [GenericSet] = []) {
                 self.name = name
                 self.dataType = dataType
-                self.multiWeight = multiWeight
+                self.sideType = sideType
                 self.sets = sets
             }
             
+            /// Denotes what data types are stored in the data sets
             enum DataType: CaseIterable, Codable, Hashable, Equatable {
                 case rep
                 case repWeight
                 case time
                 case timeWeight
+            }
+            
+            /// Denotes usage of weight/time/reps w/r left/right side
+            enum SideType: CaseIterable, Codable, Hashable, Equatable {
+                /// Two weights/reps/time are used for both sides, but always are the same anount
+                /// e.g. dumbbell bench press, lateral-to-front raise
+                case dependent
+                /// Two weights/reps/time are used, and the amounts can differ
+                /// e.g. 1-arm row, ninja kick hold, hip abductor
+                case independent
             }
         }
         

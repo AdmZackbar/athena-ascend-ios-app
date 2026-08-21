@@ -55,6 +55,15 @@ extension Routine.GenericSets.DataType {
     }
 }
 
+extension Routine.GenericSets.SideType {
+    var name: String {
+        switch self {
+        case .dependent: return "Dependent"
+        case .independent: return "Independent"
+        }
+    }
+}
+
 
 // ******* //
 // SESSION //
@@ -228,21 +237,104 @@ extension Routine.GenericSet {
 }
 
 extension Session.GenericDataSet {
-    func weightText(_ multiWeight: Bool) -> String {
-        let num = (weight ?? 0).formatted(.number.precision(.fractionLength(0...2)))
-        return multiWeight ? "\(num)/\(num) lbs" : "\(num) lbs"
+    var repsLeft: Int {
+        numReps ?? 0
+    }
+    
+    var repsRight: Int {
+        numRepsAlt ?? numReps ?? 0
+    }
+    
+    var timeLeft: Int {
+        time ?? 0
+    }
+    
+    var timeRight: Int {
+        timeAlt ?? time ?? 0
+    }
+    
+    var weightLeft: Double {
+        weight ?? 0
+    }
+    
+    var weightRight: Double {
+        weightAlt ?? weight ?? 0
+    }
+    
+    var hasDiffSideData: Bool {
+        repsLeft != repsRight || timeLeft != timeRight || weightLeft != weightRight
     }
     
     func toString(_ data: Routine.GenericSets) -> String {
         switch data.dataType {
         case .rep:
-            return "\(numReps ?? 0) reps"
+            return repToString(data.sideType)
         case .repWeight:
-            return "\(numReps ?? 0) reps @ \(weightText(data.multiWeight ?? false))"
+            return repWeightToString(data.sideType)
         case .time:
-            return "\(time ?? 0)s"
+            return timeToString(data.sideType)
         case .timeWeight:
-            return "\(time ?? 0)s @ \(weightText(data.multiWeight ?? false))"
+            return timeWeightToString(data.sideType)
+        }
+    }
+    
+    private func repToString(_ sideType: Routine.GenericSets.SideType?) -> String {
+        switch sideType {
+        case .none:
+            return "\(repsLeft) reps"
+        case .dependent:
+            return "\(repsLeft)/\(repsLeft) reps"
+        case .independent:
+            return "\(repsLeft)/\(repsRight) reps"
+        }
+    }
+    
+    private func repWeightToString(_ sideType: Routine.GenericSets.SideType?) -> String {
+        switch sideType {
+        case .none:
+            return "\(repsLeft) reps @ \(weightLeft.lbsFormat)"
+        case .dependent:
+            let weightStr = weightLeft.formatted(.number.rounded())
+            return "\(repsLeft) reps @ \(weightStr)/\(weightStr) lbs"
+        case .independent:
+            if repsLeft == repsRight && weightLeft == weightRight {
+                let weightStr = weightLeft.formatted(.number.rounded())
+                return "\(repsLeft) reps @ \(weightStr)/\(weightStr) lbs"
+            } else if repsLeft == repsRight {
+                let leftStr = weightLeft.formatted(.number.rounded())
+                let rightStr = weightRight.formatted(.number.rounded())
+                return "\(repsLeft) reps @ \(leftStr)/\(rightStr) lbs"
+            } else if weightLeft == weightRight {
+                let weightStr = weightLeft.formatted(.number.rounded())
+                return "\(repsLeft)/\(repsRight) reps @ \(weightStr)/\(weightStr) lbs"
+            } else {
+                let leftStr = weightLeft.formatted(.number.rounded())
+                let rightStr = weightRight.formatted(.number.rounded())
+                return "\(repsLeft)/\(repsRight) reps @ \(leftStr)/\(rightStr) lbs"
+            }
+        }
+    }
+    
+    private func timeToString(_ sideType: Routine.GenericSets.SideType?) -> String {
+        switch sideType {
+        case .none:
+            return "\(timeLeft)s"
+        case .dependent:
+            return "\(timeLeft)s/\(timeLeft)s"
+        case .independent:
+            return "\(timeLeft)s/\(timeRight)s"
+        }
+    }
+    
+    private func timeWeightToString(_ sideType: Routine.GenericSets.SideType?) -> String {
+        switch sideType {
+        case .none:
+            return "\(timeLeft)s @ \(weightLeft.lbsFormat)"
+        case .dependent:
+            let weightStr = weightLeft.formatted(.number.rounded())
+            return "\(timeLeft)s @ \(weightStr)/\(weightStr) lbs"
+        case .independent:
+            return "\(timeLeft)s @ \(weightLeft.lbsFormat), \(timeRight)s @ \(weightRight.lbsFormat)"
         }
     }
 }

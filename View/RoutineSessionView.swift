@@ -411,14 +411,14 @@ struct RoutineSessionView: View {
                 }.buttonStyle(.borderedProminent)
             } else {
                 VStack {
-                    Stepper(value: $genericData.num, in: 0...100) {
-                        Text("\(genericData.num) \(data.expected.setDetailText)")
+                    Stepper(value: $genericData.numLeft, in: 0...100) {
+                        Text("\(genericData.numLeft) \(data.expected.setDetailText)")
                     }
                     switch data.expected.dataType {
                     case .repWeight, .timeWeight:
-                        Stepper(value: $genericData.weight, in: -200...200, step: 5) {
+                        Stepper(value: $genericData.weightLeft, in: -200...200, step: 5) {
                             HStack {
-                                TextField("", value: $genericData.weight, format: .number.precision(.fractionLength(0...2)))
+                                TextField("", value: $genericData.weightLeft, format: .number.precision(.fractionLength(0...2)))
                                     .keyboardType(.decimalPad)
                                 Text("lbs")
                             }
@@ -563,13 +563,13 @@ struct RoutineSessionView: View {
             }.padding()
             VStack {
                 HStack {
-                    Stepper(value: $genericData.num, in: 0...100) {
-                        Text("\(genericData.num) reps")
+                    Stepper(value: $genericData.numLeft, in: 0...100) {
+                        Text("\(genericData.numLeft) reps")
                     }
                     Spacer()
-                    Stepper(value: $genericData.weight, in: -200...200, step: 5) {
+                    Stepper(value: $genericData.weightLeft, in: -200...200, step: 5) {
                         HStack {
-                            TextField("", value: $genericData.weight, format: .number.precision(.fractionLength(0...2)))
+                            TextField("", value: $genericData.weightLeft, format: .number.precision(.fractionLength(0...2)))
                                 .keyboardType(.decimalPad)
                             Text("lbs")
                         }
@@ -644,14 +644,14 @@ struct RoutineSessionView: View {
         switch currentExercise {
         case .generic(let d):
             VStack {
-                Stepper(value: $genericData.num, in: 0...100) {
-                    Text("\(genericData.num) \(d.expected.setDetailText)")
+                Stepper(value: $genericData.numLeft, in: 0...100) {
+                    Text("\(genericData.numLeft) \(d.expected.setDetailText)")
                 }
                 switch d.expected.dataType {
                 case .repWeight, .timeWeight:
-                    Stepper(value: $genericData.weight, in: -200...200, step: 5) {
+                    Stepper(value: $genericData.weightLeft, in: -200...200, step: 5) {
                         HStack {
-                            TextField("", value: $genericData.weight, format: .number.precision(.fractionLength(0...2)))
+                            TextField("", value: $genericData.weightLeft, format: .number.precision(.fractionLength(0...2)))
                                 .keyboardType(.decimalPad)
                             Text("lbs")
                         }
@@ -677,12 +677,12 @@ struct RoutineSessionView: View {
             }
         case .repeater(_):
             VStack {
-                Stepper(value: $genericData.num, in: 0...100) {
-                    Text("\(genericData.num) reps")
+                Stepper(value: $genericData.numLeft, in: 0...100) {
+                    Text("\(genericData.numLeft) reps")
                 }
-                Stepper(value: $genericData.weight, in: -200...200, step: 5) {
+                Stepper(value: $genericData.weightLeft, in: -200...200, step: 5) {
                     HStack {
-                        TextField("", value: $genericData.weight, format: .number.precision(.fractionLength(0...2)))
+                        TextField("", value: $genericData.weightLeft, format: .number.precision(.fractionLength(0...2)))
                             .keyboardType(.decimalPad)
                         Text("lbs")
                     }
@@ -705,12 +705,12 @@ struct RoutineSessionView: View {
             }
         case .maxHang(_):
             VStack {
-                Stepper(value: $genericData.num, in: 0...30) {
-                    Text("\(genericData.num) seconds")
+                Stepper(value: $genericData.numLeft, in: 0...30) {
+                    Text("\(genericData.numLeft) seconds")
                 }
-                Stepper(value: $genericData.weight, in: -200...200, step: 5) {
+                Stepper(value: $genericData.weightLeft, in: -200...200, step: 5) {
                     HStack {
-                        TextField("", value: $genericData.weight, format: .number.precision(.fractionLength(0...2)))
+                        TextField("", value: $genericData.weightLeft, format: .number.precision(.fractionLength(0...2)))
                             .keyboardType(.decimalPad)
                         Text("lbs")
                     }
@@ -794,10 +794,10 @@ struct RoutineSessionView: View {
         case .generic(let d):
             if indices.exerciseSetIndex < d.actual.count {
                 // Load from current data
-                return .init(d.actual[indices.exerciseSetIndex], type: d.expected.dataType)
+                return .init(d.actual[indices.exerciseSetIndex], format: d.expected)
             } else {
                 // Load from expected
-                return .init(num: d.expected.sets[indices.exerciseSetIndex].avg)
+                return .init(numLeft: d.expected.sets[indices.exerciseSetIndex].avg)
             }
         case .repeater(let d):
             if indices.exerciseSetIndex < d.actual.count {
@@ -806,7 +806,7 @@ struct RoutineSessionView: View {
             } else {
                 // Load from expected
                 let expected = d.expected.sets[indices.exerciseSetIndex]
-                return .init(num: expected.numReps, weight: expected.weight)
+                return .init(numLeft: expected.numReps, weightLeft: expected.weight)
             }
         case .maxHang(let d):
             if indices.exerciseSetIndex < d.actual.count {
@@ -815,7 +815,7 @@ struct RoutineSessionView: View {
             } else {
                 // Load from expected
                 let expected = d.expected.sets[indices.exerciseSetIndex]
-                return .init(side: expected.side, num: expected.target, weight: expected.weight)
+                return .init(side: expected.side, numLeft: expected.target, weightLeft: expected.weight)
             }
         }
     }
@@ -826,9 +826,9 @@ struct RoutineSessionView: View {
         case .generic(let d):
             var newActual: [Session.GenericDataSet] = d.actual
             if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = genericData.toGeneric(d.expected.dataType)
+                newActual[indices.exerciseSetIndex] = genericData.toGeneric(d.expected)
             } else {
-                newActual.append(genericData.toGeneric(d.expected.dataType))
+                newActual.append(genericData.toGeneric(d.expected))
             }
             session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .generic(.init(expected: d.expected, actual: newActual, notes: d.notes))
         case .repeater(let d):
@@ -1201,53 +1201,95 @@ struct RoutineSessionView: View {
     
     struct GenericDataSet: Codable, Hashable, Equatable {
         var side: Routine.Side
-        var num: Int
-        var weight: Double
+        var numLeft: Int
+        var numRight: Int
+        var weightLeft: Double
+        var weightRight: Double
         var notes: String
         
-        init(_ data: Session.GenericDataSet, type: Routine.GenericSets.DataType) {
-            switch type {
+        init(_ data: Session.GenericDataSet, format: Routine.GenericSets) {
+            switch format.dataType {
             case .rep, .repWeight:
-                self.init(num: data.numReps ?? 1, weight: data.weight ?? 0, notes: data.notes)
+                self.init(numLeft: data.repsLeft, numRight: data.repsRight, weightLeft: data.weightLeft, weightRight: data.weightRight, notes: data.notes)
             case .time, .timeWeight:
-                self.init(num: data.time ?? 1, weight: data.weight ?? 0, notes: data.notes)
+                self.init(numLeft: data.timeLeft, numRight: data.timeRight, weightLeft: data.weightLeft, weightRight: data.weightRight, notes: data.notes)
             }
         }
         
         init(_ data: Session.RepeaterSet) {
-            self.init(num: data.numReps, weight: data.weight, notes: data.notes)
+            self.init(numLeft: data.numReps, weightLeft: data.weight, notes: data.notes)
         }
         
         init(_ data: Session.MaxHangSet) {
-            self.init(side: data.side, num: data.target, weight: data.weight, notes: data.notes)
+            self.init(side: data.side, numLeft: data.target, weightLeft: data.weight, notes: data.notes)
         }
         
-        init(side: Routine.Side = .both, num: Int = 1, weight: Double = 0.0, notes: String = "") {
-            self.side = side
-            self.num = num
-            self.weight = weight
+        init(side: Routine.Side? = nil, numLeft: Int? = nil, numRight: Int? = 1, weightLeft: Double? = nil, weightRight: Double? = nil, notes: String = "") {
+            self.side = side ?? .both
+            self.numLeft = numLeft ?? 0
+            self.numRight = numRight ?? numLeft ?? 0
+            self.weightLeft = weightLeft ?? 0
+            self.weightRight = weightRight ?? weightLeft ?? 0
             self.notes = notes
         }
         
-        func toGeneric(_ type: Routine.GenericSets.DataType) -> Session.GenericDataSet {
-            switch type {
+        func toGeneric(_ data: Routine.GenericSets) -> Session.GenericDataSet {
+            switch data.dataType {
             case .rep:
-                return .init(numReps: num, notes: notes)
+                if data.sideType == .independent && numLeft != numRight {
+                    return .init(numReps: numLeft, numRepsAlt: numRight, notes: notes)
+                }
+                return .init(numReps: numLeft, notes: notes)
             case .repWeight:
-                return .init(numReps: num, weight: weight, notes: notes)
+                if data.sideType == .independent {
+                    var dataSet = Session.GenericDataSet(notes: notes)
+                    if numLeft != numRight {
+                        dataSet.numReps = numLeft
+                        dataSet.numRepsAlt = numRight
+                    } else {
+                        dataSet.numReps = numLeft
+                    }
+                    if weightLeft != weightRight {
+                        dataSet.weight = weightLeft
+                        dataSet.weightAlt = weightRight
+                    } else {
+                        dataSet.weight = weightLeft
+                    }
+                    return dataSet
+                }
+                return .init(numReps: numLeft, weight: weightLeft, notes: notes)
             case .time:
-                return .init(time: num, notes: notes)
+                if data.sideType == .independent && numLeft != numRight {
+                    return .init(time: numLeft, timeAlt: numRight, notes: notes)
+                }
+                return .init(numReps: numLeft, notes: notes)
             case .timeWeight:
-                return .init(time: num, weight: weight, notes: notes)
+                if data.sideType == .independent {
+                    var dataSet = Session.GenericDataSet(notes: notes)
+                    if numLeft != numRight {
+                        dataSet.time = numLeft
+                        dataSet.timeAlt = numRight
+                    } else {
+                        dataSet.numReps = numLeft
+                    }
+                    if weightLeft != weightRight {
+                        dataSet.weight = weightLeft
+                        dataSet.weightAlt = weightRight
+                    } else {
+                        dataSet.weight = weightLeft
+                    }
+                    return dataSet
+                }
+                return .init(time: numLeft, weight: weightLeft, notes: notes)
             }
         }
         
         func toRepeater() -> Session.RepeaterSet {
-            return .init(numReps: num, weight: weight, notes: notes)
+            return .init(numReps: numLeft, weight: weightLeft, notes: notes)
         }
         
         func toMaxHang() -> Session.MaxHangSet {
-            return .init(side: side, target: num, weight: weight, notes: notes)
+            return .init(side: side, target: numLeft, weight: weightLeft, notes: notes)
         }
     }
     
