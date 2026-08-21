@@ -128,7 +128,7 @@ struct RoutineSessionView: View {
                         if !newValue {
                             sheetType = nil
                         }
-                    }))
+                    }), showData: session.finished)
                 case .notes:
                     Form {
                         TextField("Notes", text: $genericData.notes, axis: .vertical)
@@ -216,7 +216,7 @@ struct RoutineSessionView: View {
                 } label: {
                     Label("Edit", systemImage: "pencil")
                 }
-                if !session.finished {
+                if !session.finished && session.routine != nil {
                     Button {
                         next()
                     } label: {
@@ -275,7 +275,7 @@ struct RoutineSessionView: View {
                     }
                 }
                 TextField("Notes", text: $session.notes, axis: .vertical)
-                    .lineLimit(3...9)
+                    .lineLimit((session.sets.isEmpty ? 9 : 3)...12)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.sentences)
                 if hasData {
@@ -346,7 +346,7 @@ struct RoutineSessionView: View {
     
     @ViewBuilder
     func setSummaryView() -> some View {
-        ForEach(session.sets.enumerated(), id: \.offset) { offset, set in
+        ForEach($session.sets.enumerated(), id: \.offset) { offset, $set in
             let setIndex = offset
             Section {
                 ForEach(set.exercises.enumerated(), id: \.offset) { offset, exercise in
@@ -381,12 +381,57 @@ struct RoutineSessionView: View {
                         }.buttonStyle(.plain)
                     }
                 }
+                if !session.finished {
+                    HStack {
+                        Menu {
+                            Button("Basic") {
+                                set.exercises.append(.generic(.init(expected: .init())))
+                                sheetType = .exercise(setIndex: setIndex, exerciseIndex: set.exercises.count - 1)
+                            }
+                            Button("Repeater") {
+                                set.exercises.append(.repeater(.init(expected: .init())))
+                                sheetType = .exercise(setIndex: setIndex, exerciseIndex: set.exercises.count - 1)
+                            }
+                            Button("Max Hang") {
+                                set.exercises.append(.maxHang(.init(expected: .init())))
+                                sheetType = .exercise(setIndex: setIndex, exerciseIndex: set.exercises.count - 1)
+                            }
+                        } label: {
+                            Label("Add Exercise...", systemImage: "plus")
+                        }
+                    }
+                }
             } header: {
                 HStack {
-                    Text(set.name)
+                    if session.finished {
+                        Text(set.name)
+                    } else {
+                        TextField("Set Name", text: $set.name)
+                    }
                     Spacer()
-                    Text("\(set.restTime)s Rest")
+                    if set.restTime > 0 {
+                        Text("\(set.restTime)s Rest")
+                    }
+                    Menu {
+                        Button(role: .destructive) {
+                            session.sets.remove(at: setIndex)
+                        } label: {
+                            Label("Delete Set", systemImage: "trash")
+                        }
+                    } label: {
+                        Label("Options", systemImage: "ellipsis.circle")
+                            .labelStyle(.iconOnly)
+                    }
                 }
+            } footer: {
+                
+            }
+        }
+        if !session.finished {
+            Button {
+                session.sets.append(.init(base: .init()))
+            } label: {
+                Label("Add New Set", systemImage: "plus")
             }
         }
     }
@@ -1376,5 +1421,11 @@ struct RingShape: Shape {
             return session
         }()
         RoutineSessionView(session: session)
+    }
+}
+
+#Preview("Fresh") {
+    NavigationStack {
+        RoutineSessionView(session: Session())
     }
 }

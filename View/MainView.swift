@@ -40,10 +40,21 @@ struct MainView: View {
                         } label: {
                             Label("View Repeaters", systemImage: "magnifyingglass")
                         }
-                        Button {
-                            navigationStore.push(ViewType.routineAdd)
+                        Menu {
+                            Button {
+                                let session = Session()
+                                modelContext.insert(session)
+                                navigationStore.push(ViewType.session(session: session))
+                            } label: {
+                                Label("Start Fresh Session", systemImage: "clock")
+                            }
+                            Button {
+                                navigationStore.push(ViewType.routineAdd)
+                            } label: {
+                                Label("Create New Routine", systemImage: "map")
+                            }
                         } label: {
-                            Label("Add Routine", systemImage: "plus")
+                            Label("Add", systemImage: "plus")
                         }
                     }
                 }.navigationDestination(for: ViewType.self, destination: Self.handleView)

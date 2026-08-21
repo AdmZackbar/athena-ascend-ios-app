@@ -12,7 +12,7 @@ struct SessionExerciseSheet: View {
     
     @Binding var exercise: Session.Exercise
     @Binding var showing: Bool
-    @State private var editType: EditType = .Data
+    @State private var editType: EditType
     @State private var selectionType: SelectionType = .single
     @State private var generic: Routine.GenericSets = .init()
     @State private var repeater: Routine.RepeaterSets = .init()
@@ -21,9 +21,10 @@ struct SessionExerciseSheet: View {
     @State private var notes: String
     @State private var multiSide: Bool
     
-    init(exercise: Binding<Session.Exercise>, showing: Binding<Bool>) {
+    init(exercise: Binding<Session.Exercise>, showing: Binding<Bool>, showData: Bool = true) {
         self._exercise = exercise
         self._showing = showing
+        self.editType = showData ? .Data : .Exercise
         switch exercise.wrappedValue {
         case .generic(let d):
             generic = d.expected

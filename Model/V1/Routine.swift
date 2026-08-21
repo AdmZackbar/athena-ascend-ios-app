@@ -42,7 +42,7 @@ extension SchemaV1 {
             /// * DFS: all sets from the first exercise before moving to the next exercise
             var order: Order
             
-            init(name: String = "", exercises: [Exercise] = [], restTime: Int = 180, order: Order = .bfs) {
+            init(name: String = "", exercises: [Exercise] = [], restTime: Int = 0, order: Order = .bfs) {
                 self.name = name
                 self.exercises = exercises
                 self.restTime = restTime
