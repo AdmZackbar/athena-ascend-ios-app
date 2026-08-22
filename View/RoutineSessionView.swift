@@ -456,7 +456,7 @@ struct RoutineSessionView: View {
                 }.buttonStyle(.borderedProminent)
             } else {
                 VStack {
-                    Stepper(value: $genericData.numLeft, in: 0...100) {
+                    Stepper(value: $genericData.numLeft, in: 0...1000) {
                         Text("\(genericData.numLeft) \(data.expected.setDetailText)")
                     }
                     switch data.expected.dataType {
@@ -608,7 +608,7 @@ struct RoutineSessionView: View {
             }.padding()
             VStack {
                 HStack {
-                    Stepper(value: $genericData.numLeft, in: 0...100) {
+                    Stepper(value: $genericData.numLeft, in: 0...1000) {
                         Text("\(genericData.numLeft) reps")
                     }
                     Spacer()
@@ -689,7 +689,7 @@ struct RoutineSessionView: View {
         switch currentExercise {
         case .generic(let d):
             VStack {
-                Stepper(value: $genericData.numLeft, in: 0...100) {
+                Stepper(value: $genericData.numLeft, in: 0...1000) {
                     Text("\(genericData.numLeft) \(d.expected.setDetailText)")
                 }
                 switch d.expected.dataType {
@@ -871,9 +871,9 @@ struct RoutineSessionView: View {
         case .generic(let d):
             var newActual: [Session.GenericDataSet] = d.actual
             if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = genericData.toGeneric(d.expected)
+                newActual[indices.exerciseSetIndex] = genericData.toGeneric(d.expected, useAlt: false)
             } else {
-                newActual.append(genericData.toGeneric(d.expected))
+                newActual.append(genericData.toGeneric(d.expected, useAlt: false))
             }
             session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .generic(.init(expected: d.expected, actual: newActual, notes: d.notes))
         case .repeater(let d):
@@ -1269,7 +1269,7 @@ struct RoutineSessionView: View {
             self.init(side: data.side, numLeft: data.target, weightLeft: data.weight, notes: data.notes)
         }
         
-        init(side: Routine.Side? = nil, numLeft: Int? = nil, numRight: Int? = 1, weightLeft: Double? = nil, weightRight: Double? = nil, notes: String = "") {
+        init(side: Routine.Side? = nil, numLeft: Int? = nil, numRight: Int? = nil, weightLeft: Double? = nil, weightRight: Double? = nil, notes: String = "") {
             self.side = side ?? .both
             self.numLeft = numLeft ?? 0
             self.numRight = numRight ?? numLeft ?? 0
@@ -1278,15 +1278,15 @@ struct RoutineSessionView: View {
             self.notes = notes
         }
         
-        func toGeneric(_ data: Routine.GenericSets) -> Session.GenericDataSet {
+        func toGeneric(_ data: Routine.GenericSets, useAlt: Bool) -> Session.GenericDataSet {
             switch data.dataType {
             case .rep:
-                if data.sideType == .independent && numLeft != numRight {
+                if data.sideType == .independent && useAlt && numLeft != numRight {
                     return .init(numReps: numLeft, numRepsAlt: numRight, notes: notes)
                 }
                 return .init(numReps: numLeft, notes: notes)
             case .repWeight:
-                if data.sideType == .independent {
+                if data.sideType == .independent && useAlt {
                     var dataSet = Session.GenericDataSet(notes: notes)
                     if numLeft != numRight {
                         dataSet.numReps = numLeft
@@ -1304,18 +1304,18 @@ struct RoutineSessionView: View {
                 }
                 return .init(numReps: numLeft, weight: weightLeft, notes: notes)
             case .time:
-                if data.sideType == .independent && numLeft != numRight {
+                if data.sideType == .independent && useAlt && numLeft != numRight {
                     return .init(time: numLeft, timeAlt: numRight, notes: notes)
                 }
-                return .init(numReps: numLeft, notes: notes)
+                return .init(time: numLeft, notes: notes)
             case .timeWeight:
-                if data.sideType == .independent {
+                if data.sideType == .independent && useAlt {
                     var dataSet = Session.GenericDataSet(notes: notes)
                     if numLeft != numRight {
                         dataSet.time = numLeft
                         dataSet.timeAlt = numRight
                     } else {
-                        dataSet.numReps = numLeft
+                        dataSet.time = numLeft
                     }
                     if weightLeft != weightRight {
                         dataSet.weight = weightLeft

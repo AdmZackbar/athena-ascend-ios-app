@@ -88,7 +88,7 @@ struct SessionExerciseSheet: View {
     func save() {
         switch exercise {
         case .generic(_):
-            exercise = .generic(.init(expected: generic, actual: data.map({ $0.toGeneric(generic) }), notes: notes))
+            exercise = .generic(.init(expected: generic, actual: data.map({ $0.toGeneric(generic, useAlt: multiSide) }), notes: notes))
         case .repeater(_):
             exercise = .repeater(.init(expected: repeater, actual: data.map({ $0.toRepeater() }), notes: notes))
         case .maxHang(_):
@@ -137,10 +137,10 @@ struct SessionExerciseSheet: View {
                     }
                 case .range:
                     HStack {
-                        Stepper(value: $set.min, in: 1...100, step: 1) {
+                        Stepper(value: $set.min, in: 1...1000, step: 1) {
                             Text("\(set.min) \(generic.setDetailText)")
                         }
-                        Stepper(value: $set.max, in: 1...100, step: 1) {
+                        Stepper(value: $set.max, in: 1...1000, step: 1) {
                             Text("\(set.max) \(generic.setDetailText)")
                         }
                     }
@@ -183,7 +183,7 @@ struct SessionExerciseSheet: View {
                     if generic.sideType == .independent && multiSide {
                         HStack {
                             VStack(alignment: .leading, spacing: 16) {
-                                Stepper("\(set.numLeft) \(generic.setDetailText)", value: $set.numLeft, in: 0...30, step: 1)
+                                Stepper("\(set.numLeft) \(generic.setDetailText)", value: $set.numLeft, in: 0...1000, step: 1)
                                 switch generic.dataType {
                                 case .repWeight, .timeWeight:
                                     Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
@@ -192,7 +192,7 @@ struct SessionExerciseSheet: View {
                                 }
                             }
                             VStack(alignment: .trailing, spacing: 16) {
-                                Stepper("\(set.numRight) \(generic.setDetailText)", value: $set.numRight, in: 0...30, step: 1)
+                                Stepper("\(set.numRight) \(generic.setDetailText)", value: $set.numRight, in: 0...1000, step: 1)
                                 switch generic.dataType {
                                 case .repWeight, .timeWeight:
                                     Stepper(set.weightRight.lbsFormat, value: $set.weightRight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
@@ -203,7 +203,7 @@ struct SessionExerciseSheet: View {
                         }
                     } else {
                         HStack {
-                            Stepper("\(set.numLeft) \(generic.setDetailText)", value: $set.numLeft, in: 0...30, step: 1)
+                            Stepper("\(set.numLeft) \(generic.setDetailText)", value: $set.numLeft, in: 0...1000, step: 1)
                             switch generic.dataType {
                             case .repWeight, .timeWeight:
                                 Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
