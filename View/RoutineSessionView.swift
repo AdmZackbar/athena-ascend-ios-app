@@ -790,6 +790,7 @@ struct RoutineSessionView: View {
                 Stepper(genericData.weightLeft.lbsFormat, value: $genericData.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
             }.font(.title3).bold()
         }
+        editNotesButton()
     }
     
     @ViewBuilder
