@@ -590,7 +590,7 @@ struct RoutineSessionView: View {
                 Text(genericData.notes.isEmpty ? "Add Notes" : "Edit Notes")
                 Spacer()
             }
-        }.buttonStyle(.glassProminent)
+        }.buttonStyle(.bordered)
             .tint(.primary)
     }
     
