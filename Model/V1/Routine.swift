@@ -80,16 +80,6 @@ extension SchemaV1 {
                 case time
                 case timeWeight
             }
-            
-            /// Denotes usage of weight/time/reps w/r left/right side
-            enum SideType: CaseIterable, Codable, Hashable, Equatable {
-                /// Two weights/reps/time are used for both sides, but always are the same anount
-                /// e.g. dumbbell bench press, lateral-to-front raise
-                case dependent
-                /// Two weights/reps/time are used, and the amounts can differ
-                /// e.g. 1-arm row, ninja kick hold, hip abductor
-                case independent
-            }
         }
         
         struct GenericSet: Codable, Hashable, Equatable {
@@ -139,36 +129,49 @@ extension SchemaV1 {
             }
         }
         
-        enum Side: Codable, Hashable, Equatable, CaseIterable {
-            case left
-            case right
-            case both
+        /// Denotes usage of weight/time/reps w/r left/right side
+        enum SideType: CaseIterable, Codable, Hashable, Equatable {
+            /// Two weights/reps/time are used for both sides, but always are the same anount
+            /// e.g. dumbbell bench press, lateral-to-front raise
+            case dependent
+            /// Two weights/reps/time are used, and the amounts can differ
+            /// e.g. 1-arm row, ninja kick hold, hip abductor
+            case independent
         }
         
         struct MaxHangSets: Codable, Hashable, Equatable {
             /// The name of the hold, grip type, etc.
             var tag: String
+            /// The arm usage for each set
+            /// If true, different weights/reps can be used for each side
+            /// If false, both arms are used for a single set with a single pair of time/weight
+            var isSingleArm: Bool
             /// The sets for each side in order
             var sets: [MaxHangSet]
             
-            init(tag: String = "", sets: [MaxHangSet] = []) {
+            init(tag: String = "", isSingleArm: Bool = true, sets: [MaxHangSet] = []) {
                 self.tag = tag
+                self.isSingleArm = isSingleArm
                 self.sets = sets
             }
         }
         
         struct MaxHangSet: Codable, Hashable, Equatable {
-            /// The arm used for this set
-            var side: Side
             /// The expected time on the hold in seconds
+            /// If not single arm, this is the sole value used. Otherwise, this is used for the left arm
             var target: Int
+            /// Same as above but for the right arm (if present)
+            var targetAlt: Int?
             /// The amount of weight added or removed in pounds (negative is removed, positive is added)
             var weight: Double
+            /// See explanation for targetAlt
+            var weightAlt: Double?
             
-            init(side: Side, target: Int = 10, weight: Double = 0.0) {
-                self.side = side
+            init(target: Int = 10, targetAlt: Int? = nil, weight: Double = 0.0, weightAlt: Double? = nil) {
                 self.target = target
+                self.targetAlt = targetAlt
                 self.weight = weight
+                self.weightAlt = weightAlt
             }
         }
     }

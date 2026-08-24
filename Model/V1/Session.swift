@@ -148,19 +148,22 @@ extension SchemaV1 {
         }
         
         struct MaxHangSet: Codable, Hashable, Equatable {
-            /// The arm used for this set
-            var side: Routine.Side
-            /// The expected time on the hold in seconds
-            var target: Int
+            /// The time on the hold in seconds
+            var time: Int?
+            /// Same as above for right arm (if used and different)
+            var timeAlt: Int?
             /// The amount of weight added or removed in pounds (negative is removed, positive is added)
-            var weight: Double
+            var weight: Double?
+            /// Same as above for right arm (if used and different)
+            var weightAlt: Double?
             /// Any additional notes or comments about the set
             var notes: String
             
-            init(side: Routine.Side, target: Int = 10, weight: Double = 0.0, notes: String = "") {
-                self.side = side
-                self.target = target
+            init(time: Int? = nil, timeAlt: Int? = nil, weight: Double? = nil, weightAlt: Double? = nil, notes: String = "") {
+                self.time = time
+                self.timeAlt = timeAlt
                 self.weight = weight
+                self.weightAlt = weightAlt
                 self.notes = notes
             }
         }

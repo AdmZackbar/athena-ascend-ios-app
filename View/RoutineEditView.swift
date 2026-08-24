@@ -170,26 +170,10 @@ struct RoutineEditView: View {
                 Text("No Tag")
                     .italic()
             }
-            if !maxHang.sets.isEmpty {
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text("Left")
-                            .underline()
-                            .font(.headline)
-                        ForEach(maxHang.sets.filter({ $0.side == .left }).enumerated(), id: \.offset) { offset, set in
-                            Text(set.text)
-                        }
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing) {
-                        Text("Right")
-                            .underline()
-                            .font(.headline)
-                        ForEach(maxHang.sets.filter({ $0.side == .right }).enumerated(), id: \.offset) { offset, set in
-                            Text(set.text)
-                        }
-                    }
-                }.font(.subheadline)
+            VStack(alignment: .leading) {
+                ForEach(maxHang.sets.enumerated(), id: \.offset) { offset, set in
+                    Text(set.text)
+                }
             }
         }
     }
@@ -208,9 +192,9 @@ struct RoutineEditView: View {
                         }
                     }
                     Picker("Sided-ness", selection: $item.sideType) {
-                        Text("None").tag(nil as Routine.GenericSets.SideType?)
-                        ForEach(Routine.GenericSets.SideType.allCases, id: \.name) { type in
-                            Text(type.name).tag(type as Routine.GenericSets.SideType?)
+                        Text("None").tag(nil as Routine.SideType?)
+                        ForEach(Routine.SideType.allCases, id: \.name) { type in
+                            Text(type.name).tag(type as Routine.SideType?)
                         }
                     }
                 }
@@ -342,33 +326,33 @@ struct RoutineEditView: View {
                     TextField("Tag", text: $item.tag)
                 }
                 Section {
-                    ForEach($item.sets.filter({ $0.wrappedValue.side == .left }).enumerated(), id: \.offset) { offset, $set in
-                        VStack {
-                            Stepper("\(set.target)s", value: $set.target, in: 0...30)
-                            Stepper(value: $set.weight, in: -200...200, step: 5) {
-                                HStack {
-                                    TextField("", value: $set.weight, format: .number.precision(.fractionLength(0...2)))
-                                        .keyboardType(.decimalPad)
-                                    Text("lbs")
-                                }
-                            }
-                        }
+                    ForEach($item.sets.enumerated(), id: \.offset) { offset, $set in
+//                        VStack {
+//                            Stepper("\(set.time)s", value: $set.time, in: 0...30)
+//                            Stepper(value: $set.weight, in: -200...200, step: 5) {
+//                                HStack {
+//                                    TextField("", value: $set.weight, format: .number.precision(.fractionLength(0...2)))
+//                                        .keyboardType(.decimalPad)
+//                                    Text("lbs")
+//                                }
+//                            }
+//                        }
                     }
                 } header: {
                     HStack(spacing: 16) {
                         Text("Left")
                         Spacer()
                         Button {
-                            if let left = item.sets.filter({ $0.side == .left }).last {
-                                item.sets.append(.init(side: .left, target: left.target, weight: left.weight))
-                            } else {
-                                item.sets.append(.init(side: .left))
-                            }
-                            if let right = item.sets.filter({ $0.side == .right }).last {
-                                item.sets.append(.init(side: .right, target: right.target, weight: right.weight))
-                            } else {
-                                item.sets.append(.init(side: .right))
-                            }
+//                            if let left = item.sets.filter({ $0.side == .left }).last {
+//                                item.sets.append(.init(side: .left, target: left.target, weight: left.weight))
+//                            } else {
+//                                item.sets.append(.init(side: .left))
+//                            }
+//                            if let right = item.sets.filter({ $0.side == .right }).last {
+//                                item.sets.append(.init(side: .right, target: right.target, weight: right.weight))
+//                            } else {
+//                                item.sets.append(.init(side: .right))
+//                            }
                             
                         } label: {
                             Image(systemName: "plus")
@@ -381,17 +365,17 @@ struct RoutineEditView: View {
                     }.buttonStyle(.plain)
                 }
                 Section("Right") {
-                    ForEach($item.sets.filter({ $0.wrappedValue.side == .right }).enumerated(), id: \.offset) { offset, $set in
-                        HStack {
-                            Stepper("\(set.target)s", value: $set.target, in: 0...30)
-                            Stepper(value: $set.weight, in: -200...200, step: 5) {
-                                HStack {
-                                    TextField("", value: $set.weight, format: .number.precision(.fractionLength(0...2)))
-                                        .keyboardType(.decimalPad)
-                                    Text("lbs")
-                                }
-                            }
-                        }
+                    ForEach($item.sets.enumerated(), id: \.offset) { offset, $set in
+//                        HStack {
+//                            Stepper("\(set.target)s", value: $set.target, in: 0...30)
+//                            Stepper(value: $set.weight, in: -200...200, step: 5) {
+//                                HStack {
+//                                    TextField("", value: $set.weight, format: .number.precision(.fractionLength(0...2)))
+//                                        .keyboardType(.decimalPad)
+//                                    Text("lbs")
+//                                }
+//                            }
+//                        }
                     }
                 }
             }.presentationDetents([.medium, .large])

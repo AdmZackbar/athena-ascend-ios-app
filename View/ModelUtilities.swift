@@ -26,24 +26,6 @@ extension Routine.Order {
     }
 }
 
-extension Routine.Side {
-    var abbreviation: String {
-        switch self {
-        case .left: return "L"
-        case .right: return "R"
-        case .both: return "B"
-        }
-    }
-    
-    var name: String {
-        switch self {
-        case .left: return "Left"
-        case .right: return "Right"
-        case .both: return "Both"
-        }
-    }
-}
-
 extension Routine.GenericSets.DataType {
     var name: String {
         switch self {
@@ -69,7 +51,7 @@ extension Routine.GenericSets.DataType {
     }
 }
 
-extension Routine.GenericSets.SideType {
+extension Routine.SideType {
     var name: String {
         switch self {
         case .dependent: return "Dependent"
@@ -302,7 +284,7 @@ extension Session.GenericDataSet {
         }
     }
     
-    private func repToString(_ sideType: Routine.GenericSets.SideType?) -> String {
+    private func repToString(_ sideType: Routine.SideType?) -> String {
         switch sideType {
         case .none:
             return "\(repsLeft) reps"
@@ -313,7 +295,7 @@ extension Session.GenericDataSet {
         }
     }
     
-    private func repWeightToString(_ sideType: Routine.GenericSets.SideType?) -> String {
+    private func repWeightToString(_ sideType: Routine.SideType?) -> String {
         switch sideType {
         case .none:
             return "\(repsLeft) reps @ \(weightLeft.lbsFormat)"
@@ -339,7 +321,7 @@ extension Session.GenericDataSet {
         }
     }
     
-    private func timeToString(_ sideType: Routine.GenericSets.SideType?) -> String {
+    private func timeToString(_ sideType: Routine.SideType?) -> String {
         switch sideType {
         case .none:
             return "\(timeLeft)s"
@@ -350,7 +332,7 @@ extension Session.GenericDataSet {
         }
     }
     
-    private func timeWeightToString(_ sideType: Routine.GenericSets.SideType?) -> String {
+    private func timeWeightToString(_ sideType: Routine.SideType?) -> String {
         switch sideType {
         case .none:
             return "\(timeLeft)s @ \(weightLeft.lbsFormat)"
@@ -382,13 +364,65 @@ extension Session.RepeaterSet {
 }
 
 extension Routine.MaxHangSet {
+    var targetLeft: Int {
+        target
+    }
+    
+    var targetRight: Int {
+        targetAlt ?? target
+    }
+    
+    var weightLeft: Double {
+        weight
+    }
+    
+    var weightRight: Double {
+        weightAlt ?? weight
+    }
+    
     var text: String {
-        return "\(side.abbreviation) \(target)s @ \(weight.lbsFormat)"
+        if targetLeft == targetRight && weightLeft == weightRight {
+            return "L/R \(targetLeft)s @ \(weightLeft.lbsFormat)"
+        } else {
+            return "L \(targetLeft)s @ \(weightLeft.lbsFormat), R \(targetRight)s @ \(weightRight.lbsFormat)"
+        }
+    }
+    
+    var textLeft: String {
+        return "\(targetLeft)s @ \(weightLeft.lbsFormat)"
+    }
+    
+    var textRight: String {
+        return "\(targetRight)s @ \(weightRight.lbsFormat)"
     }
 }
 
 extension Session.MaxHangSet {
     var text: String {
-        return "\(side.abbreviation) \(target)s @ \(weight.lbsFormat)"
+        if timeLeft == timeRight && weightLeft == weightRight {
+            return "L/R \(timeLeft)s @ \(weightLeft.lbsFormat)"
+        } else {
+            return "L \(timeLeft)s @ \(weightLeft.lbsFormat), R \(timeRight)s @ \(weightRight.lbsFormat)"
+        }
+    }
+    
+    var timeLeft: Int {
+        time ?? 0
+    }
+    
+    var timeRight: Int {
+        timeAlt ?? time ?? 0
+    }
+    
+    var weightLeft: Double {
+        weight ?? 0
+    }
+    
+    var weightRight: Double {
+        weightAlt ?? weight ?? 0
+    }
+    
+    var hasDiffSideData: Bool {
+        timeLeft != timeRight || weightLeft != weightRight
     }
 }

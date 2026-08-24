@@ -62,7 +62,7 @@ struct TestDataModifier: PreviewModifier {
                     .init(min: 8, max: 12),
                     .init(min: 8, max: 12),
                 ]))
-            ], restTime: 15, order: .dfs),
+            ], restTime: 10, order: .dfs),
             .init(name: "Hangboard Block A", exercises: [
                 .repeater(.init(tag: "10mm HC", sets: [
                     .init(numReps: 7),
@@ -81,14 +81,11 @@ struct TestDataModifier: PreviewModifier {
             ], restTime: 120, order: .dfs),
             .init(name: "Max Hang Block B", exercises: [
                 .maxHang(.init(tag: "BM Middle", sets: [
-                    .init(side: .left, target: 10, weight: 35.0),
-                    .init(side: .right, target: 10, weight: 40.0),
-                    .init(side: .left, target: 6, weight: 40.0),
-                    .init(side: .right, target: 6, weight: 45.0),
-                    .init(side: .left, target: 6, weight: 40.0),
-                    .init(side: .right, target: 6, weight: 45.0),
+                    .init(target: 10, targetAlt: 10, weight: 35.0, weightAlt: 40.0),
+                    .init(target: 6, targetAlt: 6, weight: 40.0, weightAlt: 45.0),
+                    .init(target: 6, targetAlt: 6, weight: 40.0, weightAlt: 45.0),
                 ]))
-            ], order: .dfs),
+            ], restTime: 180, order: .dfs),
         ])
         let session = Session(startTime: .now.addingTimeInterval(-3600), endTime: .now, sets: routine.sets.map({ .init(base: $0) }), bodyWeight: 155, standoutSong: .init(name: "Permanent", artist: "A Day to Remember"))
         session.sets.indices.forEach({ setIndex in
@@ -110,7 +107,7 @@ struct TestDataModifier: PreviewModifier {
                     case .maxHang(let d):
                         var actual: [Session.MaxHangSet] = []
                         for exSet in d.expected.sets {
-                            actual.append(.init(side: exSet.side, target: Int.random(in: 3...10), weight: Double(Int.random(in: 0...6) * 5)))
+                            actual.append(.init(time: Int.random(in: exSet.target - 5...exSet.target), weight: Double(Int.random(in: 0...6) * 5)))
                         }
                         return .maxHang(.init(expected: d.expected, actual: actual))
                     }

@@ -40,7 +40,7 @@ struct SessionExerciseSheet: View {
             maxHang = d.expected
             data = d.actual.map({ .init($0) })
             notes = d.notes
-            multiSide = false
+            multiSide = d.actual.contains(where: \.hasDiffSideData)
         }
     }
     
@@ -92,7 +92,7 @@ struct SessionExerciseSheet: View {
         case .repeater(_):
             exercise = .repeater(.init(expected: repeater, actual: data.map({ $0.toRepeater() }), notes: notes))
         case .maxHang(_):
-            exercise = .maxHang(.init(expected: maxHang, actual: data.map({ $0.toMaxHang() }), notes: notes))
+            exercise = .maxHang(.init(expected: maxHang, actual: data.map({ $0.toMaxHang(maxHang, useAlt: multiSide) }), notes: notes))
         }
         showing = false
     }
@@ -117,9 +117,9 @@ struct SessionExerciseSheet: View {
                 }
             }
             Picker("Sided-ness", selection: $generic.sideType) {
-                Text("None").tag(nil as Routine.GenericSets.SideType?)
-                ForEach(Routine.GenericSets.SideType.allCases, id: \.name) { type in
-                    Text(type.name).tag(type as Routine.GenericSets.SideType?)
+                Text("None").tag(nil as Routine.SideType?)
+                ForEach(Routine.SideType.allCases, id: \.name) { type in
+                    Text(type.name).tag(type as Routine.SideType?)
                 }
             }
         }
@@ -339,55 +339,56 @@ struct SessionExerciseSheet: View {
             TextField("Tag", text: $maxHang.tag)
         }
         Section {
-            ForEach($maxHang.sets.filter({ $0.wrappedValue.side == .left }).enumerated(), id: \.offset) { offset, $set in
-                HStack {
-                    Stepper("\(set.target)s", value: $set.target, in: 0...30)
-                    Stepper(value: $set.weight, in: -200...200, step: 5) {
-                        HStack {
-                            TextField("", value: $set.weight, format: .number.precision(.fractionLength(0...2)))
-                                .keyboardType(.decimalPad)
-                            Text("lbs")
+            ForEach($maxHang.sets.enumerated(), id: \.offset) { offset, $set in
+                if maxHang.isSingleArm && multiSide {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Stepper("\(set.target)s", value: $set.target, in: 0...1000, step: 1)
+                            Stepper(set.weight.lbsFormat, value: $set.weight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
                         }
+                        VStack(alignment: .trailing, spacing: 16) {
+                            Stepper("\(set.targetAlt ?? set.target)s", value: .init(get: {
+                                set.targetAlt ?? set.target
+                            }, set: { newValue in
+                                set.targetAlt = newValue
+                            }), in: 0...1000, step: 1)
+                            Stepper((set.weightAlt ?? set.weight).lbsFormat, value: .init(get: {
+                                set.weightAlt ?? set.weight
+                            }, set: { newValue in
+                                set.weightAlt = newValue
+                            }), in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                        }
+                    }
+                } else {
+                    HStack {
+                        Stepper("\(set.target)s", value: $set.target, in: 0...1000, step: 1)
+                        Stepper(set.weight.lbsFormat, value: $set.weight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
                     }
                 }
             }
         } header: {
-            HStack(spacing: 16) {
-                Text("Left")
-                Spacer()
-                Button {
-                    if let left = maxHang.sets.filter({ $0.side == .left }).last {
-                        maxHang.sets.append(.init(side: .left, target: left.target, weight: left.weight))
-                    } else {
-                        maxHang.sets.append(.init(side: .left))
-                    }
-                    if let right = maxHang.sets.filter({ $0.side == .right }).last {
-                        maxHang.sets.append(.init(side: .right, target: right.target, weight: right.weight))
-                    } else {
-                        maxHang.sets.append(.init(side: .right))
-                    }
-                } label: {
-                    Image(systemName: "plus")
+            VStack(alignment: .leading) {
+                if maxHang.isSingleArm {
+                    Toggle("Different Side Values", isOn: $multiSide)
                 }
-                Button {
-                    maxHang.sets.removeLast(2)
-                } label: {
-                    Image(systemName: "minus")
-                }.disabled(maxHang.sets.isEmpty)
-            }.buttonStyle(.plain)
-        }
-        Section("Right") {
-            ForEach($maxHang.sets.filter({ $0.wrappedValue.side == .right }).enumerated(), id: \.offset) { offset, $set in
-                HStack {
-                    Stepper("\(set.target)s", value: $set.target, in: 0...30)
-                    Stepper(value: $set.weight, in: -200...200, step: 5) {
-                        HStack {
-                            TextField("", value: $set.weight, format: .number.precision(.fractionLength(0...2)))
-                                .keyboardType(.decimalPad)
-                            Text("lbs")
+                HStack(spacing: 16) {
+                    Text("Sets")
+                    Spacer()
+                    Button {
+                        if let latest = maxHang.sets.last {
+                            maxHang.sets.append(.init(target: latest.target, targetAlt: latest.targetAlt, weight: latest.weight, weightAlt: latest.weightAlt))
+                        } else {
+                            maxHang.sets.append(.init())
                         }
+                    } label: {
+                        Image(systemName: "plus")
                     }
-                }
+                    Button {
+                        maxHang.sets.removeLast()
+                    } label: {
+                        Image(systemName: "minus")
+                    }.disabled(maxHang.sets.isEmpty)
+                }.buttonStyle(.plain)
             }
         }
     }
@@ -397,28 +398,43 @@ struct SessionExerciseSheet: View {
         Section {
             ForEach($data.enumerated(), id: \.offset) { offset, $set in
                 VStack {
-                    HStack {
-                        Stepper("\(set.side.abbreviation) \(set.numLeft)s", value: $set.numLeft, in: 0...30, step: 1)
-                        Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
+                    if maxHang.isSingleArm && multiSide {
+                        HStack {
+                            VStack {
+                                Stepper("\(set.numLeft)s", value: $set.numLeft, in: 0...30, step: 1)
+                                Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                            }
+                            VStack {
+                                Stepper("\(set.numRight)s", value: $set.numRight, in: 0...30, step: 1)
+                                Stepper(set.weightRight.lbsFormat, value: $set.weightRight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                            }
+                        }
+                    } else {
+                        HStack {
+                            Stepper("\(set.numLeft)s", value: $set.numLeft, in: 0...30, step: 1)
+                            Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                        }
                     }
                     TextField("Notes", text: $set.notes, axis: .vertical)
                         .lineLimit(1...3)
                 }
             }
         } header: {
-            HStack {
-                Text("Sets")
-                Spacer()
-                Button("Add") {
-                    let left = maxHang.sets[data.count]
-                    data.append(.init(side: left.side, numLeft: left.target, weightLeft: left.weight))
-                    let right = maxHang.sets[data.count]
-                    data.append(.init(side: right.side, numLeft: right.target, weightLeft: right.weight))
-                }.disabled(data.count >= maxHang.sets.count)
-                Button("Remove") {
-                    data.removeLast()
-                    data.removeLast()
-                }.disabled(data.isEmpty)
+            VStack(alignment: .leading) {
+                if maxHang.isSingleArm {
+                    Toggle("Different Side Values", isOn: $multiSide)
+                }
+                HStack {
+                    Text("Sets")
+                    Spacer()
+                    Button("Add") {
+                        let expected = maxHang.sets[data.count]
+                        data.append(.init(numLeft: expected.target, numRight: expected.targetAlt, weightLeft: expected.weight, weightRight: expected.weightAlt))
+                    }.disabled(data.count >= maxHang.sets.count)
+                    Button("Remove") {
+                        data.removeLast()
+                    }.disabled(data.isEmpty)
+                }
             }
         }
         Section("Notes") {
@@ -480,15 +496,11 @@ struct SessionExerciseSheet: View {
 
 #Preview("Max Hang") {
     @Previewable @State var exercise: Session.Exercise = .maxHang(.init(expected: .init(tag: "BM Middle", sets: [
-        .init(side: .left, target: 10, weight: 35),
-        .init(side: .right, target: 10, weight: 40),
-        .init(side: .left, target: 8, weight: 40),
-        .init(side: .right, target: 8, weight: 45),
+        .init(target: 10, targetAlt: 10, weight: 35, weightAlt: 40),
+        .init(target: 8, targetAlt: 8, weight: 40, weightAlt: 45),
     ]), actual: [
-        .init(side: .left, target: 10, weight: 35),
-        .init(side: .right, target: 9, weight: 40, notes: "Too much"),
-        .init(side: .left, target: 6, weight: 40),
-        .init(side: .right, target: 5, weight: 50, notes: "EZ"),
+        .init(time: 10, timeAlt: 9, weight: 35, weightAlt: 40, notes: "Too much"),
+        .init(time: 6, timeAlt: 5, weight: 40, weightAlt: 50, notes: "EZ"),
     ], notes: "Why am i doing this"))
     @Previewable @State var showSheet = false
     Form {

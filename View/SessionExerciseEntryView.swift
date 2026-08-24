@@ -141,26 +141,10 @@ struct SessionExerciseEntryView: View {
                             Text(actual.text)
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
-                            let diff: String? = {
-                                if actual.side != expected.side {
-                                    // TODO add granularity here too
-                                    return expected.text
-                                }
-                                if actual.target != expected.target && actual.weight != expected.weight {
-                                    return "\(expected.target)s @ \(expected.weight.lbsFormat)"
-                                } else if actual.target != expected.target {
-                                    return "\(expected.target)s"
-                                } else if actual.weight != expected.weight {
-                                    return expected.weight.lbsFormat
-                                } else {
-                                    return nil
-                                }
-                            }()
-                            if let diff {
-                                Text("[\(diff)]")
-                                    .font(.subheadline)
-                                    .italic()
-                            }
+                            // TODO
+//                            Text("[\(expected.text)]")
+//                                .font(.subheadline)
+//                                .italic()
                             Spacer()
                         }
                         if !actual.notes.isEmpty {
@@ -219,15 +203,11 @@ struct SessionExerciseEntryView: View {
         }
         Section("Max Hang") {
             SessionExerciseEntryView(exercise: .maxHang(.init(expected: .init(tag: "BM Middle", sets: [
-                .init(side: .left, target: 10, weight: 35),
-                .init(side: .right, target: 10, weight: 40),
-                .init(side: .left, target: 8, weight: 40),
-                .init(side: .right, target: 8, weight: 45),
+                .init(target: 10, targetAlt: 10, weight: 35, weightAlt: 40),
+                .init(target: 8, targetAlt: 8, weight: 40, weightAlt: 45),
             ]), actual: [
-                .init(side: .left, target: 10, weight: 35),
-                .init(side: .right, target: 9, weight: 40, notes: "Too much"),
-                .init(side: .left, target: 6, weight: 40),
-                .init(side: .right, target: 5, weight: 50, notes: "EZ"),
+                .init(time: 10, timeAlt: 9, weight: 35, weightAlt: 40, notes: "Too much"),
+                .init(time: 6, timeAlt: 5, weight: 40, weightAlt: 50, notes: "EZ"),
             ], notes: "Why am i doing this")))
         }
     }

@@ -698,6 +698,102 @@ struct RoutineSessionView: View {
     }
     
     @ViewBuilder
+    func maxHangHeaderView(_ data: Session.MaxHangData) -> some View {
+        let index = indices!.exerciseSetIndex
+        Text(data.expected.tag)
+            .font(.system(size: data.expected.tag.count > 16 ? 32 : 40))
+            .bold()
+        Text("Set \(index + 1)/\(data.expected.sets.count)")
+            .font(.title)
+            .fontWeight(.semibold)
+        if data.expected.isSingleArm {
+            let isRight = exerciseState == .off ? !isTimerValid : repeaterRep.max > 0 && repeaterRep.current < 2
+            HStack {
+                Text(isRight ? data.expected.sets[index].textRight : data.expected.sets[index].textLeft)
+                Spacer()
+                Text(isRight ? "Right" : "Left")
+                    .font(.title)
+                    .fontWeight(.semibold)
+            }.font(.title)
+                .fontWeight(.semibold)
+        } else {
+            Text(data.expected.sets[index].textLeft)
+                .font(.title)
+                .fontWeight(.semibold)
+        }
+        // TODO
+//        if exerciseState == .ready, let prevData = tryGetPrevGenericData(indices!) {
+//            VStack(alignment: .leading, spacing: 0) {
+//                Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevData.toString(data.expected))")
+//                    .font(.title3)
+//                if !prevData.notes.isEmpty {
+//                    Text(prevData.notes)
+//                }
+//            }.italic()
+//        }
+    }
+    
+    @ViewBuilder
+    func maxHangExerciseView(_ data: Session.MaxHangData) -> some View {
+        var timerText: String {
+            switch exerciseState {
+            case .ready: return "Get Ready"
+            case .on: return "On"
+            case .off: return "Get Ready (Alt)"
+            case .rest: return "Rest"
+            default: return ""
+            }
+        }
+        VStack(alignment: .leading) {
+            maxHangHeaderView(data)
+            if exerciseState == .rest {
+                maxHangRecordView(data)
+                nextExerciseView()
+            }
+            if timerDuration > .zero {
+                timerView(text: timerText, textCountDown: exerciseState != .on)
+            }
+            Spacer()
+            controlView {
+                if exerciseState == .rest {
+                    trySaveData()
+                }
+                if !allowTimerNext && timerDuration > .zero && elapsedSeconds < timerDuration {
+                    timerNextOverride = true
+                } else {
+                    next()
+                }
+            }
+        }.padding()
+    }
+    
+    @ViewBuilder
+    func maxHangRecordView(_ data: Session.MaxHangData) -> some View {
+        if data.expected.isSingleArm {
+            Toggle("Different Side Values", isOn: $allowMultiSide)
+                .font(.title3)
+                .bold()
+        }
+        if data.expected.isSingleArm && allowMultiSide {
+            HStack {
+                VStack(alignment: .leading, spacing: 16) {
+                    Stepper("\(genericData.numLeft)s", value: $genericData.numLeft, in: 0...1000, step: 1)
+                    Stepper(genericData.weightLeft.lbsFormat, value: $genericData.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                }
+                VStack(alignment: .trailing, spacing: 16) {
+                    Stepper("\(genericData.numRight)s", value: $genericData.numRight, in: 0...1000, step: 1)
+                    Stepper(genericData.weightRight.lbsFormat, value: $genericData.weightRight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                }
+            }.font(.title3).bold()
+        } else {
+            HStack() {
+                Stepper("\(genericData.numLeft)s", value: $genericData.numLeft, in: 0...1000, step: 1)
+                Stepper(genericData.weightLeft.lbsFormat, value: $genericData.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+            }.font(.title3).bold()
+        }
+    }
+    
+    @ViewBuilder
     func nextExerciseView() -> some View {
         if let nextIndices = nextIndices() {
             VStack(alignment: .leading, spacing: 0) {
@@ -712,141 +808,6 @@ struct RoutineSessionView: View {
                 }.font(.title2)
                     .fontWeight(.semibold)
             }
-        }
-    }
-    
-    @ViewBuilder
-    func maxHangExerciseView(_ data: Session.MaxHangData) -> some View {
-        // TODO
-        restAndRecordView()
-    }
-    
-    @ViewBuilder
-    func maxHangView(_ str: String) -> some View {
-        VStack(alignment: .center) {
-            Spacer()
-            Text(currentExercise!.name)
-                .font(.title)
-                .bold()
-            timerView(text: str)
-                .padding()
-            Spacer()
-            controlView {
-                next()
-            }
-        }.font(.title)
-            .padding()
-    }
-    
-    @ViewBuilder
-    func restAndRecordView() -> some View {
-        VStack(alignment: .center) {
-            Text(currentExercise!.getDescription(setIndex: indices!.exerciseSetIndex))
-            timerView(text: "Rest")
-                .padding()
-            recordView()
-            Spacer()
-            controlView {
-                next()
-            }
-        }.font(.title)
-            .padding()
-    }
-    
-    @ViewBuilder
-    func recordView() -> some View {
-        switch currentExercise {
-        case .generic(let d):
-            VStack {
-                Stepper(value: $genericData.numLeft, in: 0...1000) {
-                    Text("\(genericData.numLeft) \(d.expected.setDetailText)")
-                }
-                switch d.expected.dataType {
-                case .repWeight, .timeWeight:
-                    Stepper(value: $genericData.weightLeft, in: -200...200, step: 5) {
-                        HStack {
-                            TextField("", value: $genericData.weightLeft, format: .number.precision(.fractionLength(0...2)))
-                                .keyboardType(.decimalPad)
-                            Text("lbs")
-                        }
-                    }
-                default:
-                    EmptyView()
-                }
-                Button {
-                    sheetType = .notes
-                } label: {
-                    HStack {
-                        Text(genericData.notes.isEmpty ? "Add Notes..." : genericData.notes)
-                            .lineLimit(3)
-                        Spacer()
-                    }.contentShape(Rectangle())
-                        .font(.headline)
-                        .italic()
-                }
-                Button("Save") {
-                    // Save recorded data
-                    trySaveData()
-                }
-            }
-        case .repeater(_):
-            VStack {
-                Stepper(value: $genericData.numLeft, in: 0...100) {
-                    Text("\(genericData.numLeft) reps")
-                }
-                Stepper(value: $genericData.weightLeft, in: -200...200, step: 5) {
-                    HStack {
-                        TextField("", value: $genericData.weightLeft, format: .number.precision(.fractionLength(0...2)))
-                            .keyboardType(.decimalPad)
-                        Text("lbs")
-                    }
-                }
-                Button {
-                    sheetType = .notes
-                } label: {
-                    HStack {
-                        Text(genericData.notes.isEmpty ? "Add Notes..." : genericData.notes)
-                            .lineLimit(3)
-                        Spacer()
-                    }.contentShape(Rectangle())
-                        .font(.headline)
-                        .italic()
-                }
-                Button("Save") {
-                    // Save recorded data
-                    trySaveData()
-                }
-            }
-        case .maxHang(_):
-            VStack {
-                Stepper(value: $genericData.numLeft, in: 0...30) {
-                    Text("\(genericData.numLeft) seconds")
-                }
-                Stepper(value: $genericData.weightLeft, in: -200...200, step: 5) {
-                    HStack {
-                        TextField("", value: $genericData.weightLeft, format: .number.precision(.fractionLength(0...2)))
-                            .keyboardType(.decimalPad)
-                        Text("lbs")
-                    }
-                }
-                Button {
-                    sheetType = .notes
-                } label: {
-                    HStack {
-                        Text(genericData.notes.isEmpty ? "Add Notes..." : genericData.notes)
-                            .lineLimit(3)
-                        Spacer()
-                    }.contentShape(Rectangle())
-                        .font(.headline)
-                        .italic()
-                }
-                Button("Save") {
-                    // Save recorded data
-                    trySaveData()
-                }
-            }
-        case nil:
-            EmptyView()
         }
     }
     
@@ -936,7 +897,7 @@ struct RoutineSessionView: View {
             } else {
                 // Load from expected
                 let expected = d.expected.sets[indices.exerciseSetIndex]
-                return .init(side: expected.side, numLeft: expected.target, weightLeft: expected.weight)
+                return .init(numLeft: expected.target, weightLeft: expected.weight)
             }
         }
     }
@@ -965,10 +926,11 @@ struct RoutineSessionView: View {
             session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .repeater(.init(expected: d.expected, actual: newActual, notes: d.notes))
         case .maxHang(let d):
             var newActual: [Session.MaxHangSet] = d.actual
+            let updatedData = genericData.toMaxHang(d.expected, useAlt: d.expected.isSingleArm && allowMultiSide)
             if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = genericData.toMaxHang()
+                newActual[indices.exerciseSetIndex] = updatedData
             } else {
-                newActual.append(genericData.toMaxHang())
+                newActual.append(updatedData)
             }
             session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .maxHang(.init(expected: d.expected, actual: newActual, notes: d.notes))
         }
@@ -1091,6 +1053,17 @@ struct RoutineSessionView: View {
             default:
                 break
             }
+        case .maxHang(let d):
+            switch exerciseState {
+            case .ready:
+                return .init(max: d.expected.isSingleArm ? 2 : 1)
+            case .on:
+                return repeaterRep.next()
+            case .off:
+                return repeaterRep
+            default:
+                break
+            }
         default:
             break
         }
@@ -1159,7 +1132,7 @@ struct RoutineSessionView: View {
             case .rest, nil:
                 return nil
             }
-        case .repeater(_):
+        case .repeater(_), .maxHang(_):
             switch exerciseState {
             case .ready:
                 return .on
@@ -1167,15 +1140,6 @@ struct RoutineSessionView: View {
                 return repeaterRep.hasNext ? .off : .rest
             case .off:
                 return .on
-            case .rest, nil:
-                return nil
-            }
-        case .maxHang(_):
-            switch exerciseState {
-            case .ready:
-                return .on
-            case .on, .off:
-                return .rest
             case .rest, nil:
                 return nil
             }
@@ -1393,7 +1357,9 @@ struct RoutineSessionView: View {
                 return .seconds(10)
             case .on:
                 return .seconds(d.expected.sets[indices.exerciseSetIndex].target)
-            case .rest, .off:
+            case .off:
+                return .seconds(20)
+            case .rest:
                 return .seconds(set.restTime)
             }
         }
@@ -1412,7 +1378,6 @@ struct RoutineSessionView: View {
     }
     
     struct GenericDataSet: Codable, Hashable, Equatable {
-        var side: Routine.Side
         var numLeft: Int
         var numRight: Int
         var weightLeft: Double
@@ -1433,11 +1398,10 @@ struct RoutineSessionView: View {
         }
         
         init(_ data: Session.MaxHangSet) {
-            self.init(side: data.side, numLeft: data.target, weightLeft: data.weight, notes: data.notes)
+            self.init(numLeft: data.time, numRight: data.timeAlt, weightLeft: data.weight, weightRight: data.weightAlt, notes: data.notes)
         }
         
-        init(side: Routine.Side? = nil, numLeft: Int? = nil, numRight: Int? = nil, weightLeft: Double? = nil, weightRight: Double? = nil, notes: String = "") {
-            self.side = side ?? .both
+        init(numLeft: Int? = nil, numRight: Int? = nil, weightLeft: Double? = nil, weightRight: Double? = nil, notes: String = "") {
             self.numLeft = numLeft ?? 0
             self.numRight = numRight ?? numLeft ?? 0
             self.weightLeft = weightLeft ?? 0
@@ -1500,8 +1464,11 @@ struct RoutineSessionView: View {
             return .init(numReps: numLeft, weight: weightLeft, notes: notes)
         }
         
-        func toMaxHang() -> Session.MaxHangSet {
-            return .init(side: side, target: numLeft, weight: weightLeft, notes: notes)
+        func toMaxHang(_ data: Routine.MaxHangSets, useAlt: Bool) -> Session.MaxHangSet {
+            if data.isSingleArm && useAlt {
+                return .init(time: numLeft, timeAlt: numRight, weight: weightLeft, weightAlt: weightRight, notes: notes)
+            }
+            return .init(time: numLeft, weight: weightLeft, notes: notes)
         }
     }
     
