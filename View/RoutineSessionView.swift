@@ -28,15 +28,6 @@ struct RoutineSessionView: View {
         return nil
     }
     
-    /// The exercise that will be moved to next, if applicable.
-    /// Can be the same as the current exercise if the state of the exercise is different
-    var nextExercise: Session.Exercise? {
-        if let nextIndices = nextIndices() {
-            return session.sets[nextIndices.routineSetIndex].exercises[nextIndices.setExerciseIndex]
-        }
-        return nil
-    }
-    
     /// The background color of the view
     var background: some ShapeStyle {
         switch exerciseState {
@@ -53,7 +44,7 @@ struct RoutineSessionView: View {
     
     /// If true, the timer is allowed to modify the state when it finishes
     var allowTimerNext: Bool {
-        return exerciseState != .rest
+        return exerciseState != .rest || timerNextOverride
     }
     
     /// Caches the most recent session of the related routine (if it exists)
@@ -68,9 +59,9 @@ struct RoutineSessionView: View {
     @State private var exerciseState: ExerciseState? = nil
     @State private var repeaterRep: RepeaterRep = .zero
     /// Set to the start time of the timer (in seconds)
-    @State private var timerDuration: Duration = .seconds(0)
+    @State private var timerDuration: Duration = .zero
     /// Tracks how many seconds have passed for the current timer
-    @State private var elapsedSeconds: Duration = .seconds(0)
+    @State private var elapsedSeconds: Duration = .zero
     /// For better interactivity precision
     @State private var elapsedMilliseconds: Int = 0
     /// The current timer, if in use
@@ -85,6 +76,7 @@ struct RoutineSessionView: View {
     @State private var song: Session.Song = .init()
     /// If true, the delete alert should be shown
     @State private var showAlert: Bool = false
+    @State private var timerNextOverride: Bool = false
     
     init(session: Session) {
         self.session = session
@@ -257,13 +249,7 @@ struct RoutineSessionView: View {
         case .generic(let data):
             genericExerciseView(data)
         case .repeater(let data):
-            // TODO
-            switch exerciseState {
-            case .rest:
-                repeaterRestView()
-            default:
-                repeaterMainView()
-            }
+            repeaterExerciseView(data)
         case .maxHang(let data):
             maxHangExerciseView(data)
         }
@@ -470,9 +456,13 @@ struct RoutineSessionView: View {
         }.font(.title)
             .fontWeight(.semibold)
         if exerciseState == .ready, let prevData = tryGetPrevGenericData(indices!) {
-            Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevData.toString(data.expected))")
-                .font(.headline)
-                .italic()
+            VStack(alignment: .leading, spacing: 0) {
+                Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevData.toString(data.expected))")
+                    .font(.title3)
+                if !prevData.notes.isEmpty {
+                    Text(prevData.notes)
+                }
+            }.italic()
         }
     }
     
@@ -505,13 +495,18 @@ struct RoutineSessionView: View {
         case .rest:
             genericExerciseHeaderView(data)
             genericRecordView(data)
+            nextExerciseView()
             if timerDuration > .zero {
                 timerView(text: "Rest")
             }
             Spacer()
             controlView {
                 trySaveData()
-                next()
+                if timerDuration > .zero && elapsedSeconds < timerDuration && !timerNextOverride {
+                    timerNextOverride = true
+                } else {
+                    next()
+                }
             }
         default:
             Text("Invalid state for generic exercise")
@@ -530,13 +525,18 @@ struct RoutineSessionView: View {
         case .rest:
             genericExerciseHeaderView(data)
             genericRecordView(data)
+            nextExerciseView()
             if timerDuration > .zero {
                 timerView(text: "Rest")
             }
             Spacer()
             controlView {
                 trySaveData()
-                next()
+                if timerDuration > .zero && elapsedSeconds < timerDuration && !timerNextOverride {
+                    timerNextOverride = true
+                } else {
+                    next()
+                }
             }
         default:
             Text("Invalid state for generic exercise")
@@ -582,6 +582,11 @@ struct RoutineSessionView: View {
                 genericRecordSingleEntryView(data)
             }
         }
+        editNotesButton()
+    }
+    
+    @ViewBuilder
+    func editNotesButton() -> some View {
         Button {
             sheetType = .notes
         } label: {
@@ -605,148 +610,98 @@ struct RoutineSessionView: View {
     }
     
     @ViewBuilder
-    func repeaterMainView() -> some View {
-        let text: String = {
-            switch exerciseState {
-            case .ready:
-                return "Get Ready"
-            case .on:
-                return "On"
-            case .off:
-                return "Off"
-            default:
-                return "N/A"
-            }
-        }()
-        let setIndex = indices!.exerciseSetIndex
-        let currentRep = repeaterRep.current
-        let maxRep = repeaterRep.max
-        VStack(alignment: .center, spacing: 8) {
+    func repeaterHeaderView(_ data: Session.RepeaterData) -> some View {
+        let index = indices!.exerciseSetIndex
+        HStack {
+            Text(data.expected.tag)
             Spacer()
-            if case .repeater(let d) = currentExercise {
-                let numReps = d.expected.sets[setIndex].numReps
-                HStack {
-                    Text(d.expected.tag)
-                    Spacer()
-                    Text("[\(setIndex + 1)/\(d.expected.sets.count)]")
-                }.font(.system(size: 36))
-                    .bold()
-                HStack {
-                    Text("\(d.expected.timeOn)s/\(d.expected.timeOff)s")
-                    Spacer()
-                    Text("\(d.expected.sets[setIndex].weight.lbsFormat)")
-                }.font(.system(size: 30))
-                    .fontWeight(.semibold)
-                HStack {
-                    Text("Rep")
-                    Spacer()
-                    Text("\(currentRep)/\(maxRep)")
-                }.font(.system(size: 30))
-                    .fontWeight(.semibold)
-            } else {
-                // Shouldn't be possible
-                Text(currentExercise?.description ?? "No Current Exercise")
-                    .font(.title)
-                    .bold()
-            }
-            timerView(text: text)
-                .padding()
-            Button {
-                exerciseState = .rest
-            } label: {
-                Text("Record Data")
-            }
-            Spacer()
-            controlView {
-                next(skip: true)
-            }
-        }.font(.title)
-            .padding()
+            Text("Set \(index + 1)/\(data.expected.sets.count)")
+        }.font(.system(size: 32))
+            .bold()
+        if exerciseState != .rest {
+            HStack {
+                Text("\(data.expected.timeOn)s/\(data.expected.timeOff)s")
+                Spacer()
+                Text("\(data.expected.sets[index].weight.lbsFormat)")
+            }.font(.title)
+                .fontWeight(.semibold)
+            HStack {
+                Text("Rep")
+                Spacer()
+                Text("\(repeaterRep.current)/\(repeaterRep.max)")
+            }.font(.title)
+                .fontWeight(.semibold)
+        }
+        if exerciseState == .ready, let prevData = tryGetPrevRepeaterData(indices!) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevData.text)")
+                    .font(.title3)
+                if !prevData.notes.isEmpty {
+                    Text(prevData.notes)
+                }
+            }.italic()
+        }
     }
     
     @ViewBuilder
-    func repeaterRestView() -> some View {
-        VStack {
-            switch nextExercise {
-            case .repeater(let d):
-                let setIndex = nextIndices()!.exerciseSetIndex
-                Text("Next Exercise")
-                HStack {
-                    Text(d.expected.tag)
-                    Spacer()
-                    Text("[\(setIndex + 1)/\(d.expected.sets.count)]")
-                }.font(.system(size: 36))
-                    .bold()
-                HStack {
-                    Text("\(d.expected.timeOn)s/\(d.expected.timeOff)s")
-                    Spacer()
-                    Text("\(d.expected.sets[setIndex].weight.lbsFormat)")
-                }.font(.system(size: 30))
-                    .fontWeight(.semibold)
-            case nil:
-                Text("No More Sets")
-            default:
-                // TODO
-                Text(nextExercise!.description)
+    func repeaterExerciseView(_ data: Session.RepeaterData) -> some View {
+        var timerText: String {
+            switch exerciseState {
+            case .ready: return "Get Ready"
+            case .on: return "On"
+            case .off: return "Off"
+            case .rest: return "Rest"
+            default: return ""
             }
-            ZStack {
-                RingShape(progress: 1.0)
-                    .stroke(.secondary, lineWidth: 8)
-                RingShape(progress: 1.0 - progress)
-                    .stroke(.primary, style: .init(lineWidth: 12, lineCap: .round))
-                VStack(spacing: 0) {
-                    Text("Rest")
-                        .font(.system(size: 40))
-                        .bold()
-                    Text(timerDuration - elapsedSeconds, format: .time(pattern: .minuteSecond(padMinuteToLength: 2)))
-                        .contentTransition(.numericText())
-                        .monospaced()
-                        .font(.system(size: 60))
-                        .bold()
-                }
-            }.padding()
-            VStack {
-                HStack {
-                    Stepper(value: $genericData.numLeft, in: 0...1000) {
-                        Text("\(genericData.numLeft) reps")
-                    }
-                    Spacer()
-                    Stepper(value: $genericData.weightLeft, in: -200...200, step: 5) {
-                        HStack {
-                            TextField("", value: $genericData.weightLeft, format: .number.precision(.fractionLength(0...2)))
-                                .keyboardType(.decimalPad)
-                            Text("lbs")
-                        }
-                    }
-                }.font(.title2)
-                    .bold()
-                Button {
-                    sheetType = .notes
-                } label: {
-                    HStack {
-                        Text(genericData.notes.isEmpty ? "Add Notes..." : genericData.notes)
-                            .lineLimit(3)
-                        Spacer()
-                    }.contentShape(Rectangle())
-                        .font(.headline)
-                        .italic()
-                }
-                Button("Save") {
-                    // Save recorded data
-                    trySaveData()
-                }
+        }
+        VStack(alignment: .leading) {
+            repeaterHeaderView(data)
+            if exerciseState == .rest {
+                repeaterRecordView(data)
+                nextExerciseView()
+            }
+            if timerDuration > .zero {
+                timerView(text: timerText)
             }
             Spacer()
-            HStack {
-                Button("Prev") {
-                    prev()
+            controlView {
+                if exerciseState == .rest {
+                    trySaveData()
                 }
-                Spacer()
-                Button("Next") {
+                if !allowTimerNext && timerDuration > .zero && elapsedSeconds < timerDuration {
+                    timerNextOverride = true
+                } else {
                     next()
                 }
             }
         }.padding()
+    }
+    
+    @ViewBuilder
+    func repeaterRecordView(_ data: Session.RepeaterData) -> some View {
+        HStack {
+            Stepper("\(genericData.numLeft) reps", value: $genericData.numLeft, in: 0...1000, step: 1)
+            Stepper(genericData.weightLeft.lbsFormat, value: $genericData.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+        }.font(.title3).bold()
+        editNotesButton()
+    }
+    
+    @ViewBuilder
+    func nextExerciseView() -> some View {
+        if let nextIndices = nextIndices() {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Next Exercise")
+                    .font(.title3)
+                    .italic()
+                let exercise = session.sets[nextIndices.routineSetIndex].exercises[nextIndices.setExerciseIndex]
+                HStack {
+                    Text(exercise.name)
+                    Spacer()
+                    Text(exercise.getText(setIndex: nextIndices.exerciseSetIndex))
+                }.font(.title2)
+                    .fontWeight(.semibold)
+            }
+        }
     }
     
     @ViewBuilder
@@ -759,7 +714,7 @@ struct RoutineSessionView: View {
     func maxHangView(_ str: String) -> some View {
         VStack(alignment: .center) {
             Spacer()
-            Text(currentExercise!.description)
+            Text(currentExercise!.name)
                 .font(.title)
                 .bold()
             timerView(text: str)
@@ -921,7 +876,7 @@ struct RoutineSessionView: View {
                     .font(.system(size: 96))
             }.disabled(elapsedSeconds >= timerDuration)
             Button(action: nextAction) {
-                Image(systemName: "arrowshape.forward.circle")
+                Image(systemName: allowTimerNext || elapsedSeconds >= timerDuration ? "arrowshape.forward.circle" : "checkmark.circle")
                     .font(.system(size: 64))
             }
             Spacer()
@@ -1024,6 +979,22 @@ struct RoutineSessionView: View {
         return nil
     }
     
+    func tryGetPrevRepeaterData(_ indices: ExerciseIndices) -> Session.RepeaterSet? {
+        if let prevSession {
+            if indices.routineSetIndex < prevSession.sets.count {
+                let set = prevSession.sets[indices.routineSetIndex]
+                if indices.setExerciseIndex < set.exercises.count {
+                    if case .repeater(let d) = set.exercises[indices.setExerciseIndex] {
+                        if indices.exerciseSetIndex < d.actual.count {
+                            return d.actual[indices.exerciseSetIndex]
+                        }
+                    }
+                }
+            }
+        }
+        return nil
+    }
+    
     
     // ********************** //
     // CONTROL FLOW FUNCTIONS //
@@ -1031,12 +1002,21 @@ struct RoutineSessionView: View {
     
     /// Updates state to a different exercise
     func setState(newIndices: ExerciseIndices?) {
-        let newState = ExerciseState.ready
-        self.timerDuration = computeTimerDuration(indices: newIndices, exerciseState: newState)
-        self.genericData = loadData(newIndices)
-        self.exerciseState = newState
-        self.indices = newIndices
-        onStateChanged()
+        if let newIndices {
+            let newState = ExerciseState.ready
+            self.timerDuration = computeTimerDuration(indices: newIndices, exerciseState: newState)
+            self.genericData = loadData(newIndices)
+            self.exerciseState = newState
+            self.indices = newIndices
+            onStateChanged()
+        } else {
+            self.indices = nil
+            self.exerciseState = nil
+            self.timerDuration = .zero
+            pauseTimer()
+            self.genericData = .init()
+            self.timerNextOverride = false
+        }
     }
     
     /// Updates state for the same exerecise
@@ -1061,8 +1041,10 @@ struct RoutineSessionView: View {
         case .maxHang(_):
             startTimer()
         case nil:
-            break
+            pauseTimer()
         }
+        // Reset flag
+        self.timerNextOverride = false
     }
     
     /// Computes the next state of the repeater rep field
@@ -1341,7 +1323,7 @@ struct RoutineSessionView: View {
     }
 
     private func shouldShowCancelButton() -> Bool {
-        return isTimerValid || elapsedSeconds > .seconds(0)
+        return isTimerValid || elapsedSeconds > .zero
     }
     
     private var shouldStopTimer: Bool {
@@ -1533,7 +1515,7 @@ struct RoutineSessionView: View {
         case song
     }
     
-    enum ExerciseState: Codable, Hashable, Equatable {
+    enum ExerciseState: String, Codable, Hashable, Equatable {
         case ready
         case on
         case off

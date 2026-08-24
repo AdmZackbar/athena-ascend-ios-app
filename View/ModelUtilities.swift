@@ -106,15 +106,14 @@ extension Session {
 // ********* //
 
 extension Routine.Exercise {
-    // TODO
-    var description: String {
+    var name: String {
         switch self {
         case .generic(let d):
-            return "\(d.name): \(numSets) sets"
+            return d.name
         case .repeater(let d):
-            return "Repeater: \(d.tag) \(d.timeOn)s/\(d.timeOff)s \(numSets) sets"
+            return d.text
         case .maxHang(let d):
-            return "Max Hang: \(d.tag) \(numSets) sets"
+            return d.tag
         }
     }
     
@@ -153,15 +152,26 @@ extension Session.Exercise {
         }
     }
     
-    // TODO
-    var description: String {
+    var name: String {
         switch self {
         case .generic(let d):
-            return "\(d.expected.name): \(numSets) sets"
+            return d.expected.name
         case .repeater(let d):
-            return "Repeater: \(d.expected.tag) \(d.expected.timeOn)s/\(d.expected.timeOff)s \(numSets) sets"
+            return d.expected.text
         case .maxHang(let d):
-            return "Max Hang: \(d.expected.tag) \(numSets) sets"
+            return d.expected.tag
+        }
+    }
+    
+    func getText(setIndex: Int) -> String {
+        guard setIndex >= 0 && setIndex < numSets else { return name }
+        switch self {
+        case .generic(let d):
+            return "\(d.expected.sets[setIndex].text) \(d.expected.setDetailText)"
+        case .repeater(let d):
+            return d.expected.sets[setIndex].text
+        case .maxHang(let d):
+            return d.expected.sets[setIndex].text
         }
     }
     
@@ -350,6 +360,12 @@ extension Session.GenericDataSet {
         case .independent:
             return "\(timeLeft)s @ \(weightLeft.lbsFormat), \(timeRight)s @ \(weightRight.lbsFormat)"
         }
+    }
+}
+
+extension Routine.RepeaterSets {
+    var text: String {
+        "\(tag) \(timeOn)s/\(timeOff)s"
     }
 }
 
