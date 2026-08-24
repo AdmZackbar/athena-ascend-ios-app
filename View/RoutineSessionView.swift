@@ -13,8 +13,6 @@ struct RoutineSessionView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     
-    let readyTime: Duration = .seconds(10)
-    
     /// If true, data has been collected in some form for the session
     var hasData: Bool {
         !session.notes.isEmpty || session.sets.contains(where: { $0.exercises.contains(where: \.hasData) })
@@ -36,6 +34,9 @@ struct RoutineSessionView: View {
         case .on:
             return .active
         case .rest:
+            if timerDuration > .zero && progress <= 0.25 {
+                return .rest.mix(with: .ready, by: 1.0 - (progress * 4.0), in: .perceptual)
+            }
             return .rest
         case .none:
             return Color(uiColor: .systemGroupedBackground)
@@ -471,7 +472,7 @@ struct RoutineSessionView: View {
         switch exerciseState {
         case .ready, .on:
             genericExerciseHeaderView(data)
-            timerView(text: exerciseState == .ready ? "Ready" : "Active")
+            timerView(text: exerciseState == .ready ? "Ready" : "Active", textCountDown: exerciseState == .ready)
             Spacer()
             controlView {
                 next()
@@ -840,7 +841,7 @@ struct RoutineSessionView: View {
     }
     
     @ViewBuilder
-    func timerView(text: String) -> some View {
+    func timerView(text: String, textCountDown: Bool = true) -> some View {
         ZStack {
             RingShape(progress: 1.0)
                 .stroke(.secondary, lineWidth: 8)
@@ -850,7 +851,7 @@ struct RoutineSessionView: View {
                 Text(text)
                     .font(.system(size: 40))
                     .bold()
-                Text(timerDuration - elapsedSeconds, format: .time(pattern: .minuteSecond(padMinuteToLength: 2)))
+                Text(textCountDown ? timerDuration - elapsedSeconds : elapsedSeconds, format: .time(pattern: .minuteSecond(padMinuteToLength: 2)))
                     .contentTransition(.numericText())
                     .monospaced()
                     .font(.system(size: 60))
@@ -1356,7 +1357,6 @@ struct RoutineSessionView: View {
             if d.expected.dataType.hasTime {
                 switch exerciseState {
                 case .ready, .off:
-                    // TODO
                     return .seconds(3)
                 case .on:
                     return .seconds(d.expected.sets[indices.exerciseSetIndex].max)
@@ -1369,7 +1369,7 @@ struct RoutineSessionView: View {
         case .repeater(let d):
             switch exerciseState {
             case .ready:
-                return readyTime
+                return .seconds(10)
             case .on:
                 return .seconds(d.expected.timeOn)
             case .off:
@@ -1380,7 +1380,7 @@ struct RoutineSessionView: View {
         case .maxHang(let d):
             switch exerciseState {
             case .ready:
-                return readyTime
+                return .seconds(10)
             case .on:
                 return .seconds(d.expected.sets[indices.exerciseSetIndex].target)
             case .rest, .off:
