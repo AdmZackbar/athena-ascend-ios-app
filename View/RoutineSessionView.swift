@@ -56,6 +56,9 @@ struct RoutineSessionView: View {
         return exerciseState != .rest
     }
     
+    /// Caches the most recent session of the related routine (if it exists)
+    let prevSession: Session?
+    
     /// The main session of the view. Is a state to allow for easy edits to notes, sets, etc.
     @State private var session: Session
     /// The state variable. Determines which exercise and set is currently displayed.
@@ -72,6 +75,7 @@ struct RoutineSessionView: View {
     @State private var elapsedMilliseconds: Int = 0
     /// The current timer, if in use
     @State private var cancellable: Cancellable?
+    /// If true, a data entry component for left and right should be used
     @State private var allowMultiSide: Bool = false
     /// Contains data in an indeterminate state that is loaded to and saved from for the current exercise
     @State private var genericData: GenericDataSet = .init()
@@ -84,6 +88,7 @@ struct RoutineSessionView: View {
     
     init(session: Session) {
         self.session = session
+        self.prevSession = session.routine?.sessions.filter({ $0 != session }).last
     }
     
     var body: some View {
@@ -464,6 +469,11 @@ struct RoutineSessionView: View {
             }
         }.font(.title)
             .fontWeight(.semibold)
+        if exerciseState == .ready, let prevData = tryGetPrevGenericData(indices!) {
+            Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevData.toString(data.expected))")
+                .font(.headline)
+                .italic()
+        }
     }
     
     @ViewBuilder
@@ -575,8 +585,11 @@ struct RoutineSessionView: View {
         Button {
             sheetType = .notes
         } label: {
-            Text("Add Notes...")
-                .lineLimit(6)
+            HStack {
+                Spacer()
+                Text(genericData.notes.isEmpty ? "Add Notes" : "Edit Notes")
+                Spacer()
+            }
         }.buttonStyle(.glassProminent)
             .tint(.primary)
     }
@@ -925,6 +938,10 @@ struct RoutineSessionView: View {
         let exercise = session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex]
         switch exercise {
         case .generic(let d):
+            // Try to load from previous session if it exists
+            if let prevData = tryGetPrevGenericData(indices) {
+                return .init(prevData, format: d.expected)
+            }
             if indices.exerciseSetIndex < d.actual.count {
                 // Load from current data
                 return .init(d.actual[indices.exerciseSetIndex], format: d.expected)
@@ -989,6 +1006,22 @@ struct RoutineSessionView: View {
             }
             session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .maxHang(.init(expected: d.expected, actual: newActual, notes: d.notes))
         }
+    }
+    
+    func tryGetPrevGenericData(_ indices: ExerciseIndices) -> Session.GenericDataSet? {
+        if let prevSession {
+            if indices.routineSetIndex < prevSession.sets.count {
+                let set = prevSession.sets[indices.routineSetIndex]
+                if indices.setExerciseIndex < set.exercises.count {
+                    if case .generic(let d) = set.exercises[indices.setExerciseIndex] {
+                        if indices.exerciseSetIndex < d.actual.count {
+                            return d.actual[indices.exerciseSetIndex]
+                        }
+                    }
+                }
+            }
+        }
+        return nil
     }
     
     
@@ -1333,26 +1366,24 @@ struct RoutineSessionView: View {
     }
     
     private func computeTimerDuration(indices: ExerciseIndices?, exerciseState: ExerciseState?) -> Duration {
-        guard let indices else { return .zero }
+        guard let indices, let exerciseState else { return .zero }
         let set = session.sets[indices.routineSetIndex]
         let exercise = set.exercises[indices.setExerciseIndex]
         switch exercise {
         case .generic(let d):
-            switch d.expected.dataType {
-            case .time, .timeWeight:
+            if d.expected.dataType.hasTime {
                 switch exerciseState {
                 case .ready, .off:
                     // TODO
                     return .seconds(3)
                 case .on:
                     return .seconds(d.expected.sets[indices.exerciseSetIndex].max)
-                default:
-                    break
+                case .rest:
+                    return .seconds(set.restTime)
                 }
-            default:
-                break
+            } else {
+                return exerciseState == .rest ? .seconds(set.restTime) : .zero
             }
-            return .seconds(set.restTime)
         case .repeater(let d):
             switch exerciseState {
             case .ready:
@@ -1361,7 +1392,7 @@ struct RoutineSessionView: View {
                 return .seconds(d.expected.timeOn)
             case .off:
                 return .seconds(d.expected.timeOff)
-            case .rest, .none:
+            case .rest:
                 return .seconds(set.restTime)
             }
         case .maxHang(let d):
@@ -1370,7 +1401,7 @@ struct RoutineSessionView: View {
                 return readyTime
             case .on:
                 return .seconds(d.expected.sets[indices.exerciseSetIndex].target)
-            case .rest, .off, .none:
+            case .rest, .off:
                 return .seconds(set.restTime)
             }
         }
