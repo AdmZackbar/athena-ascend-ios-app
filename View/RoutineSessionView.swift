@@ -721,16 +721,15 @@ struct RoutineSessionView: View {
                 .font(.title)
                 .fontWeight(.semibold)
         }
-        // TODO
-//        if exerciseState == .ready, let prevData = tryGetPrevGenericData(indices!) {
-//            VStack(alignment: .leading, spacing: 0) {
-//                Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevData.toString(data.expected))")
-//                    .font(.title3)
-//                if !prevData.notes.isEmpty {
-//                    Text(prevData.notes)
-//                }
-//            }.italic()
-//        }
+        if exerciseState == .ready, let prevData = tryGetPrevMaxHangData(indices!) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevData.text)")
+                    .font(.title3)
+                if !prevData.notes.isEmpty {
+                    Text(prevData.notes)
+                }
+            }.italic()
+        }
     }
     
     @ViewBuilder
@@ -958,6 +957,22 @@ struct RoutineSessionView: View {
                 let set = prevSession.sets[indices.routineSetIndex]
                 if indices.setExerciseIndex < set.exercises.count {
                     if case .repeater(let d) = set.exercises[indices.setExerciseIndex] {
+                        if indices.exerciseSetIndex < d.actual.count {
+                            return d.actual[indices.exerciseSetIndex]
+                        }
+                    }
+                }
+            }
+        }
+        return nil
+    }
+    
+    func tryGetPrevMaxHangData(_ indices: ExerciseIndices) -> Session.MaxHangSet? {
+        if let prevSession {
+            if indices.routineSetIndex < prevSession.sets.count {
+                let set = prevSession.sets[indices.routineSetIndex]
+                if indices.setExerciseIndex < set.exercises.count {
+                    if case .maxHang(let d) = set.exercises[indices.setExerciseIndex] {
                         if indices.exerciseSetIndex < d.actual.count {
                             return d.actual[indices.exerciseSetIndex]
                         }
