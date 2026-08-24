@@ -5,6 +5,7 @@
 //  Created by Zach Wassynger on 8/16/26.
 //
 
+import AudioToolbox
 import SwiftData
 import SwiftUI
 internal import Combine
@@ -51,6 +52,7 @@ struct RoutineSessionView: View {
     /// Caches the most recent session of the related routine (if it exists)
     let prevSession: Session?
     
+    @State private var audioManager = AudioManager.shared
     /// The main session of the view. Is a state to allow for easy edits to notes, sets, etc.
     @State private var session: Session
     /// The state variable. Determines which exercise and set is currently displayed.
@@ -90,6 +92,14 @@ struct RoutineSessionView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden()
             .background(background)
+            .onChange(of: exerciseState, { oldValue, newValue in
+                if oldValue == ExerciseState.on && newValue == ExerciseState.rest {
+                    audioManager.playSystemSound(1428)
+                }
+            })
+            .sensoryFeedback(.success, trigger: exerciseState, condition: { oldValue, newValue in
+                oldValue == ExerciseState.on && newValue == ExerciseState.rest
+            })
             .alert("Are you sure you want to delete this session?", isPresented: $showAlert, actions: {
                 Button(role: .destructive) {
                     modelContext.delete(session)
