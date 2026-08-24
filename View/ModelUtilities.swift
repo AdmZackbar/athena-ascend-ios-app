@@ -53,6 +53,20 @@ extension Routine.GenericSets.DataType {
         case .timeWeight: return "Time/Weight"
         }
     }
+    
+    var hasTime: Bool {
+        switch self {
+        case .time, .timeWeight: return true
+        case .rep, .repWeight: return false
+        }
+    }
+    
+    var hasWeight: Bool {
+        switch self {
+        case .repWeight, .timeWeight: return true
+        case .rep, .time: return false
+        }
+    }
 }
 
 extension Routine.GenericSets.SideType {

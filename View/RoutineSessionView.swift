@@ -72,8 +72,7 @@ struct RoutineSessionView: View {
     @State private var elapsedMilliseconds: Int = 0
     /// The current timer, if in use
     @State private var cancellable: Cancellable?
-    /// If true, data entry should be shown (in addition to prev/next buttons)
-    @State private var showNext: Bool = false
+    @State private var allowMultiSide: Bool = false
     /// Contains data in an indeterminate state that is loaded to and saved from for the current exercise
     @State private var genericData: GenericDataSet = .init()
     /// The current sheet that should be shown - if nil, nothing is shown
@@ -132,10 +131,10 @@ struct RoutineSessionView: View {
                 case .notes:
                     Form {
                         TextField("Notes", text: $genericData.notes, axis: .vertical)
-                            .lineLimit(3...6)
+                            .lineLimit(10...14)
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
-                    }.presentationDetents([.medium, .large])
+                    }.presentationDetents([.large])
                 case .song:
                     editSongSheet()
                 }
@@ -243,25 +242,25 @@ struct RoutineSessionView: View {
     
     @ViewBuilder
     func mainView() -> some View {
-        if let currentExercise {
-            switch currentExercise {
-            case .generic(let data):
-                genericExerciseView(data)
-            case .repeater(let data):
-                // TODO
-                switch exerciseState {
-                case .rest:
-                    repeaterRestView()
-                default:
-                    repeaterMainView()
-                }
-            case .maxHang(let data):
-                maxHangExerciseView(data)
+        switch currentExercise {
+        case nil:
+            if session.finished {
+                closedHomePage()
+            } else {
+                activeHomePage()
             }
-        } else if session.finished {
-            closedHomePage()
-        } else {
-            activeHomePage()
+        case .generic(let data):
+            genericExerciseView(data)
+        case .repeater(let data):
+            // TODO
+            switch exerciseState {
+            case .rest:
+                repeaterRestView()
+            default:
+                repeaterMainView()
+            }
+        case .maxHang(let data):
+            maxHangExerciseView(data)
         }
     }
     
@@ -300,7 +299,7 @@ struct RoutineSessionView: View {
         Form {
             Section {
                 TextField("Notes", text: $session.notes, axis: .vertical)
-                    .lineLimit(4...8)
+                    .lineLimit((session.sets.isEmpty ? 9 : 3)...12)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.sentences)
                 Button {
@@ -381,8 +380,18 @@ struct RoutineSessionView: View {
                         }.buttonStyle(.plain)
                     }
                 }
-                if !session.finished {
-                    HStack {
+            } header: {
+                HStack {
+                    if session.finished {
+                        Text(set.name)
+                    } else {
+                        TextField("Set Name", text: $set.name)
+                    }
+                    Spacer()
+                    if set.restTime > 0 {
+                        Text("\(set.restTime)s Rest")
+                    }
+                    Menu {
                         Menu {
                             Button("Basic") {
                                 set.exercises.append(.generic(.init(expected: .init())))
@@ -399,20 +408,7 @@ struct RoutineSessionView: View {
                         } label: {
                             Label("Add Exercise...", systemImage: "plus")
                         }
-                    }
-                }
-            } header: {
-                HStack {
-                    if session.finished {
-                        Text(set.name)
-                    } else {
-                        TextField("Set Name", text: $set.name)
-                    }
-                    Spacer()
-                    if set.restTime > 0 {
-                        Text("\(set.restTime)s Rest")
-                    }
-                    Menu {
+                        Divider()
                         Button(role: .destructive) {
                             session.sets.remove(at: setIndex)
                         } label: {
@@ -438,73 +434,161 @@ struct RoutineSessionView: View {
     
     @ViewBuilder
     func genericExerciseView(_ data: Session.GenericData) -> some View {
-        let exerciseIndex = indices!.exerciseSetIndex
         VStack(alignment: .leading) {
-            Text(data.expected.name)
-                .font(.title)
-                .bold()
-            HStack {
-                Text("Set \(exerciseIndex + 1)/\(data.expected.sets.count)")
-                Spacer()
-                Text("\(data.expected.sets[exerciseIndex].text) \(data.expected.setDetailText)")
-            }.font(.title2)
-                .fontWeight(.semibold)
-            if !showNext {
-                Button("Complete") {
-                    showNext = true
-                    startTimer()
-                }.buttonStyle(.borderedProminent)
-            } else {
-                VStack {
-                    Stepper(value: $genericData.numLeft, in: 0...1000) {
-                        Text("\(genericData.numLeft) \(data.expected.setDetailText)")
-                    }
-                    switch data.expected.dataType {
-                    case .repWeight, .timeWeight:
-                        Stepper(value: $genericData.weightLeft, in: -200...200, step: 5) {
-                            HStack {
-                                TextField("", value: $genericData.weightLeft, format: .number.precision(.fractionLength(0...2)))
-                                    .keyboardType(.decimalPad)
-                                Text("lbs")
-                            }
-                        }
-                    default:
-                        EmptyView()
-                    }
-                }.font(.title2)
-                    .fontWeight(.semibold)
-                    .frame(width: 240)
-                Button {
-                    sheetType = .notes
-                } label: {
-                    if genericData.notes.isEmpty {
-                        Text("Add Notes...")
-                    } else {
-                        Text(genericData.notes)
-                    }
-                }.buttonStyle(.plain)
-                    .font(.body)
-                    .italic()
-                timerView(text: "Rest")
-                    .padding()
+            switch data.expected.dataType {
+            case .time, .timeWeight:
+                timedGenericExerciseView(data)
+            case .rep, .repWeight:
+                defaultGenericExerciseView(data)
             }
+        }.padding()
+    }
+    
+    @ViewBuilder
+    func genericExerciseHeaderView(_ data: Session.GenericData) -> some View {
+        let index = indices!.exerciseSetIndex
+        Text(data.expected.name)
+            .font(.system(size: data.expected.name.count > 16 ? 32 : 40))
+            .bold()
+        Text("Set \(index + 1)/\(data.expected.sets.count)")
+            .font(.title)
+            .fontWeight(.semibold)
+        HStack {
+            Text("\(data.expected.sets[index].text) \(data.expected.setDetailText)")
             Spacer()
-            if showNext {
-                HStack {
-                    Button("Prev") {
-                        // Don't save when going back
-                        prev()
-                    }.buttonStyle(.borderedProminent)
-                    Spacer()
-                    Button("Next") {
-                        // Save before continuing
-                        saveData(indices!)
-                        next()
-                    }.buttonStyle(.borderedProminent)
-                }
+            if data.expected.sideType == .independent && data.expected.dataType.hasTime {
+                let isRight = exerciseState == .off ? !isTimerValid : repeaterRep.max > 0 && repeaterRep.current < 2
+                Text(isRight ? "Right" : "Left")
+                    .font(.title)
+                    .fontWeight(.semibold)
             }
         }.font(.title)
-            .padding()
+            .fontWeight(.semibold)
+    }
+    
+    @ViewBuilder
+    func timedGenericExerciseView(_ data: Session.GenericData) -> some View {
+        switch exerciseState {
+        case .ready, .on:
+            genericExerciseHeaderView(data)
+            timerView(text: exerciseState == .ready ? "Ready" : "Active")
+            Spacer()
+            controlView {
+                next()
+            }
+        case .off:
+            genericExerciseHeaderView(data)
+            if isTimerValid {
+                timerView(text: "Ready")
+                Spacer()
+                controlView {
+                    next()
+                }
+            } else {
+                genericRecordView(data)
+                Spacer()
+                controlView {
+                    trySaveData()
+                    startTimer()
+                }
+            }
+        case .rest:
+            genericExerciseHeaderView(data)
+            genericRecordView(data)
+            if timerDuration > .zero {
+                timerView(text: "Rest")
+            }
+            Spacer()
+            controlView {
+                trySaveData()
+                next()
+            }
+        default:
+            Text("Invalid state for generic exercise")
+        }
+    }
+    
+    @ViewBuilder
+    func defaultGenericExerciseView(_ data: Session.GenericData) -> some View {
+        switch exerciseState {
+        case .ready:
+            genericExerciseHeaderView(data)
+            Spacer()
+            controlView {
+                next()
+            }
+        case .rest:
+            genericExerciseHeaderView(data)
+            genericRecordView(data)
+            if timerDuration > .zero {
+                timerView(text: "Rest")
+            }
+            Spacer()
+            controlView {
+                trySaveData()
+                next()
+            }
+        default:
+            Text("Invalid state for generic exercise")
+        }
+    }
+    
+    @ViewBuilder
+    func genericRecordView(_ data: Session.GenericData) -> some View {
+        if data.expected.dataType.hasTime {
+            let isRight = exerciseState == .off ? !isTimerValid : repeaterRep.max > 0 && repeaterRep.current < 2
+            if isRight {
+                HStack {
+                    Stepper("\(genericData.numRight) \(data.expected.setDetailText)", value: $genericData.numRight, in: 0...1000, step: 1)
+                    if data.expected.dataType.hasWeight {
+                        Stepper(genericData.weightLeft.lbsFormat, value: $genericData.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                    }
+                }.font(.title3).bold()
+            } else {
+                genericRecordSingleEntryView(data)
+            }
+        } else {
+            if data.expected.sideType == .independent {
+                Toggle("Different Side Values", isOn: $allowMultiSide)
+                    .font(.title3)
+                    .bold()
+            }
+            if data.expected.sideType == .independent && allowMultiSide {
+                HStack {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Stepper("\(genericData.numLeft) \(data.expected.setDetailText)", value: $genericData.numLeft, in: 0...1000, step: 1)
+                        if data.expected.dataType.hasWeight {
+                            Stepper(genericData.weightLeft.lbsFormat, value: $genericData.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                        }
+                    }
+                    VStack(alignment: .trailing, spacing: 16) {
+                        Stepper("\(genericData.numRight) \(data.expected.setDetailText)", value: $genericData.numRight, in: 0...1000, step: 1)
+                        if data.expected.dataType.hasWeight {
+                            Stepper(genericData.weightRight.lbsFormat, value: $genericData.weightRight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                        }
+                    }
+                }.font(.title3).bold()
+            } else {
+                genericRecordSingleEntryView(data)
+            }
+        }
+        Button {
+            sheetType = .notes
+        } label: {
+            Text("Add Notes...")
+                .lineLimit(6)
+        }.buttonStyle(.glassProminent)
+            .tint(.primary)
+    }
+    
+    @ViewBuilder
+    func genericRecordSingleEntryView(_ data: Session.GenericData) -> some View {
+        HStack {
+            Stepper("\(genericData.numLeft) \(data.expected.setDetailText)", value: $genericData.numLeft, in: 0...1000, step: 1)
+            if data.expected.dataType.hasWeight {
+                Stepper(genericData.weightLeft.lbsFormat, value: $genericData.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+            }
+        }.font(.title3).bold()
     }
     
     @ViewBuilder
@@ -560,7 +644,9 @@ struct RoutineSessionView: View {
                 Text("Record Data")
             }
             Spacer()
-            controlView()
+            controlView {
+                next(skip: true)
+            }
         }.font(.title)
             .padding()
     }
@@ -634,7 +720,7 @@ struct RoutineSessionView: View {
                 }
                 Button("Save") {
                     // Save recorded data
-                    saveData(indices!)
+                    trySaveData()
                 }
             }
             Spacer()
@@ -666,7 +752,9 @@ struct RoutineSessionView: View {
             timerView(text: str)
                 .padding()
             Spacer()
-            controlView()
+            controlView {
+                next()
+            }
         }.font(.title)
             .padding()
     }
@@ -679,7 +767,9 @@ struct RoutineSessionView: View {
                 .padding()
             recordView()
             Spacer()
-            controlView()
+            controlView {
+                next()
+            }
         }.font(.title)
             .padding()
     }
@@ -717,7 +807,7 @@ struct RoutineSessionView: View {
                 }
                 Button("Save") {
                     // Save recorded data
-                    saveData(indices!)
+                    trySaveData()
                 }
             }
         case .repeater(_):
@@ -745,7 +835,7 @@ struct RoutineSessionView: View {
                 }
                 Button("Save") {
                     // Save recorded data
-                    saveData(indices!)
+                    trySaveData()
                 }
             }
         case .maxHang(_):
@@ -773,7 +863,7 @@ struct RoutineSessionView: View {
                 }
                 Button("Save") {
                     // Save recorded data
-                    saveData(indices!)
+                    trySaveData()
                 }
             }
         case nil:
@@ -802,7 +892,7 @@ struct RoutineSessionView: View {
     }
     
     @ViewBuilder
-    func controlView() -> some View {
+    func controlView(nextAction: @escaping () -> Void) -> some View {
         HStack(spacing: 16) {
             Spacer()
             Button {
@@ -817,9 +907,7 @@ struct RoutineSessionView: View {
                 Image(systemName: isTimerValid ? "pause.circle" : "play.circle")
                     .font(.system(size: 96))
             }.disabled(elapsedSeconds >= timerDuration)
-            Button {
-                next(skip: true)
-            } label: {
+            Button(action: nextAction) {
                 Image(systemName: "arrowshape.forward.circle")
                     .font(.system(size: 64))
             }
@@ -841,8 +929,13 @@ struct RoutineSessionView: View {
                 // Load from current data
                 return .init(d.actual[indices.exerciseSetIndex], format: d.expected)
             } else {
-                // Load from expected
-                return .init(numLeft: d.expected.sets[indices.exerciseSetIndex].avg)
+                // Load from expected (and prev data if possible)
+                var data = GenericDataSet(numLeft: d.expected.sets[indices.exerciseSetIndex].avg)
+                if let latest = d.actual.last {
+                    data.weightLeft = latest.weightLeft
+                    data.weightRight = latest.weightRight
+                }
+                return data
             }
         case .repeater(let d):
             if indices.exerciseSetIndex < d.actual.count {
@@ -865,15 +958,18 @@ struct RoutineSessionView: View {
         }
     }
     
-    func saveData(_ indices: ExerciseIndices) {
+    func trySaveData() {
+        guard let indices else { return }
         let exercise = session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex]
         switch exercise {
         case .generic(let d):
             var newActual: [Session.GenericDataSet] = d.actual
+            let updatedData: Session.GenericDataSet = genericData.toGeneric(d.expected, useAlt: d.expected.sideType == .independent && (d.expected.dataType.hasTime || allowMultiSide))
+            // TODO handle this case better
             if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = genericData.toGeneric(d.expected, useAlt: false)
+                newActual[indices.exerciseSetIndex] = updatedData
             } else {
-                newActual.append(genericData.toGeneric(d.expected, useAlt: false))
+                newActual.append(updatedData)
             }
             session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .generic(.init(expected: d.expected, actual: newActual, notes: d.notes))
         case .repeater(let d):
@@ -923,9 +1019,15 @@ struct RoutineSessionView: View {
         self.repeaterRep = nextRepeaterRep()
         // Start timer if needed
         switch currentExercise {
-        case .repeater(_), .maxHang(_):
+        case .generic(_):
+            if exerciseState != .off {
+                startTimer()
+            }
+        case .repeater(_):
             startTimer()
-        default:
+        case .maxHang(_):
+            startTimer()
+        case nil:
             break
         }
     }
@@ -933,6 +1035,25 @@ struct RoutineSessionView: View {
     /// Computes the next state of the repeater rep field
     private func nextRepeaterRep() -> RepeaterRep {
         switch currentExercise {
+        case .generic(let d):
+            switch exerciseState {
+            case .ready:
+                let max: Int = {
+                    switch d.expected.dataType {
+                    case .time, .timeWeight:
+                        return d.expected.sideType == .independent ? 2 : 1
+                    case .rep, .repWeight:
+                        return 0
+                    }
+                }()
+                return .init(max: max)
+            case .on:
+                return repeaterRep.next()
+            case .off:
+                return repeaterRep
+            default:
+                break
+            }
         case .repeater(let d):
             switch exerciseState {
             case .ready:
@@ -961,10 +1082,10 @@ struct RoutineSessionView: View {
     
     func prevState() -> ExerciseState? {
         switch exerciseState {
-        case .rest:
-            return .ready
-        default:
+        case .ready, nil:
             return nil
+        default:
+            return .ready
         }
     }
     
@@ -987,7 +1108,7 @@ struct RoutineSessionView: View {
     
     func next(skip: Bool = false) {
         stopAndResetTimer()
-        if let newState = nextState() {
+        if !skip, let newState = nextState() {
             setState(newState: newState)
         } else {
             setState(newIndices: nextIndices())
@@ -996,10 +1117,19 @@ struct RoutineSessionView: View {
     
     func nextState() -> ExerciseState? {
         switch currentExercise {
-        case .generic(_):
+        case .generic(let d):
             switch exerciseState {
-            case .ready, .on, .off:
-                return .rest
+            case .ready:
+                switch d.expected.dataType {
+                case .time, .timeWeight:
+                    return .on
+                case .rep, .repWeight:
+                    return .rest
+                }
+            case .on:
+                return repeaterRep.hasNext ? .off : .rest
+            case .off:
+                return .on
             case .rest, nil:
                 return nil
             }
@@ -1207,6 +1337,22 @@ struct RoutineSessionView: View {
         let set = session.sets[indices.routineSetIndex]
         let exercise = set.exercises[indices.setExerciseIndex]
         switch exercise {
+        case .generic(let d):
+            switch d.expected.dataType {
+            case .time, .timeWeight:
+                switch exerciseState {
+                case .ready, .off:
+                    // TODO
+                    return .seconds(3)
+                case .on:
+                    return .seconds(d.expected.sets[indices.exerciseSetIndex].max)
+                default:
+                    break
+                }
+            default:
+                break
+            }
+            return .seconds(set.restTime)
         case .repeater(let d):
             switch exerciseState {
             case .ready:
@@ -1227,8 +1373,6 @@ struct RoutineSessionView: View {
             case .rest, .off, .none:
                 return .seconds(set.restTime)
             }
-        default:
-            return .seconds(set.restTime)
         }
     }
     

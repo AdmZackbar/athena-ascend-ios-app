@@ -40,6 +40,29 @@ struct TestDataModifier: PreviewModifier {
     
     static func populateContainer(_ container: ModelContainer) {
         let routine: Routine = .init(name: "Spring 2026 Monday", sets: [
+            .init(name: "Warmup Set", exercises: [
+                .generic(.init(name: "Pancake Fold", dataType: .time, sets: [
+                    .init(num: 5),
+                ])),
+                .generic(.init(name: "Ninja Kick", dataType: .time, sideType: .independent, sets: [
+                    .init(num: 3),
+                ])),
+                .generic(.init(name: "Cossack Squats", dataType: .rep, sideType: .independent, sets: [
+                    .init(num: 10),
+                    .init(num: 10),
+                    .init(num: 10),
+                ])),
+                .generic(.init(name: "Dumbbell Bench Press", sideType: .dependent, sets: [
+                    .init(num: 10),
+                    .init(num: 8),
+                    .init(num: 6),
+                ])),
+                .generic(.init(name: "Curtsy Squat", sideType: .independent, sets: [
+                    .init(min: 8, max: 12),
+                    .init(min: 8, max: 12),
+                    .init(min: 8, max: 12),
+                ]))
+            ], restTime: 15, order: .dfs),
             .init(name: "Hangboard Block A", exercises: [
                 .repeater(.init(tag: "10mm HC", sets: [
                     .init(numReps: 7),
@@ -66,18 +89,6 @@ struct TestDataModifier: PreviewModifier {
                     .init(side: .right, target: 6, weight: 45.0),
                 ]))
             ], order: .dfs),
-            .init(name: "Warmup Set", exercises: [
-                .generic(.init(name: "Dumbbell Bench Press", sets: [
-                    .init(num: 10),
-                    .init(num: 8),
-                    .init(num: 6),
-                ])),
-                .generic(.init(name: "Curtsy Squat", sets: [
-                    .init(min: 8, max: 12),
-                    .init(min: 8, max: 12),
-                    .init(min: 8, max: 12),
-                ]))
-            ], restTime: 15, order: .bfs)
         ])
         let session = Session(startTime: .now.addingTimeInterval(-3600), endTime: .now, sets: routine.sets.map({ .init(base: $0) }), bodyWeight: 155, standoutSong: .init(name: "Permanent", artist: "A Day to Remember"))
         session.sets.indices.forEach({ setIndex in

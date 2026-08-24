@@ -184,31 +184,22 @@ struct SessionExerciseSheet: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 16) {
                                 Stepper("\(set.numLeft) \(generic.setDetailText)", value: $set.numLeft, in: 0...1000, step: 1)
-                                switch generic.dataType {
-                                case .repWeight, .timeWeight:
+                                if generic.dataType.hasWeight {
                                     Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
-                                case .rep, .time:
-                                    EmptyView()
                                 }
                             }
                             VStack(alignment: .trailing, spacing: 16) {
                                 Stepper("\(set.numRight) \(generic.setDetailText)", value: $set.numRight, in: 0...1000, step: 1)
-                                switch generic.dataType {
-                                case .repWeight, .timeWeight:
+                                if generic.dataType.hasWeight {
                                     Stepper(set.weightRight.lbsFormat, value: $set.weightRight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
-                                case .rep, .time:
-                                    EmptyView()
                                 }
                             }
                         }
                     } else {
                         HStack {
                             Stepper("\(set.numLeft) \(generic.setDetailText)", value: $set.numLeft, in: 0...1000, step: 1)
-                            switch generic.dataType {
-                            case .repWeight, .timeWeight:
+                            if generic.dataType.hasWeight {
                                 Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
-                            case .rep, .time:
-                                EmptyView()
                             }
                         }
                     }
