@@ -57,6 +57,8 @@ extension SchemaV1 {
                     return .repeater(.init(expected: d))
                 case .maxHang(let d):
                     return .maxHang(.init(expected: d))
+                case .campus(let d):
+                    return .campus(.init(expected: d))
                 }
             }
         }
@@ -65,6 +67,7 @@ extension SchemaV1 {
             case generic(_ data: GenericData)
             case repeater(_ data: RepeaterData)
             case maxHang(_ data: MaxHangData)
+            case campus(_ data: CampusSetData)
         }
         
         struct GenericData: Codable, Hashable, Equatable {
@@ -165,6 +168,28 @@ extension SchemaV1 {
                 self.weight = weight
                 self.weightAlt = weightAlt
                 self.notes = notes
+            }
+        }
+        
+        struct CampusSetData: Codable, Hashable, Equatable {
+            var expected: Routine.CampusSets
+            var actual: [CampusSetPair]
+            var notes: String
+            
+            init(expected: Routine.CampusSets, actual: [CampusSetPair] = [], notes: String = "") {
+                self.expected = expected
+                self.actual = actual
+                self.notes = notes
+            }
+        }
+        
+        struct CampusSetPair: Codable, Hashable, Equatable {
+            var main: CampusSet
+            var alt: CampusSet?
+            
+            init(main: CampusSet, alt: CampusSet? = nil) {
+                self.main = main
+                self.alt = alt
             }
         }
         

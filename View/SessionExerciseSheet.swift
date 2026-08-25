@@ -17,6 +17,7 @@ struct SessionExerciseSheet: View {
     @State private var generic: Routine.GenericSets = .init()
     @State private var repeater: Routine.RepeaterSets = .init()
     @State private var maxHang: Routine.MaxHangSets = .init()
+    @State private var campus: Routine.CampusSets = .init()
     @State private var data: [RoutineSessionView.GenericDataSet]
     @State private var notes: String
     @State private var multiSide: Bool
@@ -41,6 +42,11 @@ struct SessionExerciseSheet: View {
             data = d.actual.map({ .init($0) })
             notes = d.notes
             multiSide = d.actual.contains(where: \.hasDiffSideData)
+        case .campus(let d):
+            campus = d.expected
+            data = d.actual.map({ .init($0) })
+            notes = d.notes
+            multiSide = d.actual.contains(where: \.hasDiffSideData)
         }
     }
     
@@ -54,6 +60,9 @@ struct SessionExerciseSheet: View {
                     repeaterView()
                 case .maxHang(_):
                     maxHangView()
+                case .campus(_):
+                    // TODO
+                    EmptyView()
                 }
             }.navigationTitle("Edit Exercise")
                 .navigationBarTitleDisplayMode(.inline)
@@ -93,6 +102,8 @@ struct SessionExerciseSheet: View {
             exercise = .repeater(.init(expected: repeater, actual: data.map({ $0.toRepeater() }), notes: notes))
         case .maxHang(_):
             exercise = .maxHang(.init(expected: maxHang, actual: data.map({ $0.toMaxHang(maxHang, useAlt: multiSide) }), notes: notes))
+        case .campus(_):
+            exercise = .campus(.init(expected: campus, actual: data.map({ $0.toCampus(campus, useAlt: multiSide ) }), notes: notes))
         }
         showing = false
     }

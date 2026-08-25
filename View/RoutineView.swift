@@ -61,6 +61,13 @@ struct RoutineView: View {
             Text(d.tag)
                 .font(.headline)
                 .bold()
+        case .campus(let d):
+            Text("Campus")
+                .font(.subheadline)
+                .italic()
+            Text(d.type.text)
+                .font(.headline)
+                .bold()
         }
     }
     
@@ -78,6 +85,8 @@ struct RoutineView: View {
                         return "\(d.expected.tag) \(d.expected.timeOn)s/\(d.expected.timeOff)s"
                     case .maxHang(let d):
                         return d.expected.tag
+                    case .campus(let d):
+                        return d.expected.type.text
                     }
                 }()
                 Text(updated)
@@ -95,6 +104,15 @@ struct RoutineView: View {
             case .maxHang(let data):
                 ForEach(data.actual.enumerated(), id: \.offset) { offset, d in
                     Text(d.text)
+                }
+            case .campus(let data):
+                ForEach(data.actual.enumerated(), id: \.offset) { offset, d in
+                    HStack {
+                        Text(d.main.moves.text)
+                        if let alt = d.alt?.moves {
+                            Text(alt.text)
+                        }
+                    }
                 }
             }
         }.font(.subheadline)
@@ -116,6 +134,10 @@ struct RoutineView: View {
                     Text(set.text)
                 }
             case .maxHang(let data):
+                ForEach(data.sets.enumerated(), id: \.offset) { offset, set in
+                    Text(set.text)
+                }
+            case .campus(let data):
                 ForEach(data.sets.enumerated(), id: \.offset) { offset, set in
                     Text(set.text)
                 }

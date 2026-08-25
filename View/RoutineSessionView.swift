@@ -263,6 +263,9 @@ struct RoutineSessionView: View {
             repeaterExerciseView(data)
         case .maxHang(let data):
             maxHangExerciseView(data)
+        case .campus(let data):
+            // TODO
+            EmptyView()
         }
     }
     
@@ -899,6 +902,18 @@ struct RoutineSessionView: View {
                 let expected = d.expected.sets[indices.exerciseSetIndex]
                 return .init(numLeft: expected.target, weightLeft: expected.weight)
             }
+        case .campus(let d):
+            if indices.exerciseSetIndex < d.actual.count {
+                // Load from current data
+                return .init(d.actual[indices.exerciseSetIndex])
+            } else {
+                // Load from expected
+                let expected = d.expected.sets[indices.exerciseSetIndex]
+                if case .defined(let moves) = expected.moves {
+                    return .init(campusSet: .init(board: expected.board, moves: moves))
+                }
+                return .init(campusSet: .init(board: expected.board))
+            }
         }
     }
     
@@ -933,6 +948,15 @@ struct RoutineSessionView: View {
                 newActual.append(updatedData)
             }
             session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .maxHang(.init(expected: d.expected, actual: newActual, notes: d.notes))
+        case .campus(let d):
+            var newActual: [Session.CampusSetPair] = d.actual
+            let updatedData = genericData.toCampus(d.expected, useAlt: d.expected.type.shouldMirror && allowMultiSide)
+            if indices.exerciseSetIndex < d.actual.count {
+                newActual[indices.exerciseSetIndex] = updatedData
+            } else {
+                newActual.append(updatedData)
+            }
+            session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .campus(.init(expected: d.expected, actual: newActual, notes: d.notes))
         }
     }
     
@@ -1025,9 +1049,7 @@ struct RoutineSessionView: View {
             if exerciseState != .off {
                 startTimer()
             }
-        case .repeater(_):
-            startTimer()
-        case .maxHang(_):
+        case .repeater(_), .maxHang(_), .campus(_):
             startTimer()
         case nil:
             pauseTimer()
@@ -1148,7 +1170,7 @@ struct RoutineSessionView: View {
             case .rest, nil:
                 return nil
             }
-        case .repeater(_), .maxHang(_):
+        case .repeater(_), .maxHang(_), .campus(_):
             switch exerciseState {
             case .ready:
                 return .on
@@ -1378,6 +1400,15 @@ struct RoutineSessionView: View {
             case .rest:
                 return .seconds(set.restTime)
             }
+        case .campus(_):
+            switch exerciseState {
+            case .ready:
+                return .seconds(5)
+            case .on:
+                return .seconds(10)
+            case .off, .rest:
+                return .seconds(set.restTime)
+            }
         }
     }
     
@@ -1398,6 +1429,8 @@ struct RoutineSessionView: View {
         var numRight: Int
         var weightLeft: Double
         var weightRight: Double
+        var campusSet: CampusSet
+        var movesAlt: [CampusMove]
         var notes: String
         
         init(_ data: Session.GenericDataSet, format: Routine.GenericSets) {
@@ -1417,11 +1450,17 @@ struct RoutineSessionView: View {
             self.init(numLeft: data.time, numRight: data.timeAlt, weightLeft: data.weight, weightRight: data.weightAlt, notes: data.notes)
         }
         
-        init(numLeft: Int? = nil, numRight: Int? = nil, weightLeft: Double? = nil, weightRight: Double? = nil, notes: String = "") {
+        init(_ data: Session.CampusSetPair) {
+            self.init(campusSet: data.main, movesAlt: data.alt?.moves, notes: data.main.notes)
+        }
+        
+        init(numLeft: Int? = nil, numRight: Int? = nil, weightLeft: Double? = nil, weightRight: Double? = nil, campusSet: CampusSet? = nil, movesAlt: [CampusMove]? = nil, notes: String = "") {
             self.numLeft = numLeft ?? 0
             self.numRight = numRight ?? numLeft ?? 0
             self.weightLeft = weightLeft ?? 0
             self.weightRight = weightRight ?? weightLeft ?? 0
+            self.campusSet = campusSet ?? .init()
+            self.movesAlt = movesAlt ?? []
             self.notes = notes
         }
         
@@ -1485,6 +1524,13 @@ struct RoutineSessionView: View {
                 return .init(time: numLeft, timeAlt: numRight, weight: weightLeft, weightAlt: weightRight, notes: notes)
             }
             return .init(time: numLeft, weight: weightLeft, notes: notes)
+        }
+        
+        func toCampus(_ data: Routine.CampusSets, useAlt: Bool) -> Session.CampusSetPair {
+            if data.type.shouldMirror && useAlt {
+                return .init(main: .init(board: campusSet.board, moves: campusSet.moves, tempo: campusSet.tempo, notes: notes), alt: .init(board: campusSet.board, moves: movesAlt, tempo: campusSet.tempo, notes: notes))
+            }
+            return .init(main: .init(board: campusSet.board, moves: campusSet.moves, tempo: campusSet.tempo, notes: notes))
         }
     }
     

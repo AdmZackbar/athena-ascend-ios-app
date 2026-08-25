@@ -48,6 +48,11 @@ struct RoutineEditView: View {
                             set.exercises.append(exercise)
                             editExercise = (set.id, exercise.id)
                         }
+                        Button("Campus") {
+                            let exercise = Item.Exercise(.campus(.init()))
+                            set.exercises.append(exercise)
+                            editExercise = (set.id, exercise.id)
+                        }
                     }
                 } header: {
                     VStack {
@@ -85,6 +90,9 @@ struct RoutineEditView: View {
                     EditRepeaterSetsSheet(item: exercise.repeater)
                 case .maxHang:
                     EditMaxHangSetsSheet(item: exercise.maxHang)
+                case .campus:
+                    // TODO
+                    EmptyView()
                 }
             }
         }.navigationTitle(item.routine != nil ? "Edit Routine" : "Create Routine")
@@ -118,6 +126,8 @@ struct RoutineEditView: View {
             repeaterView(exercise.repeater)
         case .maxHang:
             maxHangView(exercise.maxHang)
+        case .campus:
+            campusView(exercise.campus)
         }
     }
     
@@ -170,6 +180,19 @@ struct RoutineEditView: View {
                 Text("No Tag")
                     .italic()
             }
+            VStack(alignment: .leading) {
+                ForEach(maxHang.sets.enumerated(), id: \.offset) { offset, set in
+                    Text(set.text)
+                }
+            }
+        }
+    }
+    
+    private func campusView(_ maxHang: Routine.CampusSets) -> some View {
+        VStack(alignment: .leading) {
+            Text(maxHang.type.text)
+                .font(.title3)
+                .bold()
             VStack(alignment: .leading) {
                 ForEach(maxHang.sets.enumerated(), id: \.offset) { offset, set in
                     Text(set.text)
@@ -319,6 +342,7 @@ struct RoutineEditView: View {
     
     struct EditMaxHangSetsSheet: View {
         @Binding var item: Routine.MaxHangSets
+        @State var multiSide: Bool = true
         
         var body: some View {
             Form {
@@ -327,55 +351,55 @@ struct RoutineEditView: View {
                 }
                 Section {
                     ForEach($item.sets.enumerated(), id: \.offset) { offset, $set in
-//                        VStack {
-//                            Stepper("\(set.time)s", value: $set.time, in: 0...30)
-//                            Stepper(value: $set.weight, in: -200...200, step: 5) {
-//                                HStack {
-//                                    TextField("", value: $set.weight, format: .number.precision(.fractionLength(0...2)))
-//                                        .keyboardType(.decimalPad)
-//                                    Text("lbs")
-//                                }
-//                            }
-//                        }
+                        if item.isSingleArm && multiSide {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 16) {
+                                    Stepper("\(set.target)s", value: $set.target, in: 0...1000, step: 1)
+                                    Stepper(set.weight.lbsFormat, value: $set.weight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                                }
+                                VStack(alignment: .trailing, spacing: 16) {
+                                    Stepper("\(set.targetAlt ?? set.target)s", value: .init(get: {
+                                        set.targetAlt ?? set.target
+                                    }, set: { newValue in
+                                        set.targetAlt = newValue
+                                    }), in: 0...1000, step: 1)
+                                    Stepper((set.weightAlt ?? set.weight).lbsFormat, value: .init(get: {
+                                        set.weightAlt ?? set.weight
+                                    }, set: { newValue in
+                                        set.weightAlt = newValue
+                                    }), in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                                }
+                            }
+                        } else {
+                            HStack {
+                                Stepper("\(set.target)s", value: $set.target, in: 0...1000, step: 1)
+                                Stepper(set.weight.lbsFormat, value: $set.weight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                            }
+                        }
                     }
                 } header: {
-                    HStack(spacing: 16) {
-                        Text("Left")
-                        Spacer()
-                        Button {
-//                            if let left = item.sets.filter({ $0.side == .left }).last {
-//                                item.sets.append(.init(side: .left, target: left.target, weight: left.weight))
-//                            } else {
-//                                item.sets.append(.init(side: .left))
-//                            }
-//                            if let right = item.sets.filter({ $0.side == .right }).last {
-//                                item.sets.append(.init(side: .right, target: right.target, weight: right.weight))
-//                            } else {
-//                                item.sets.append(.init(side: .right))
-//                            }
-                            
-                        } label: {
-                            Image(systemName: "plus")
+                    VStack(alignment: .leading) {
+                        if item.isSingleArm {
+                            Toggle("Different Side Values", isOn: $multiSide)
                         }
-                        Button {
-                            item.sets.removeLast(2)
-                        } label: {
-                            Image(systemName: "minus")
-                        }.disabled(item.sets.isEmpty)
-                    }.buttonStyle(.plain)
-                }
-                Section("Right") {
-                    ForEach($item.sets.enumerated(), id: \.offset) { offset, $set in
-//                        HStack {
-//                            Stepper("\(set.target)s", value: $set.target, in: 0...30)
-//                            Stepper(value: $set.weight, in: -200...200, step: 5) {
-//                                HStack {
-//                                    TextField("", value: $set.weight, format: .number.precision(.fractionLength(0...2)))
-//                                        .keyboardType(.decimalPad)
-//                                    Text("lbs")
-//                                }
-//                            }
-//                        }
+                        HStack(spacing: 16) {
+                            Text("Sets")
+                            Spacer()
+                            Button {
+                                if let latest = item.sets.last {
+                                    item.sets.append(.init(target: latest.target, targetAlt: latest.targetAlt, weight: latest.weight, weightAlt: latest.weightAlt))
+                                } else {
+                                    item.sets.append(.init())
+                                }
+                            } label: {
+                                Image(systemName: "plus")
+                            }
+                            Button {
+                                item.sets.removeLast()
+                            } label: {
+                                Image(systemName: "minus")
+                            }.disabled(item.sets.isEmpty)
+                        }.buttonStyle(.plain)
                     }
                 }
             }.presentationDetents([.medium, .large])
@@ -435,6 +459,8 @@ struct RoutineEditView: View {
                 .repeater(exercise.repeater)
             case .maxHang:
                 .maxHang(exercise.maxHang)
+            case .campus:
+                .campus(exercise.campus)
             }
         }
         
@@ -466,7 +492,7 @@ struct RoutineEditView: View {
         }
         
         enum ExerciseType {
-            case generic, repeater, maxHang
+            case generic, repeater, maxHang, campus
         }
         
         struct Exercise: Identifiable {
@@ -475,6 +501,7 @@ struct RoutineEditView: View {
             var generic: Routine.GenericSets = .init()
             var repeater: Routine.RepeaterSets = .init()
             var maxHang: Routine.MaxHangSets = .init()
+            var campus: Routine.CampusSets = .init()
             
             var invalid: Bool {
                 switch type {
@@ -484,6 +511,9 @@ struct RoutineEditView: View {
                     repeater.tag.isEmpty || repeater.sets.isEmpty || repeater.sets.contains(where: isInvalid)
                 case .maxHang:
                     maxHang.tag.isEmpty || maxHang.sets.isEmpty || maxHang.sets.contains(where: isInvalid)
+                case .campus:
+                    // TODO
+                    campus.sets.isEmpty
                 }
             }
             
@@ -499,6 +529,9 @@ struct RoutineEditView: View {
                 case .maxHang(let d):
                     self.type = .maxHang
                     self.maxHang = d
+                case .campus(let d):
+                    self.type = .campus
+                    self.campus = d
                 }
             }
             

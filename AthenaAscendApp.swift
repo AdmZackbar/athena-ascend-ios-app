@@ -86,6 +86,18 @@ struct TestDataModifier: PreviewModifier {
                     .init(target: 6, targetAlt: 6, weight: 40.0, weightAlt: 45.0),
                 ]))
             ], restTime: 180, order: .dfs),
+            .init(name: "Warmup Campus", exercises: [
+                .campus(.init(type: .basicLadder, sets: [
+                    .init(moves: .defined([
+                        .init(rung: .full(1), side: .both),
+                        .init(rung: .full(3), side: .right),
+                        .init(rung: .full(5), side: .left),
+                        .init(rung: .full(7), side: .right),
+                        .init(rung: .full(9), side: .left),
+                        .init(rung: .full(9), side: .both),
+                    ]))
+                ]))
+            ], restTime: 100, order: .dfs)
         ])
         let session = Session(startTime: .now.addingTimeInterval(-3600), endTime: .now, sets: routine.sets.map({ .init(base: $0) }), bodyWeight: 155, standoutSong: .init(name: "Permanent", artist: "A Day to Remember"))
         session.sets.indices.forEach({ setIndex in
@@ -110,6 +122,13 @@ struct TestDataModifier: PreviewModifier {
                             actual.append(.init(time: Int.random(in: exSet.target - 5...exSet.target), weight: Double(Int.random(in: 0...6) * 5)))
                         }
                         return .maxHang(.init(expected: d.expected, actual: actual))
+                    case .campus(let d):
+                        var actual: [Session.CampusSetPair] = []
+                        // TODO
+//                        for exSet in d.expected.sets {
+//                            actual.append(.init(main: .init(moves: [.init(rung: .full(1), side: .both)])))
+//                        }
+                        return .campus(.init(expected: d.expected, actual: actual))
                     }
                 }()
                 session.sets[setIndex].exercises[exIndex] = newExercise

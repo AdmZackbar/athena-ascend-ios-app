@@ -78,6 +78,8 @@ extension Session {
             return sets.flatMap({ $0.exercises }).filter({ $0.isBasedOn(expectedData) })
         case .maxHang(let expectedData):
             return sets.flatMap({ $0.exercises }).filter({ $0.isBasedOn(expectedData) })
+        case .campus(let expectedData):
+            return sets.flatMap({ $0.exercises }).filter({ $0.isBasedOn(expectedData) })
         }
     }
 }
@@ -96,6 +98,8 @@ extension Routine.Exercise {
             return d.text
         case .maxHang(let d):
             return d.tag
+        case .campus(let d):
+            return d.type.text
         }
     }
     
@@ -106,6 +110,8 @@ extension Routine.Exercise {
         case .repeater(let d):
             return d.sets.count
         case .maxHang(let d):
+            return d.sets.count
+        case .campus(let d):
             return d.sets.count
         }
     }
@@ -118,6 +124,8 @@ extension Routine.Exercise {
             return "\(d.tag) (\(setIndex + 1)/\(numSets)): \(d.timeOn)s/\(d.timeOff)s \(d.sets[setIndex].text)"
         case .maxHang(let d):
             return "\(d.tag) (\(setIndex + 1)/\(numSets)): \(d.sets[setIndex].text)"
+        case .campus(let d):
+            return "\(d.type.text) (\(setIndex + 1)/\(numSets)): \(d.sets[setIndex].text)"
         }
     }
 }
@@ -131,6 +139,8 @@ extension Session.Exercise {
             return !d.actual.isEmpty
         case .maxHang(let d):
             return !d.actual.isEmpty
+        case .campus(let d):
+            return !d.actual.isEmpty
         }
     }
     
@@ -142,6 +152,8 @@ extension Session.Exercise {
             return d.expected.text
         case .maxHang(let d):
             return d.expected.tag
+        case .campus(let d):
+            return d.expected.type.text
         }
     }
     
@@ -154,6 +166,8 @@ extension Session.Exercise {
             return d.expected.sets[setIndex].text
         case .maxHang(let d):
             return d.expected.sets[setIndex].text
+        case .campus(let d):
+            return d.expected.sets[setIndex].text
         }
     }
     
@@ -164,6 +178,8 @@ extension Session.Exercise {
         case .repeater(let d):
             return d.expected.sets.count
         case .maxHang(let d):
+            return d.expected.sets.count
+        case .campus(let d):
             return d.expected.sets.count
         }
     }
@@ -176,6 +192,8 @@ extension Session.Exercise {
             return "\(d.expected.tag) (\(setIndex + 1)/\(numSets)): \(d.expected.timeOn)s/\(d.expected.timeOff)s \(d.expected.sets[setIndex].text)"
         case .maxHang(let d):
             return "\(d.expected.tag) (\(setIndex + 1)/\(numSets)): \(d.expected.sets[setIndex].text)"
+        case .campus(let d):
+            return "\(d.expected.type.text) (\(setIndex + 1)/\(numSets)): \(d.expected.sets[setIndex].text)"
         }
     }
     
@@ -186,6 +204,8 @@ extension Session.Exercise {
         case .repeater(let data):
             return isBasedOn(data)
         case .maxHang(let data):
+            return isBasedOn(data)
+        case .campus(let data):
             return isBasedOn(data)
         }
     }
@@ -217,6 +237,16 @@ extension Session.Exercise {
         case .maxHang(let sessionData):
             // Only compare based on tag
             return basis.tag == sessionData.expected.tag
+        default:
+            return false
+        }
+    }
+    
+    func isBasedOn(_ basis: Routine.CampusSets) -> Bool {
+        switch self {
+        case .campus(let sessionData):
+            // Only compare based on type
+            return basis.type == sessionData.expected.type
         default:
             return false
         }
@@ -424,5 +454,48 @@ extension Session.MaxHangSet {
     
     var hasDiffSideData: Bool {
         timeLeft != timeRight || weightLeft != weightRight
+    }
+}
+
+extension CampusBoard {
+    static let largeEdges = CampusBoard(name: "Large Edges")
+    static let mediumEdges = CampusBoard(name: "Medium Edges")
+    static let smallEdges = CampusBoard(name: "Small Edges")
+    static let sloperRungs = CampusBoard(name: "Sloper Rungs", endRung: .full(8), hasHalf: false)
+}
+
+extension [CampusMove] {
+    var text: String {
+        return "\(self.map({ $0.text }).joined(separator: "-"))"
+    }
+    
+    var flipped: [CampusMove] {
+        return self.map({ .init(rung: $0.rung, side: $0.side.flipped) })
+    }
+}
+
+extension Routine.CampusSets.PlannedSet {
+    var text: String {
+        let m: String = {
+            switch moves {
+            case .defined(let moves):
+                if self.doMirror {
+                    return "\(moves.text)\n  \(moves.flipped.text)"
+                }
+                return moves.text
+            case .baseline(let offsets):
+                let text = "Baseline: \(offsets.map({ $0 >= 0 ? "+\($0)" : "\($0)" }).joined(separator: ", "))"
+                return self.doMirror ? "\(text) x2" : text
+            case .progressive:
+                return self.doMirror ? "Progressive x2" : "Progressive"
+            }
+        }()
+        return board.name.isEmpty ? m : "\(board.name): \(m)"
+    }
+}
+
+extension Session.CampusSetPair {
+    var hasDiffSideData: Bool {
+        alt != nil
     }
 }

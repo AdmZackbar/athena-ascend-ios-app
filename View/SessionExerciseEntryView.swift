@@ -19,6 +19,8 @@ struct SessionExerciseEntryView: View {
             repeaterEntryView(d)
         case .maxHang(let d):
             maxHangEntryView(d)
+        case .campus(let d):
+            campusEntryView(d)
         }
     }
     
@@ -164,6 +166,47 @@ struct SessionExerciseEntryView: View {
             }
         }
     }
+    
+    @ViewBuilder
+    func campusEntryView(_ d: Session.CampusSetData) -> some View {
+        VStack(alignment: .leading) {
+            Text(d.expected.type.text)
+                .bold()
+            VStack(alignment: .leading) {
+                ForEach(d.expected.sets.enumerated(), id: \.offset) { offset, expected in
+                    if offset < d.actual.count {
+                        let actual = d.actual[offset]
+                        VStack(alignment: .leading) {
+                            HStack {
+                                Text(actual.main.moves.text)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                Text(expected.text)
+                                    .font(.subheadline)
+                                    .italic()
+                                Spacer()
+                            }
+                            if !actual.main.notes.isEmpty {
+                                Text(actual.main.notes)
+                                    .lineLimit(1)
+                                    .font(.caption)
+                                    .padding(.leading, 4)
+                            }
+                        }
+                    } else {
+                        Text(expected.text)
+                            .font(.subheadline)
+                    }
+                }
+                if !d.notes.isEmpty {
+                    Text(d.notes)
+                        .lineLimit(3)
+                        .font(.subheadline)
+                        .fontWeight(.light)
+                }
+            }.padding(.leading, 4)
+        }
+    }
 }
 
 #Preview {
@@ -209,6 +252,28 @@ struct SessionExerciseEntryView: View {
                 .init(time: 10, timeAlt: 9, weight: 35, weightAlt: 40, notes: "Too much"),
                 .init(time: 6, timeAlt: 5, weight: 40, weightAlt: 50, notes: "EZ"),
             ], notes: "Why am i doing this")))
+        }
+        Section("Campus") {
+            SessionExerciseEntryView(exercise: .campus(.init(expected: .init(type: .maxLadder, sets: [
+                .init(moves: .defined([
+                    .init(rung: .full(1), side: .both),
+                    .init(rung: .full(3), side: .right),
+                    .init(rung: .full(5), side: .left),
+                    .init(rung: .full(7), side: .right),
+                    .init(rung: .full(9), side: .left),
+                    .init(rung: .full(9), side: .both),
+                ])),
+                .init(moves: .defined([
+                    .init(rung: .full(1), side: .both),
+                    .init(rung: .half(3), side: .right),
+                    .init(rung: .full(6), side: .left),
+                    .init(rung: .half(8), side: .right),
+                    .init(rung: .full(10), side: .left),
+                    .init(rung: .full(10), side: .both),
+                ])),
+                .init(moves: .baseline([1, 1])),
+                .init(moves: .progressive),
+            ]))))
         }
     }
 }

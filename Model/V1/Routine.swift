@@ -9,6 +9,7 @@ import Foundation
 import SwiftData
 
 typealias Routine = SchemaV1.Routine
+typealias CampusExercise = Routine.CampusSets.Exercise
 
 extension SchemaV1 {
     @Model
@@ -54,6 +55,7 @@ extension SchemaV1 {
             case generic(_ data: GenericSets)
             case repeater(_ data: RepeaterSets)
             case maxHang(_ data: MaxHangSets)
+            case campus(_ data: CampusSets)
         }
         
         struct GenericSets: Codable, Hashable, Equatable {
@@ -172,6 +174,71 @@ extension SchemaV1 {
                 self.targetAlt = targetAlt
                 self.weight = weight
                 self.weightAlt = weightAlt
+            }
+        }
+        
+        struct CampusSets: Codable, Hashable, Equatable {
+            /// The types of sets contained here
+            var type: Exercise
+            /// All the planned sets
+            var sets: [PlannedSet]
+            
+            init(type: Exercise = .maxLadder, sets: [PlannedSet] = []) {
+                self.type = type
+                self.sets = sets
+            }
+            
+            /// Describes the type of campus exercise
+            enum Exercise: CaseIterable, Codable, Hashable, Equatable {
+                /// Starting from a match, move up 1 rung at a time, alternating hands, matching only at the finish
+                /// e.g. B1-L3-R5-L7-R9-B9
+                case basicLadder
+                /// Starting from a match, move up 1 rung as far as possible, repeat on the other hand, then match the same rung
+                /// e.g. B1-R5-L9-B9
+                case maxLadder
+                /// Single move of the max ladder, then match the rung (or pull slightly higher)
+                /// e.g. B1-R6-B6
+                case maxFirst
+                /// Same first move of the max first, then continue to bump the same hand
+                /// e.g. B1-R6-R6.5-R7
+                case bumps
+                /// Starting from match, move up as if to latch, but only touch before slowly dropping back to the match.
+                /// e.g. B1-R4-B1-L4-B1
+                case touches
+                /// Only double dynos, usually going up. Both hands go/grab at the same time.
+                /// e.g. B1-B3-B5-B7
+                case doubles
+                /// Same as doubles, but the initial move is down followed up by an explosive upward move.
+                /// e.g. B3-B2-B4
+                case downUps
+                
+                /// If true, the set should be done twice - one for each side (with mirrored grip positions on each rung)
+                var shouldMirror: Bool {
+                    switch self {
+                    case .basicLadder, .maxLadder, .maxFirst, .bumps, .touches:
+                        return true
+                    case .doubles, .downUps:
+                        return false
+                    }
+                }
+            }
+            
+            struct PlannedSet: Codable, Hashable, Equatable {
+                var board: CampusBoard
+                var moves: Moves
+                var doMirror: Bool
+                
+                init(board: CampusBoard = .largeEdges, moves: Moves, doMirror: Bool = true) {
+                    self.board = board
+                    self.moves = moves
+                    self.doMirror = doMirror
+                }
+                
+                enum Moves: Codable, Hashable, Equatable {
+                    case defined(_ moves: [CampusMove])
+                    case baseline(_ offsets: [Int])
+                    case progressive
+                }
             }
         }
     }
