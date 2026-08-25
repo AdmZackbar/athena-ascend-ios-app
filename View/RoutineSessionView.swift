@@ -1044,6 +1044,8 @@ struct RoutineSessionView: View {
     
     /// Housekeeping after changing exercises or exercise state
     private func onStateChanged() {
+        // Reset flag
+        self.timerNextOverride = false
         // Update repeater rep
         self.repeaterRep = nextRepeaterRep()
         // Start timer if needed
@@ -1057,8 +1059,6 @@ struct RoutineSessionView: View {
         case nil:
             pauseTimer()
         }
-        // Reset flag
-        self.timerNextOverride = false
     }
     
     /// Computes the next state of the repeater rep field
@@ -1312,9 +1312,11 @@ struct RoutineSessionView: View {
                     } completion: {
                         if shouldStopTimer {
                             if allowTimerNext {
-                                // Reset timer and move to next state
                                 stopAndResetTimer()
-                                next()
+                                // Go to next state if applicable
+                                if timerDuration > .zero {
+                                    next()
+                                }
                             } else {
                                 // Don't reset, keep showing 0:00 until handled
                                 pauseTimer()
@@ -1357,6 +1359,10 @@ struct RoutineSessionView: View {
     
     private func stopAndResetTimer() {
         pauseTimer()
+        resetTimer()
+    }
+    
+    private func resetTimer() {
         elapsedMilliseconds = 0
         withAnimation(.easeInOut) {
             elapsedSeconds = .zero
