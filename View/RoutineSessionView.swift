@@ -83,7 +83,10 @@ struct RoutineSessionView: View {
     
     init(session: Session) {
         self.session = session
-        self.prevSession = session.routine?.sessions.filter({ $0 != session }).last
+        self.prevSession = session.routine?.sessions
+            .filter({ $0 != session })
+            .sorted(by: { $0.startTime < $1.startTime })
+            .last
     }
     
     var body: some View {
