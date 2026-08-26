@@ -107,18 +107,8 @@ struct MainView: View {
             Button {
                 navigationStore.push(ViewType.session(session: session))
             } label: {
-                HStack {
-                    VStack(alignment: .leading) {
-                        if let routine = session.routine {
-                            Text(routine.name)
-                                .font(.subheadline)
-                                .italic()
-                        }
-                        Text(session.startTime.formatted(date: .long, time: .shortened))
-                            .fontWeight(.semibold)
-                    }
-                    Spacer()
-                }.contentShape(Rectangle())
+                sessionView(session)
+                    .contentShape(Rectangle())
             }.buttonStyle(.plain)
                 .contextMenu {
                     Button(role: .destructive) {
@@ -127,6 +117,36 @@ struct MainView: View {
                         Label("Delete", systemImage: "trash")
                     }
                 }
+        }
+    }
+    
+    @ViewBuilder
+    func sessionView(_ session: Session) -> some View {
+        HStack {
+            VStack(alignment: .leading) {
+                HStack {
+                    if let routine = session.routine {
+                        Text(routine.name)
+                            .italic()
+                    }
+                    Spacer()
+                    if let endTime = session.endTime {
+                        Text(Duration.seconds(endTime.timeIntervalSince(session.startTime)).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
+                    }
+                }.font(.subheadline)
+                HStack {
+                    Text(session.startTime.formatted(date: .long, time: .omitted))
+                    Spacer()
+                    Text(session.startTime.formatted(date: .omitted, time: .shortened))
+                        .fontWeight(.semibold)
+                }.fontWeight(.semibold)
+                HStack {
+                    Text(session.bodyWeight.lbsFormat)
+                        .fontWeight(.light)
+                    Spacer()
+                }.font(.subheadline)
+            }
+            Spacer()
         }
     }
 
