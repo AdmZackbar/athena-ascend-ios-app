@@ -473,14 +473,19 @@ struct RoutineSessionView: View {
         }.font(.title)
             .fontWeight(.semibold)
         if exerciseState == .ready, let prevData = tryGetPrevGenericData(indices!) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevData.toString(data.expected))")
-                    .font(.title3)
-                if !prevData.notes.isEmpty {
-                    Text(prevData.notes)
-                }
-            }.italic()
+            genericPrevDataView(prevData.0.expected, prevData.1)
         }
+    }
+    
+    @ViewBuilder
+    func genericPrevDataView(_ prevData: Routine.GenericSets, _ prevDataSet: Session.GenericDataSet) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevDataSet.toString(prevData))")
+                .font(.title3)
+            if !prevDataSet.notes.isEmpty {
+                Text(prevDataSet.notes)
+            }
+        }.italic()
     }
     
     @ViewBuilder
@@ -650,14 +655,19 @@ struct RoutineSessionView: View {
                 .fontWeight(.semibold)
         }
         if exerciseState == .ready, let prevData = tryGetPrevRepeaterData(indices!) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevData.text)")
-                    .font(.title3)
-                if !prevData.notes.isEmpty {
-                    Text(prevData.notes)
-                }
-            }.italic()
+            repeaterPrevDataView(prevData)
         }
+    }
+    
+    @ViewBuilder
+    func repeaterPrevDataView(_ prevData: Session.RepeaterSet) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevData.text)")
+                .font(.title3)
+            if !prevData.notes.isEmpty {
+                Text(prevData.notes)
+            }
+        }.italic()
     }
     
     @ViewBuilder
@@ -728,14 +738,19 @@ struct RoutineSessionView: View {
                 .fontWeight(.semibold)
         }
         if exerciseState == .ready, let prevData = tryGetPrevMaxHangData(indices!) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevData.text)")
-                    .font(.title3)
-                if !prevData.notes.isEmpty {
-                    Text(prevData.notes)
-                }
-            }.italic()
+            maxHangPrevDataView(prevData)
         }
+    }
+    
+    @ViewBuilder
+    func maxHangPrevDataView(_ prevData: Session.MaxHangSet) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevData.text)")
+                .font(.title3)
+            if !prevData.notes.isEmpty {
+                Text(prevData.notes)
+            }
+        }.italic()
     }
     
     @ViewBuilder
@@ -814,6 +829,13 @@ struct RoutineSessionView: View {
                 }.font(.title2)
                     .fontWeight(.semibold)
             }
+            if let prevData = tryGetPrevGenericData(nextIndices) {
+                genericPrevDataView(prevData.0.expected, prevData.1)
+            } else if let prevData = tryGetPrevRepeaterData(nextIndices) {
+                repeaterPrevDataView(prevData)
+            } else if let prevData = tryGetPrevMaxHangData(nextIndices) {
+                maxHangPrevDataView(prevData)
+            }
         }
     }
     
@@ -873,7 +895,7 @@ struct RoutineSessionView: View {
         case .generic(let d):
             // Try to load from previous session if it exists
             if let prevData = tryGetPrevGenericData(indices) {
-                return .init(prevData, format: d.expected)
+                return .init(prevData.1, format: prevData.0.expected)
             }
             if indices.exerciseSetIndex < d.actual.count {
                 // Load from current data
@@ -963,14 +985,14 @@ struct RoutineSessionView: View {
         }
     }
     
-    func tryGetPrevGenericData(_ indices: ExerciseIndices) -> Session.GenericDataSet? {
+    func tryGetPrevGenericData(_ indices: ExerciseIndices) -> (Session.GenericData, Session.GenericDataSet)? {
         if let prevSession {
             if indices.routineSetIndex < prevSession.sets.count {
                 let set = prevSession.sets[indices.routineSetIndex]
                 if indices.setExerciseIndex < set.exercises.count {
                     if case .generic(let d) = set.exercises[indices.setExerciseIndex] {
                         if indices.exerciseSetIndex < d.actual.count {
-                            return d.actual[indices.exerciseSetIndex]
+                            return (d, d.actual[indices.exerciseSetIndex])
                         }
                     }
                 }
