@@ -14,6 +14,14 @@ struct RoutineSessionView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     
+    var title: String {
+        if let indices {
+            return session.sets[indices.routineSetIndex].name
+        } else {
+            return session.startTime.formatted(date: .numeric, time: .shortened)
+        }
+    }
+    
     /// If true, data has been collected in some form for the session
     var hasData: Bool {
         !session.notes.isEmpty || session.sets.contains(where: { $0.exercises.contains(where: \.hasData) })
@@ -91,7 +99,7 @@ struct RoutineSessionView: View {
     
     var body: some View {
         mainView()
-            .navigationTitle(session.startTime.formatted(date: .numeric, time: .shortened))
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden()
             .background(background)
@@ -121,6 +129,14 @@ struct RoutineSessionView: View {
                         }, set: { newValue in
                             session.endTime = newValue
                         }), displayedComponents: [.date, .hourAndMinute])
+                    }.presentationDetents([.medium])
+                case .weight:
+                    Form {
+                        Stepper(value: $session.bodyWeight, in: 0...1000, step: 1) {
+                            HStack {
+                                Text("Body Weight: \(session.bodyWeight.lbsFormat)")
+                            }
+                        }
                     }.presentationDetents([.medium])
                 case .exercise(let setIndex, let exerciseIndex):
                     SessionExerciseSheet(exercise: .init(get: {
@@ -204,6 +220,11 @@ struct RoutineSessionView: View {
                             sheetType = .date
                         } label: {
                             Label("Edit Start/End Date", systemImage: "calendar")
+                        }
+                        Button {
+                            sheetType = .weight
+                        } label: {
+                            Label("Edit Weight", systemImage: "scalemass")
                         }
                         Button {
                             song = session.standoutSong ?? .init()
@@ -427,8 +448,6 @@ struct RoutineSessionView: View {
                             .labelStyle(.iconOnly)
                     }
                 }
-            } footer: {
-                
             }
         }
         if !session.finished {
@@ -1570,6 +1589,8 @@ struct RoutineSessionView: View {
             switch self {
             case .date:
                 "date"
+            case .weight:
+                "weight"
             case .exercise(let setIndex, let exerciseIndex):
                 "ex-\(setIndex)-\(exerciseIndex)"
             case .notes:
@@ -1580,6 +1601,7 @@ struct RoutineSessionView: View {
         }
         
         case date
+        case weight
         case exercise(setIndex: Int, exerciseIndex: Int)
         case notes
         case song
