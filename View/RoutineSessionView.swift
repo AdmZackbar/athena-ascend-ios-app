@@ -914,11 +914,11 @@ struct RoutineSessionView: View {
         case .generic(let d):
             // Try to load from previous session if it exists
             if let prevData = tryGetPrevGenericData(indices) {
-                return .init(prevData.1, format: prevData.0.expected)
+                return .init(prevData.1, format: prevData.0.expected, includeNotes: false)
             }
             if indices.exerciseSetIndex < d.actual.count {
                 // Load from current data
-                return .init(d.actual[indices.exerciseSetIndex], format: d.expected)
+                return .init(d.actual[indices.exerciseSetIndex], format: d.expected, includeNotes: true)
             } else {
                 // Load from expected (and prev data if possible)
                 var data = GenericDataSet(numLeft: d.expected.sets[indices.exerciseSetIndex].avg)
@@ -1483,12 +1483,13 @@ struct RoutineSessionView: View {
         var movesAlt: [CampusMove]
         var notes: String
         
-        init(_ data: Session.GenericDataSet, format: Routine.GenericSets) {
+        init(_ data: Session.GenericDataSet, format: Routine.GenericSets, includeNotes: Bool) {
+            let notes = includeNotes ? data.notes : ""
             switch format.dataType {
             case .rep, .repWeight:
-                self.init(numLeft: data.repsLeft, numRight: data.repsRight, weightLeft: data.weightLeft, weightRight: data.weightRight, notes: data.notes)
+                self.init(numLeft: data.repsLeft, numRight: data.repsRight, weightLeft: data.weightLeft, weightRight: data.weightRight, notes: notes)
             case .time, .timeWeight:
-                self.init(numLeft: data.timeLeft, numRight: data.timeRight, weightLeft: data.weightLeft, weightRight: data.weightRight, notes: data.notes)
+                self.init(numLeft: data.timeLeft, numRight: data.timeRight, weightLeft: data.weightLeft, weightRight: data.weightRight, notes: notes)
             }
         }
         

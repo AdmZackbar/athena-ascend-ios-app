@@ -29,7 +29,7 @@ struct SessionExerciseSheet: View {
         switch exercise.wrappedValue {
         case .generic(let d):
             generic = d.expected
-            data = d.actual.map({ .init($0, format: d.expected) })
+            data = d.actual.map({ .init($0, format: d.expected, includeNotes: true) })
             notes = d.notes
             multiSide = d.actual.contains(where: \.hasDiffSideData)
         case .repeater(let d):
