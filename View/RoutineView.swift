@@ -5,18 +5,51 @@
 //  Created by Zach Wassynger on 8/19/26.
 //
 
+import Charts
 import SwiftData
 import SwiftUI
 
 struct RoutineView: View {
     let routine: Routine
+    let groupedData: [String : [RepWeightChart.Data]]
+    @State private var selectedType: String? = nil
     
     init(routine: Routine) {
         self.routine = routine
+        self.groupedData = {
+            let taggedData: [(String, RepWeightChart.Data)] = routine.sessions.sorted(by: { $0.startTime < $1.startTime }).flatMap({ session in
+                session.sets.flatMap({ set in
+                    set.exercises.flatMap({ exercise in
+                        switch exercise {
+                        case .repeater(let d):
+                            return d.actual.map({ (
+                                RepeaterChartType(tag: d.expected.tag, timeOn: d.expected.timeOn, timeOff: d.expected.timeOff).text,
+                                RepWeightChart.Data(date: session.startTime, reps: $0.numReps, weight: $0.weight)
+                            ) })
+                        case .generic(let d):
+                            switch d.expected.dataType {
+                            case .repWeight:
+                                // TODO L/R
+                                return d.actual.map({ (
+                                    d.expected.name,
+                                    RepWeightChart.Data(date: session.startTime, reps: $0.repsLeft, weight: $0.weightLeft)
+                                ) })
+                            default:
+                                return []
+                            }
+                        default: return []
+                        }
+                    })
+                })
+            })
+            let dict = Dictionary(grouping: taggedData) { $0.0 }
+            return dict.mapValues({ $0.map({ $0.1 }) })
+        }()
     }
     
     var body: some View {
         Form {
+            chartsView()
             ForEach(routine.sets.enumerated(), id: \.offset) { offset, set in
                 let setIndex = offset
                 Section(set.name) {
@@ -38,6 +71,35 @@ struct RoutineView: View {
                 }
             }
         }.navigationTitle(routine.name)
+            .onAppear {
+                selectedType = groupedData.keys.sorted().first
+            }
+    }
+    
+    struct RepeaterChartType: Hashable, Equatable {
+        var tag: String
+        var timeOn: Int
+        var timeOff: Int
+        
+        var text: String {
+            "\(tag) \(timeOn)s/\(timeOff)s"
+        }
+    }
+    
+    @ViewBuilder
+    func chartsView() -> some View {
+        if !groupedData.isEmpty {
+            Section("Charts") {
+                Picker("Repeater Type", selection: $selectedType) {
+                    ForEach(groupedData.keys.sorted(), id: \.self) {
+                        Text($0).tag($0)
+                    }
+                }
+                if let selectedType {
+                    RepWeightChart(data: groupedData[selectedType]!)
+                }
+            }
+        }
     }
     
     @ViewBuilder

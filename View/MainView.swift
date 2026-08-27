@@ -138,7 +138,6 @@ struct MainView: View {
                     Text(session.startTime.formatted(date: .long, time: .omitted))
                     Spacer()
                     Text(session.startTime.formatted(date: .omitted, time: .shortened))
-                        .fontWeight(.semibold)
                 }.fontWeight(.semibold)
                 HStack {
                     Text(session.bodyWeight.lbsFormat)
