@@ -13,7 +13,8 @@ struct RoutineEditView: View {
     @Environment(\.dismiss) var dismiss
     
     @State private var item: Item
-    @State private var editExercise: (UUID, UUID)? = nil
+    @State private var editExercise: (Int, Int)? = nil
+    @State private var deleteExercise: (Int, Int)? = nil
     
     init(routine: Routine? = nil) {
         self.item = .init(routine: routine)
@@ -22,36 +23,49 @@ struct RoutineEditView: View {
     var body: some View {
         Form {
             TextField("Name", text: $item.name)
-            ForEach($item.sets) { $set in
+            ForEach($item.sets.enumerated(), id: \.offset) { offset, $set in
+                let setIndex = offset
                 Section {
-                    ForEach($set.exercises) { $exercise in
+                    ForEach($set.exercises.enumerated(), id: \.offset) { offset, $exercise in
+                        let exerciseIndex = offset
                         Button {
-                            editExercise = (set.id, exercise.id)
+                            editExercise = (setIndex, exerciseIndex)
                         } label: {
                             exerciseView(exercise)
                                 .contentShape(Rectangle())
                         }.buttonStyle(.plain)
+                            .swipeActions {
+                                Button {
+                                    deleteExercise = (setIndex, exerciseIndex)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }.tint(.red)
+                            }
                     }
                     Menu("Add Exercise") {
                         Button("Basic") {
                             let exercise = Item.Exercise(.generic(.init()))
+                            let exerciseIndex = set.exercises.count
                             set.exercises.append(exercise)
-                            editExercise = (set.id, exercise.id)
+                            editExercise = (setIndex, exerciseIndex)
                         }
                         Button("Repeater") {
                             let exercise = Item.Exercise(.repeater(.init()))
+                            let exerciseIndex = set.exercises.count
                             set.exercises.append(exercise)
-                            editExercise = (set.id, exercise.id)
+                            editExercise = (setIndex, exerciseIndex)
                         }
                         Button("Max Hang") {
                             let exercise = Item.Exercise(.maxHang(.init()))
+                            let exerciseIndex = set.exercises.count
                             set.exercises.append(exercise)
-                            editExercise = (set.id, exercise.id)
+                            editExercise = (setIndex, exerciseIndex)
                         }
                         Button("Campus") {
                             let exercise = Item.Exercise(.campus(.init()))
+                            let exerciseIndex = set.exercises.count
                             set.exercises.append(exercise)
-                            editExercise = (set.id, exercise.id)
+                            editExercise = (setIndex, exerciseIndex)
                         }
                     }
                 } header: {
@@ -81,8 +95,7 @@ struct RoutineEditView: View {
             }
         })) {
             if let editExercise {
-                let exercise = $item.sets.filter { $0.id == editExercise.0 }.first!
-                    .exercises.filter { $0.id == editExercise.1 }.first!
+                let exercise = $item.sets[editExercise.0].exercises[editExercise.1]
                 switch exercise.wrappedValue.type {
                 case .generic:
                     EditGenericSetsSheet(item: exercise.generic)
@@ -98,6 +111,21 @@ struct RoutineEditView: View {
         }.navigationTitle(item.routine != nil ? "Edit Routine" : "Create Routine")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden()
+            .alert("Delete Exercise?", isPresented: .init(get: {
+                deleteExercise != nil
+            }, set: { newValue in
+                if !newValue {
+                    deleteExercise = nil
+                }
+            })) {
+                Button(role: .destructive) {
+                    if let deleteExercise {
+                        item.sets[deleteExercise.0].exercises.remove(at: deleteExercise.1)
+                    }
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
@@ -406,8 +434,7 @@ struct RoutineEditView: View {
         }
     }
     
-    private struct Item: Identifiable {
-        let id: UUID
+    private struct Item {
         var routine: Routine?
         var name: String
         var sets: [Set]
@@ -425,7 +452,6 @@ struct RoutineEditView: View {
         }
         
         init(routine: Routine? = nil) {
-            self.id = .init()
             self.routine = routine
             if let routine {
                 self.name = routine.name
@@ -464,8 +490,7 @@ struct RoutineEditView: View {
             }
         }
         
-        struct Set: Identifiable {
-            let id: UUID
+        struct Set {
             var name: String
             var exercises: [Exercise]
             var restTime: Int
@@ -476,7 +501,6 @@ struct RoutineEditView: View {
             }
             
             init(_ set: Routine.ExerciseSet? = nil) {
-                self.id = .init()
                 if let set {
                     self.name = set.name
                     self.exercises = set.exercises.map({ Exercise($0) })
@@ -495,8 +519,7 @@ struct RoutineEditView: View {
             case generic, repeater, maxHang, campus
         }
         
-        struct Exercise: Identifiable {
-            let id: UUID
+        struct Exercise {
             var type: ExerciseType
             var generic: Routine.GenericSets = .init()
             var repeater: Routine.RepeaterSets = .init()
@@ -518,7 +541,6 @@ struct RoutineEditView: View {
             }
             
             init(_ exercise: Routine.Exercise) {
-                self.id = .init()
                 switch exercise {
                 case .generic(let d):
                     self.type = .generic

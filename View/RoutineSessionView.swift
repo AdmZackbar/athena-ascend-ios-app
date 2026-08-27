@@ -88,6 +88,7 @@ struct RoutineSessionView: View {
     /// If true, the delete alert should be shown
     @State private var showAlert: Bool = false
     @State private var timerNextOverride: Bool = false
+    @State private var deleteExercise: (Int, Int)? = nil
     
     init(session: Session) {
         self.session = session
@@ -119,6 +120,21 @@ struct RoutineSessionView: View {
                     Label("Delete", systemImage: "trash")
                 }
             })
+            .alert("Delete Exercise?", isPresented: .init(get: {
+                deleteExercise != nil
+            }, set: { newValue in
+                if !newValue {
+                    deleteExercise = nil
+                }
+            })) {
+                Button(role: .destructive) {
+                    if let deleteExercise {
+                        session.sets[deleteExercise.0].exercises.remove(at: deleteExercise.1)
+                    }
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
             .sheet(item: $sheetType) { t in
                 switch t {
                 case .date:
@@ -309,7 +325,6 @@ struct RoutineSessionView: View {
                 if hasData {
                     Button {
                         session.endTime = .now
-                        dismiss()
                     } label: {
                         Label("Finish Session", systemImage: "checkmark")
                     }
@@ -398,6 +413,11 @@ struct RoutineSessionView: View {
                                 Spacer()
                             }.contentShape(Rectangle())
                         }.buttonStyle(.plain)
+                            .swipeActions {
+                                Button("Delete", systemImage: "trash") {
+                                    deleteExercise = (setIndex, exerciseIndex)
+                                }.tint(.red)
+                            }
                     } else {
                         Button {
                             sheetType = .exercise(setIndex: setIndex, exerciseIndex: exerciseIndex)
@@ -407,6 +427,11 @@ struct RoutineSessionView: View {
                                 Spacer()
                             }.contentShape(Rectangle())
                         }.buttonStyle(.plain)
+                            .swipeActions {
+                                Button("Delete", systemImage: "trash") {
+                                    deleteExercise = (setIndex, exerciseIndex)
+                                }.tint(.red)
+                            }
                     }
                 }
             } header: {
