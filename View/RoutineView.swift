@@ -90,7 +90,7 @@ struct RoutineView: View {
     func chartsView() -> some View {
         if !groupedData.isEmpty {
             Section("Charts") {
-                Picker("Repeater Type", selection: $selectedType) {
+                Picker("Exercise", selection: $selectedType) {
                     ForEach(groupedData.keys.sorted(), id: \.self) {
                         Text($0).tag($0)
                     }
