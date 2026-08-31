@@ -462,6 +462,8 @@ extension CampusBoard {
     static let mediumEdges = CampusBoard(name: "Medium Edges")
     static let smallEdges = CampusBoard(name: "Small Edges")
     static let sloperRungs = CampusBoard(name: "Sloper Rungs", endRung: .full(8), hasHalf: false)
+    
+    static let allCases = [largeEdges, mediumEdges, smallEdges, sloperRungs]
 }
 
 extension [CampusMove] {
@@ -474,23 +476,35 @@ extension [CampusMove] {
     }
 }
 
-extension Routine.CampusSets.PlannedSet {
+extension Routine.CampusSets.PlannedSet.Moves {
     var text: String {
-        let m: String = {
-            switch moves {
-            case .defined(let moves):
-                if self.doMirror {
-                    return "\(moves.text)\n  \(moves.flipped.text)"
-                }
-                return moves.text
-            case .baseline(let offsets):
-                let text = "Baseline: \(offsets.map({ $0 >= 0 ? "+\($0)" : "\($0)" }).joined(separator: ", "))"
-                return self.doMirror ? "\(text) x2" : text
-            case .progressive:
-                return self.doMirror ? "Progressive x2" : "Progressive"
-            }
-        }()
-        return board.name.isEmpty ? m : "\(board.name): \(m)"
+        switch self {
+        case .defined(let moves):
+            return moves.text
+        case .baseline(let offsets):
+            return "Baseline: \(offsets.map({ $0 >= 0 ? "+\($0)" : "\($0)" }).joined(separator: ", "))"
+        case .progressive:
+            return "Progressive"
+        }
+    }
+    
+    var moves: [CampusMove]? {
+        switch self {
+        case .defined(let m):
+            return m
+        default:
+            return nil
+        }
+    }
+}
+
+extension Routine.CampusSets.PlannedSet {
+    var movesText: String {
+        return doMirror ? "\(moves.text) x2" : moves.text
+    }
+    
+    var text: String {
+        return board.name.isEmpty ? movesText : "\(board.name): \(movesText)"
     }
 }
 

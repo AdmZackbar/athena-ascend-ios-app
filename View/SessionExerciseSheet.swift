@@ -21,11 +21,14 @@ struct SessionExerciseSheet: View {
     @State private var data: [RoutineSessionView.GenericDataSet]
     @State private var notes: String
     @State private var multiSide: Bool
+    @State private var editIndex: Int? = nil
+    @State private var campusMoves: [CampusMove] = []
+    @State private var campusMoveType: CampusMoveType = .defined
     
     init(exercise: Binding<Session.Exercise>, showing: Binding<Bool>, showData: Bool = true) {
         self._exercise = exercise
         self._showing = showing
-        self.editType = showData ? .Data : .Exercise
+        self.editType = showData ? .data : .base
         switch exercise.wrappedValue {
         case .generic(let d):
             generic = d.expected
@@ -61,8 +64,7 @@ struct SessionExerciseSheet: View {
                 case .maxHang(_):
                     maxHangView()
                 case .campus(_):
-                    // TODO
-                    EmptyView()
+                    campusBoardView()
                 }
             }.navigationTitle("Edit Exercise")
                 .navigationBarTitleDisplayMode(.inline)
@@ -74,24 +76,47 @@ struct SessionExerciseSheet: View {
     @ToolbarContentBuilder
     func toolbarContent() -> some ToolbarContent {
         ToolbarItem(placement: .principal) {
-            Picker("", selection: $editType) {
-                ForEach(EditType.allCases, id: \.rawValue) { type in
-                    Text(type.rawValue).tag(type)
-                }
-            }.pickerStyle(.segmented)
+            if editIndex != nil {
+                Text(campus.type.text)
+            } else {
+                Picker("", selection: $editType) {
+                    ForEach(EditType.allCases, id: \.name) { type in
+                        Text(type.name).tag(type)
+                    }
+                }.pickerStyle(.segmented)
+            }
         }
         ToolbarItem(placement: .primaryAction) {
-            Button(action: save) {
+            Button(action: editIndex != nil ? saveEditItem : save) {
                 Label("Save", systemImage: "checkmark")
             }
         }
         ToolbarItem(placement: .cancellationAction) {
             Button {
-                showing = false
+                if editIndex != nil {
+                    editIndex = nil
+                } else {
+                    showing = false
+                }
             } label: {
                 Label("Back", systemImage: "chevron.left")
             }
         }
+    }
+    
+    func saveEditItem() {
+        if let editIndex {
+            switch editType {
+            case .base:
+                switch campusMoveType {
+                case .defined:
+                    campus.sets[editIndex].moves = .defined(campusMoves)
+                }
+            case .data:
+                data[editIndex].campusSet.moves = campusMoves
+            }
+        }
+        editIndex = nil
     }
     
     func save() {
@@ -111,9 +136,9 @@ struct SessionExerciseSheet: View {
     @ViewBuilder
     func genericView() -> some View {
         switch editType {
-        case .Exercise:
+        case .base:
             genericBaseView()
-        case .Data:
+        case .data:
             genericDataView()
         }
     }
@@ -245,9 +270,9 @@ struct SessionExerciseSheet: View {
     @ViewBuilder
     func repeaterView() -> some View {
         switch editType {
-        case .Exercise:
+        case .base:
             repeaterBaseView()
-        case .Data:
+        case .data:
             repeaterDataView()
         }
     }
@@ -337,9 +362,9 @@ struct SessionExerciseSheet: View {
     @ViewBuilder
     func maxHangView() -> some View {
         switch editType {
-        case .Exercise:
+        case .base:
             maxHangBaseView()
-        case .Data:
+        case .data:
             maxHangDataView()
         }
     }
@@ -454,8 +479,195 @@ struct SessionExerciseSheet: View {
         }
     }
     
-    enum EditType: String, CaseIterable, Codable, Hashable, Equatable {
-        case Exercise, Data
+    @ViewBuilder
+    func campusBoardView() -> some View {
+        if let editIndex {
+            campusBoardEditSetView(index: editIndex)
+        } else {
+            switch editType {
+            case .base:
+                campusBoardBaseView()
+            case .data:
+                campusBoardDataView()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    func campusBoardEditSetView(index: Int) -> some View {
+//        CampusBoardView(board: .largeEdges, exercise: campus.type, moves: $campusMoves)
+        switch editType {
+        case .base:
+            campusBoardEditBaseSetView(index: index)
+        case .data:
+            campusBoardEditDataSetView(index: index)
+        }
+    }
+    
+    @ViewBuilder
+    func campusBoardEditBaseSetView(index: Int) -> some View {
+        // TODO handle non-defined move set for base
+        Section("Set \(index + 1)") {
+            Picker("Board/Edges:", selection: $campus.sets[index].board) {
+                ForEach(CampusBoard.allCases, id: \.name) { board in
+                    Text(board.name).tag(board)
+                }
+            }
+            if campus.type.shouldMirror {
+                Toggle("Mirror Set:", isOn: $campus.sets[index].doMirror)
+            }
+            if CampusMoveType.allCases.count > 1 {
+                Picker("Moves:", selection: $campusMoveType) {
+                    ForEach(CampusMoveType.allCases, id: \.name) { moveType in
+                        Text(moveType.name).tag(moveType)
+                    }
+                }
+            }
+            switch campusMoveType {
+            case .defined:
+                CampusBoardView(board: campus.sets[index].board, exercise: campus.type, moves: $campusMoves)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    func campusBoardEditDataSetView(index: Int) -> some View {
+        let set = data[index].campusSet
+        Section("Set \(index + 1)") {
+            Picker("Board/Edges:", selection: $data[index].campusSet.board) {
+                ForEach(CampusBoard.allCases, id: \.name) { board in
+                    Text(board.name).tag(board)
+                }
+            }
+            CampusBoardView(board: set.board, exercise: campus.type, moves: $campusMoves)
+        }
+    }
+    
+    @ViewBuilder
+    func campusBoardBaseView() -> some View {
+        Section {
+            Picker("Type:", selection: $campus.type) {
+                ForEach(Routine.CampusSets.Exercise.allCases, id: \.text) {
+                    Text($0.text).tag($0)
+                }
+            }
+        }
+        Section {
+            ForEach(campus.sets.enumerated(), id: \.offset) { offset, set in
+                Button {
+                    switch campus.sets[offset].moves {
+                    case .defined(let m):
+                        campusMoves = m
+                        campusMoveType = .defined
+                    default:
+                        // TODO
+                        break
+                    }
+                    editIndex = offset
+                } label: {
+                    VStack(alignment: .leading) {
+                        Text(set.board.name)
+                            .font(.subheadline)
+                            .fontWeight(.regular)
+                            .italic()
+                        if let moves = set.moves.moves {
+                            Text(moves.text)
+                            if set.doMirror {
+                                Text(moves.flipped.text)
+                            }
+                        } else {
+                            Text(set.doMirror ? "\(set.moves.text) x2" : set.moves.text)
+                        }
+                    }.contentShape(Rectangle())
+                        .fontWeight(.semibold)
+                }.buttonStyle(.plain)
+            }
+        } header: {
+            VStack(alignment: .leading) {
+                HStack(spacing: 16) {
+                    Text("Sets")
+                    Spacer()
+                    Button {
+                        campus.sets.append(.init(moves: .defined([campus.type.start])))
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    Button {
+                        campus.sets.removeLast()
+                    } label: {
+                        Image(systemName: "minus")
+                    }.disabled(campus.sets.isEmpty)
+                }.buttonStyle(.plain)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    func campusBoardDataView() -> some View {
+        Section {
+            ForEach(data.enumerated(), id: \.offset) { offset, set in
+                Button {
+                    // TODO
+                    campusMoves = data[offset].campusSet.moves
+                    editIndex = offset
+                } label: {
+                    VStack(alignment: .leading) {
+                        Text(set.campusSet.board.name)
+                            .font(.subheadline)
+                            .fontWeight(.regular)
+                            .italic()
+                        Text(set.campusSet.moves.text)
+                        // TODO
+                        if campus.sets[offset].doMirror {
+                            Text(set.campusSet.moves.flipped.text)
+                        }
+                    }.contentShape(Rectangle())
+                        .fontWeight(.semibold)
+                }.buttonStyle(.plain)
+            }
+        } header: {
+            VStack(alignment: .leading) {
+                HStack(spacing: 16) {
+                    Text("Sets")
+                    Spacer()
+                    Button {
+                        let base = campus.sets[data.count]
+                        data.append(.init(campusSet: .init(board: base.board, moves: base.moves.moves ?? [])))
+                    } label: {
+                        Image(systemName: "plus")
+                    }.disabled(campus.sets.count <= data.count)
+                    Button {
+                        campus.sets.removeLast()
+                    } label: {
+                        Image(systemName: "minus")
+                    }.disabled(campus.sets.isEmpty)
+                }.buttonStyle(.plain)
+            }
+        }
+    }
+    
+    enum EditType: CaseIterable, Codable, Hashable, Equatable {
+        case base, data
+        
+        var name: String {
+            switch self {
+            case .base:
+                return "Expected"
+            case .data:
+                return "Actual"
+            }
+        }
+    }
+    
+    enum CampusMoveType: CaseIterable, Hashable, Equatable {
+        case defined
+        
+        var name: String {
+            switch self {
+            case .defined:
+                return "Defined"
+            }
+        }
     }
 }
 
@@ -513,6 +725,29 @@ struct SessionExerciseSheet: View {
         .init(time: 10, timeAlt: 9, weight: 35, weightAlt: 40, notes: "Too much"),
         .init(time: 6, timeAlt: 5, weight: 40, weightAlt: 50, notes: "EZ"),
     ], notes: "Why am i doing this"))
+    @Previewable @State var showSheet = false
+    Form {
+        Button {
+            showSheet = true
+        } label: {
+            SessionExerciseEntryView(exercise: exercise)
+        }.buttonStyle(.plain)
+    }.sheet(isPresented: $showSheet) {
+        SessionExerciseSheet(exercise: $exercise, showing: $showSheet)
+    }
+}
+
+#Preview("Campus") {
+    @Previewable @State var exercise: Session.Exercise = .campus(.init(expected: .init(type: .basicLadder, sets: [
+        .init(moves: .defined([
+            .init(rung: .full(1), side: .both),
+            .init(rung: .full(3), side: .right),
+            .init(rung: .full(5), side: .left),
+            .init(rung: .full(7), side: .right),
+            .init(rung: .full(9), side: .left),
+            .init(rung: .full(9), side: .both),
+        ]))
+    ])))
     @Previewable @State var showSheet = false
     Form {
         Button {

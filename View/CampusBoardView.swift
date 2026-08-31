@@ -55,33 +55,27 @@ struct CampusBoardView: View {
     
     var body: some View {
         VStack {
-            Text(board.name)
-                .font(.title)
-                .bold()
             movesView()
-            ScrollView(.vertical) {
-                HStack {
-                    VStack {
-                        ForEach(((board.startRung.num + (board.startRung.isHalf ? 1 : 0))...board.endRung.num).reversed().map({ CampusRung.full($0) }), id: \.text) { rung in
-                            rungButton(rung)
-                        }
+            HStack {
+                VStack {
+                    ForEach(((board.startRung.num + (board.startRung.isHalf ? 1 : 0))...board.endRung.num).reversed().map({ CampusRung.full($0) }), id: \.text) { rung in
+                        rungButton(rung)
                     }
-                    if board.hasHalf {
-                        VStack {
-                            ForEach((board.startRung.num...(board.endRung.num - (board.endRung.isHalf ? 0 : 1))).reversed().map({ CampusRung.half($0) }), id: \.text) { rung in
-                                rungButton(rung)
-                            }
+                }
+                if board.hasHalf {
+                    VStack {
+                        ForEach((board.startRung.num...(board.endRung.num - (board.endRung.isHalf ? 0 : 1))).reversed().map({ CampusRung.half($0) }), id: \.text) { rung in
+                            rungButton(rung)
                         }
                     }
                 }
             }
             Spacer()
-        }.padding()
-            .onAppear {
-                if moves.isEmpty {
-                    moves = [exercise.start]
-                }
+        }.onAppear {
+            if moves.isEmpty {
+                moves = [exercise.start]
             }
+        }
     }
     
     @ViewBuilder
@@ -211,7 +205,7 @@ struct CampusBoardView: View {
 #Preview {
     @Previewable @State var exercise: Routine.CampusSets.Exercise = .maxLadder
     @Previewable @State var moves: [CampusMove] = []
-    VStack {
+    Form {
         Picker("Campus Type", selection: $exercise) {
             ForEach(Routine.CampusSets.Exercise.allCases, id: \.text) { exercise in
                 Text(exercise.text).tag(exercise)
