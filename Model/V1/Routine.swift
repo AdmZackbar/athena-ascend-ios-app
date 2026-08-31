@@ -213,7 +213,7 @@ extension SchemaV1 {
                 case downUps
                 
                 /// If true, the set should be done twice - one for each side (with mirrored grip positions on each rung)
-                var shouldMirror: Bool {
+                var canMirror: Bool {
                     switch self {
                     case .basicLadder, .maxLadder, .maxFirst, .bumps, .touches:
                         return true

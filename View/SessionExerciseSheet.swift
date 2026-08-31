@@ -513,7 +513,7 @@ struct SessionExerciseSheet: View {
                     Text(board.name).tag(board)
                 }
             }
-            if campus.type.shouldMirror {
+            if campus.type.canMirror {
                 Toggle("Mirror Set:", isOn: $campus.sets[index].doMirror)
             }
             if CampusMoveType.allCases.count > 1 {

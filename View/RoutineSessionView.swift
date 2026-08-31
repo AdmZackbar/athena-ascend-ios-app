@@ -1019,7 +1019,7 @@ struct RoutineSessionView: View {
             session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .maxHang(.init(expected: d.expected, actual: newActual, notes: d.notes))
         case .campus(let d):
             var newActual: [Session.CampusSetPair] = d.actual
-            let updatedData = genericData.toCampus(d.expected, useAlt: d.expected.type.shouldMirror && allowMultiSide)
+            let updatedData = genericData.toCampus(d.expected, useAlt: d.expected.type.canMirror && allowMultiSide)
             if indices.exerciseSetIndex < d.actual.count {
                 newActual[indices.exerciseSetIndex] = updatedData
             } else {
@@ -1603,7 +1603,7 @@ struct RoutineSessionView: View {
         }
         
         func toCampus(_ data: Routine.CampusSets, useAlt: Bool) -> Session.CampusSetPair {
-            if data.type.shouldMirror && useAlt {
+            if data.type.canMirror && useAlt {
                 return .init(main: .init(board: campusSet.board, moves: campusSet.moves, tempo: campusSet.tempo, notes: notes), alt: .init(board: campusSet.board, moves: movesAlt, tempo: campusSet.tempo, notes: notes))
             }
             return .init(main: .init(board: campusSet.board, moves: campusSet.moves, tempo: campusSet.tempo, notes: notes))
