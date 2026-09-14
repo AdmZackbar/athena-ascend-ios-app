@@ -175,6 +175,6 @@ enum ViewType: Hashable {
     case repeaters
 }
 
-#Preview(traits: .modifier(TestDataModifier())) {
+#Preview(traits: .sampleData) {
     MainView()
 }

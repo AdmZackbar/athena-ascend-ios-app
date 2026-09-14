@@ -209,7 +209,7 @@ struct RoutineView: View {
     }
 }
 
-#Preview(traits: .modifier(TestDataModifier())) {
+#Preview(traits: .sampleData) {
     @Previewable @Query var routines: [Routine]
     NavigationStack {
         RoutineView(routine: routines.first!)

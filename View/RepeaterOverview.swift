@@ -53,7 +53,7 @@ struct RepeaterOverview: View {
     }
 }
 
-#Preview(traits: .modifier(TestDataModifier())) {
+#Preview(traits: .sampleData) {
     NavigationStack {
         RepeaterOverview()
     }

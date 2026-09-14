@@ -1685,7 +1685,7 @@ struct RingShape: Shape {
     }
 }
 
-#Preview(traits: .modifier(TestDataModifier())) {
+#Preview(traits: .sampleData) {
     @Previewable @Query var routines: [Routine]
     NavigationStack {
         let routine = routines.first!
