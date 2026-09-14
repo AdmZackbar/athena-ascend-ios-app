@@ -1444,7 +1444,7 @@ struct RoutineSessionView: View {
             if d.expected.dataType.hasTime {
                 switch exerciseState {
                 case .ready, .off:
-                    return .seconds(3)
+                    return .seconds(5)
                 case .on:
                     return .seconds(d.expected.sets[indices.exerciseSetIndex].max)
                 case .rest:
