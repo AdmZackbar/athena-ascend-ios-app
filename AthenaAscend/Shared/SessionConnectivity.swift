@@ -36,6 +36,11 @@ final class SessionConnectivity: NSObject, WCSessionDelegate {
         guard let data = try? JSONEncoder().encode(ActiveSessionState(snapshot: snapshot)) else { return }
         let session = WCSession.default
         guard session.activationState == .activated else { return }
+        // Deliberately NOT gated on isPaired/isWatchAppInstalled: those flags have been
+        // observed to lag or misreport after a fresh activation (especially in Simulator),
+        // and gating on them silently blocked delivery even once a real counterpart was
+        // installed and running. Attempting the send and letting it fail harmlessly (logged,
+        // swallowed by try?) is what actually lets this recover once the pairing catches up.
         try? session.updateApplicationContext(["activeSession": data])
         if session.isReachable {
             session.sendMessage(["activeSession": data], replyHandler: nil, errorHandler: nil)
