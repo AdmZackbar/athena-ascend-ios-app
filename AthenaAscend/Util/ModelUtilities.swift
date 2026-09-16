@@ -187,13 +187,13 @@ extension Session.Exercise {
     func getDescription(setIndex: Int) -> String {
         switch self {
         case .generic(let d):
-            return "\(d.expected.name) (\(setIndex + 1)/\(numSets)): \(d.expected.sets[setIndex].text) \(d.expected.setDetailText)"
+            return "\(d.expected.sets[setIndex].text) \(d.expected.setDetailText)"
         case .repeater(let d):
-            return "\(d.expected.tag) (\(setIndex + 1)/\(numSets)): \(d.expected.timeOn)s/\(d.expected.timeOff)s \(d.expected.sets[setIndex].text)"
+            return "\(d.expected.timeOn)s/\(d.expected.timeOff)s \(d.expected.sets[setIndex].text)"
         case .maxHang(let d):
-            return "\(d.expected.tag) (\(setIndex + 1)/\(numSets)): \(d.expected.sets[setIndex].text)"
+            return "\(d.expected.sets[setIndex].text)"
         case .campus(let d):
-            return "\(d.expected.type.text) (\(setIndex + 1)/\(numSets)): \(d.expected.sets[setIndex].text)"
+            return "\(d.expected.sets[setIndex].text)"
         }
     }
     

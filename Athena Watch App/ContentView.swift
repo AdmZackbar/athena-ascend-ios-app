@@ -67,15 +67,13 @@ struct ContentView: View {
     private func sessionView(_ snapshot: ActiveSessionSnapshot) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
-                if let routineName = snapshot.routineName {
-                    Text(routineName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Text(snapshot.exerciseName)
-                    .font(.headline)
+                HStack(alignment: .top) {
+                    Text(snapshot.exerciseName)
+                    Spacer()
+                    Text("(\(snapshot.setIndex + 1)/\(snapshot.setCount))")
+                }.font(.subheadline)
                 Text(snapshot.exerciseDetailText)
-                    .font(.subheadline)
+                    .font(.caption)
                 Text(phaseLabel(snapshot.phase))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -102,12 +100,7 @@ struct ContentView: View {
     private func timerView(_ snapshot: ActiveSessionSnapshot) -> some View {
         if let endDate = snapshot.timerEndDate {
             let startDate = endDate.addingTimeInterval(-snapshot.timerDuration)
-            VStack(spacing: 4) {
-                ProgressView(timerInterval: startDate...endDate, countsDown: true)
-                Text(timerInterval: startDate...endDate, countsDown: true)
-                    .font(.title2)
-                    .monospacedDigit()
-            }
+            ProgressView(timerInterval: startDate...endDate, countsDown: true)
         } else if snapshot.timerDuration > 0 {
             Text("Paused")
                 .font(.title3)
@@ -117,18 +110,29 @@ struct ContentView: View {
 
     @ViewBuilder
     private func restEntryForm(_ snapshot: ActiveSessionSnapshot) -> some View {
-        VStack(alignment: .leading) {
-            Stepper("\(restEntry.numLeft) \(snapshot.unitLabel)", value: $restEntry.numLeft, in: 0...1000)
+        VStack(alignment: .center, spacing: 0) {
+            if snapshot.recordsDualSides {
+                Text("LEFT")
+                    .font(.title3)
+            }
+            Stepper(restEntry.numLeft.formatted(), value: $restEntry.numLeft, in: 0...999)
+            Text(snapshot.unitLabel)
             if snapshot.recordsWeight {
                 Stepper(weightLabel(restEntry.weightLeft), value: $restEntry.weightLeft, in: -200...200, step: 5)
+                Text("lbs")
             }
             if snapshot.recordsDualSides {
-                Stepper("\(restEntry.numRight) \(snapshot.unitLabel) (R)", value: $restEntry.numRight, in: 0...1000)
+                Spacer()
+                Text("RIGHT")
+                    .font(.title3)
+                Stepper(restEntry.numRight.formatted(), value: $restEntry.numRight, in: 0...999)
+                Text(snapshot.unitLabel)
                 if snapshot.recordsWeight {
-                    Stepper(weightLabel(restEntry.weightRight, suffix: " (R)"), value: $restEntry.weightRight, in: -200...200, step: 5)
+                    Stepper(weightLabel(restEntry.weightRight), value: $restEntry.weightRight, in: -200...200, step: 5)
+                    Text("lbs")
                 }
             }
-        }
+        }.font(.subheadline)
     }
 
     /// The .off-phase mirror is always a single value (see the Design section's trace of
@@ -138,13 +142,15 @@ struct ContentView: View {
     private func offEntryForm(_ snapshot: ActiveSessionSnapshot) -> some View {
         VStack(alignment: .leading) {
             Text("Right")
-                .font(.caption)
                 .foregroundStyle(.secondary)
-            Stepper("\(offCount) \(snapshot.unitLabel)", value: $offCount, in: 0...1000)
+                .font(.title3)
+            Stepper(offCount.formatted(), value: $offCount, in: 0...1000)
+            Text(snapshot.unitLabel)
             if snapshot.recordsWeight {
                 Stepper(weightLabel(offWeight), value: $offWeight, in: -200...200, step: 5)
+                Text("lbs")
             }
-        }
+        }.font(.caption)
     }
 
     @ViewBuilder
@@ -161,7 +167,8 @@ struct ContentView: View {
                 connectivity.sendCommand(.toggleTimer)
             } label: {
                 Image(systemName: snapshot.timerEndDate != nil ? "pause.circle" : "play.circle")
-            }
+            }.font(.system(size: 64))
+                .disabled(snapshot.timerEndDate == nil || snapshot.timerEndDate! <= .now)
             Spacer()
             Button {
                 connectivity.sendCommand(.next(data: nextPayload(for: snapshot)))
@@ -170,7 +177,7 @@ struct ContentView: View {
             }
             Spacer()
         }
-        .font(.system(size: 28))
+        .font(.system(size: 48))
         .buttonStyle(.plain)
     }
 
@@ -196,8 +203,8 @@ struct ContentView: View {
         }
     }
 
-    private func weightLabel(_ weight: Double, suffix: String = "") -> String {
-        "\(weight.formatted(.number.precision(.fractionLength(0)))) lb\(suffix)"
+    private func weightLabel(_ weight: Double) -> String {
+        weight.formatted(.number.precision(.fractionLength(0)))
     }
 }
 
