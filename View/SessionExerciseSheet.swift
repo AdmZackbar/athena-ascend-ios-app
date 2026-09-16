@@ -14,10 +14,10 @@ struct SessionExerciseSheet: View {
     @Binding var showing: Bool
     @State private var editType: EditType
     @State private var selectionType: SelectionType = .single
-    @State private var generic: Routine.GenericSets = .init()
-    @State private var repeater: Routine.RepeaterSets = .init()
-    @State private var maxHang: Routine.MaxHangSets = .init()
-    @State private var campus: Routine.CampusSets = .init()
+    @State private var generic: Routine.GenericSets
+    @State private var repeater: Routine.RepeaterSets
+    @State private var maxHang: Routine.MaxHangSets
+    @State private var campus: Routine.CampusSets
     @State private var data: [RoutineSessionView.GenericDataSet]
     @State private var notes: String
     @State private var multiSide: Bool
@@ -32,21 +32,33 @@ struct SessionExerciseSheet: View {
         switch exercise.wrappedValue {
         case .generic(let d):
             generic = d.expected
+            repeater = .init()
+            maxHang = .init()
+            campus = .init()
             data = d.actual.map({ .init($0, format: d.expected, includeNotes: true) })
             notes = d.notes
             multiSide = d.actual.contains(where: \.hasDiffSideData)
         case .repeater(let d):
             repeater = d.expected
+            generic = .init()
+            maxHang = .init()
+            campus = .init()
             data = d.actual.map({ .init($0) })
             notes = d.notes
             multiSide = false
         case .maxHang(let d):
             maxHang = d.expected
+            generic = .init()
+            repeater = .init()
+            campus = .init()
             data = d.actual.map({ .init($0) })
             notes = d.notes
             multiSide = d.actual.contains(where: \.hasDiffSideData)
         case .campus(let d):
             campus = d.expected
+            generic = .init()
+            repeater = .init()
+            maxHang = .init()
             data = d.actual.map({ .init($0) })
             notes = d.notes
             multiSide = d.actual.contains(where: \.hasDiffSideData)
