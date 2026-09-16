@@ -18,6 +18,12 @@ struct AthenaAscendApp: App {
         }
     }()
 
+    init() {
+        // Start the WCSession handshake as early as possible, rather than waiting for the
+        // first RoutineSessionView to appear.
+        _ = SessionConnectivity.shared
+    }
+
     var body: some Scene {
         WindowGroup {
             MainView()

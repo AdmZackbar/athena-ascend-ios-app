@@ -34,7 +34,76 @@ struct RoutineSessionView: View {
         }
         return nil
     }
-    
+
+    /// Snapshot of the live session state, sent to the watch whenever it changes.
+    /// Returns nil when there's nothing to mirror (no active exercise, or the session is done).
+    var activeSessionSnapshot: ActiveSessionSnapshot? {
+        guard !session.finished, let indices, let exerciseState, let currentExercise else { return nil }
+        let set = session.sets[indices.routineSetIndex]
+        let recordsWeight: Bool
+        let recordsDualSides: Bool
+        let hasOffPhaseEntry: Bool
+        let unitLabel: String
+        switch currentExercise {
+        case .generic(let d):
+            recordsWeight = d.expected.dataType.hasWeight
+            recordsDualSides = d.expected.sideType == .independent
+            hasOffPhaseEntry = d.expected.dataType.hasTime && d.expected.sideType == .independent
+            unitLabel = d.expected.setDetailText
+        case .repeater:
+            recordsWeight = true
+            recordsDualSides = false
+            hasOffPhaseEntry = false
+            unitLabel = "reps"
+        case .maxHang(let d):
+            recordsWeight = true
+            recordsDualSides = d.expected.isSingleArm
+            hasOffPhaseEntry = false
+            unitLabel = "s"
+        case .campus:
+            recordsWeight = false
+            recordsDualSides = false
+            hasOffPhaseEntry = false
+            unitLabel = ""
+        }
+        // Suggested values only matter during the .rest form or the .off entry window; genericData
+        // was already seeded by loadData(_:) when setState(newIndices:) ran, so this just reads it.
+        let showsSuggestedData = exerciseState == .rest || (exerciseState == .off && hasOffPhaseEntry && timerEndDate == nil)
+        return ActiveSessionSnapshot(
+            sessionStartTime: session.startTime,
+            routineName: session.routine?.name,
+            setName: set.name,
+            setIndex: indices.exerciseSetIndex,
+            setCount: currentExercise.numSets,
+            exerciseName: currentExercise.name,
+            exerciseDetailText: currentExercise.getDescription(setIndex: indices.exerciseSetIndex),
+            phase: snapshotPhase(for: exerciseState),
+            repCurrent: repeaterRep.current,
+            repMax: repeaterRep.max,
+            timerEndDate: timerEndDate,
+            timerDuration: timerDuration / .seconds(1),
+            recordsWeight: recordsWeight,
+            recordsDualSides: recordsDualSides,
+            hasOffPhaseEntry: hasOffPhaseEntry,
+            unitLabel: unitLabel,
+            suggestedNumLeft: showsSuggestedData ? genericData.numLeft : 0,
+            suggestedNumRight: showsSuggestedData ? genericData.numRight : 0,
+            suggestedWeightLeft: showsSuggestedData ? genericData.weightLeft : 0,
+            suggestedWeightRight: showsSuggestedData ? genericData.weightRight : 0
+        )
+    }
+
+    /// Maps this view's private ExerciseState to the shared, Codable DTO's Phase, keeping
+    /// the Shared/ types free of any dependency on this view's private types.
+    private func snapshotPhase(for state: ExerciseState) -> ActiveSessionSnapshot.Phase {
+        switch state {
+        case .ready: return .ready
+        case .on: return .on
+        case .off: return .off
+        case .rest: return .rest
+        }
+    }
+
     /// The background color of the view
     var background: some ShapeStyle {
         switch exerciseState {
@@ -61,6 +130,7 @@ struct RoutineSessionView: View {
     let prevSession: Session?
     
     @State private var audioManager = AudioManager.shared
+    @State private var commandCenter = SessionCommandCenter.shared
     /// The main session of the view. Is a state to allow for easy edits to notes, sets, etc.
     @State private var session: Session
     /// The state variable. Determines which exercise and set is currently displayed.
@@ -75,6 +145,9 @@ struct RoutineSessionView: View {
     @State private var elapsedSeconds: Duration = .zero
     /// For better interactivity precision
     @State private var elapsedMilliseconds: Int = 0
+    /// The absolute end date of the current timer, if running. Lets the watch render a live
+    /// countdown without any per-second WatchConnectivity traffic.
+    @State private var timerEndDate: Date? = nil
     /// The current timer, if in use
     @State private var cancellable: Cancellable?
     /// If true, a data entry component for left and right should be used
@@ -90,6 +163,26 @@ struct RoutineSessionView: View {
     @State private var timerNextOverride: Bool = false
     @State private var deleteExercise: (Int, Int)? = nil
     
+    /// Applies the WatchConnectivity lifecycle hooks. Split out of `body` because folding
+    /// these directly into that already-long modifier chain made the whole expression too
+    /// complex for the type-checker.
+    @ViewBuilder
+    private func connectivityHooks(_ content: some View) -> some View {
+        content
+            .onAppear {
+                SessionConnectivity.shared.send(activeSessionSnapshot)
+            }
+            .onChange(of: activeSessionSnapshot) { _, newValue in
+                SessionConnectivity.shared.send(newValue)
+            }
+            .onChange(of: commandCenter.pendingCommand) { _, newValue in
+                handleRemoteCommand(newValue)
+            }
+            .onDisappear {
+                SessionConnectivity.shared.send(nil)
+            }
+    }
+
     init(session: Session) {
         self.session = session
         self.prevSession = session.routine?.sessions
@@ -99,19 +192,21 @@ struct RoutineSessionView: View {
     }
     
     var body: some View {
-        mainView()
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden()
-            .background(background)
-            .onChange(of: exerciseState, { oldValue, newValue in
-                if oldValue == ExerciseState.on && newValue == ExerciseState.rest {
-                    audioManager.playSystemSound(1428)
-                }
-            })
-            .sensoryFeedback(.success, trigger: exerciseState, condition: { oldValue, newValue in
-                oldValue == ExerciseState.on && newValue == ExerciseState.rest
-            })
+        connectivityHooks(
+            mainView()
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarBackButtonHidden()
+                .background(background)
+                .onChange(of: exerciseState, { oldValue, newValue in
+                    if oldValue == ExerciseState.on && newValue == ExerciseState.rest {
+                        audioManager.playSystemSound(1428)
+                    }
+                })
+                .sensoryFeedback(.success, trigger: exerciseState, condition: { oldValue, newValue in
+                    oldValue == ExerciseState.on && newValue == ExerciseState.rest
+                })
+        )
             .alert("Are you sure you want to delete this session?", isPresented: $showAlert, actions: {
                 Button(role: .destructive) {
                     modelContext.delete(session)
@@ -554,8 +649,7 @@ struct RoutineSessionView: View {
                 genericRecordView(data)
                 Spacer()
                 controlView {
-                    trySaveData()
-                    startTimer()
+                    confirmOffPhaseData()
                 }
             }
         case .rest:
@@ -567,12 +661,7 @@ struct RoutineSessionView: View {
             }
             Spacer()
             controlView {
-                trySaveData()
-                if timerDuration > .zero && elapsedSeconds < timerDuration && !timerNextOverride {
-                    timerNextOverride = true
-                } else {
-                    next()
-                }
+                performNextAction()
             }
         default:
             Text("Invalid state for generic exercise")
@@ -597,12 +686,7 @@ struct RoutineSessionView: View {
             }
             Spacer()
             controlView {
-                trySaveData()
-                if timerDuration > .zero && elapsedSeconds < timerDuration && !timerNextOverride {
-                    timerNextOverride = true
-                } else {
-                    next()
-                }
+                performNextAction()
             }
         default:
             Text("Invalid state for generic exercise")
@@ -737,9 +821,8 @@ struct RoutineSessionView: View {
             Spacer()
             controlView {
                 if exerciseState == .rest {
-                    trySaveData()
-                }
-                if !allowTimerNext && timerDuration > .zero && elapsedSeconds < timerDuration {
+                    performNextAction()
+                } else if !allowTimerNext && timerDuration > .zero && elapsedSeconds < timerDuration {
                     timerNextOverride = true
                 } else {
                     next()
@@ -820,9 +903,8 @@ struct RoutineSessionView: View {
             Spacer()
             controlView {
                 if exerciseState == .rest {
-                    trySaveData()
-                }
-                if !allowTimerNext && timerDuration > .zero && elapsedSeconds < timerDuration {
+                    performNextAction()
+                } else if !allowTimerNext && timerDuration > .zero && elapsedSeconds < timerDuration {
                     timerNextOverride = true
                 } else {
                     next()
@@ -986,6 +1068,64 @@ struct RoutineSessionView: View {
         }
     }
     
+    /// Applies a command received from the watch, exactly as if the phone's own matching
+    /// button had been tapped. Pulled out of the body's .onChange closure since inlining this
+    /// switch there made the modifier chain too complex for the type-checker.
+    private func handleRemoteCommand(_ command: SessionCommand?) {
+        guard indices != nil, let command else { return }
+        switch command {
+        case .toggleTimer:
+            toggleTimer()
+        case .prev:
+            prev()
+        case .next(let data):
+            if let data {
+                genericData.numLeft = data.numLeft
+                genericData.numRight = data.numRight
+                genericData.weightLeft = data.weightLeft
+                genericData.weightRight = data.weightRight
+                // Ensure toGeneric(_:useAlt:) actually honors the right-side value the watch
+                // sent, rather than silently collapsing to the left value for independent-side
+                // exercises. A no-op for exercises without independent sides, and a no-op for
+                // dataType.hasTime cases (toGeneric already forces useAlt there regardless).
+                allowMultiSide = true
+            }
+            // Mirrors exactly what the phone's own controlView closure does in each phase:
+            // .rest saves + maybe advances; .off's entry window saves + starts the get-ready
+            // countdown (but doesn't advance yet); everything else (including .off's own
+            // countdown) just advances.
+            switch exerciseState {
+            case .rest:
+                performNextAction()
+            case .off where timerEndDate == nil:
+                confirmOffPhaseData()
+            default:
+                next()
+            }
+        }
+        commandCenter.consume()
+    }
+
+    /// Saves the entered data, then either advances or arms the timer-skip override. Used by
+    /// all four exercise types' .rest-phase "Next" controls (phone button and remote watch
+    /// command alike), so there's exactly one implementation of "what Next does during rest."
+    private func performNextAction() {
+        trySaveData()
+        if !allowTimerNext && timerDuration > .zero && elapsedSeconds < timerDuration {
+            timerNextOverride = true
+        } else {
+            next()
+        }
+    }
+
+    /// Confirms the side just finished (for independent-sided timed generic exercises) and
+    /// starts the "get ready for the other side" countdown. Named so a remote watch command can
+    /// call the identical code the phone's own off-phase confirm button calls.
+    private func confirmOffPhaseData() {
+        trySaveData()
+        startTimer()
+    }
+
     func trySaveData() {
         guard let indices else { return }
         let exercise = session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex]
@@ -1366,6 +1506,7 @@ struct RoutineSessionView: View {
     
     private func startTimer() {
         guard timerDuration > .zero else { return }
+        timerEndDate = Date.now.addingTimeInterval((timerDuration - elapsedSeconds) / .seconds(1))
         cancellable = Timer
             .publish(every: 0.01, on: .main, in: .common)
             .autoconnect()
@@ -1421,6 +1562,7 @@ struct RoutineSessionView: View {
     private func pauseTimer() {
         cancellable?.cancel()
         cancellable = nil
+        timerEndDate = nil
     }
     
     private func stopAndResetTimer() {
