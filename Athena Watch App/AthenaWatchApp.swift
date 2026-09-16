@@ -1,6 +1,6 @@
 //
-//  AthenaAscendWatchApp.swift
-//  AthenaAscendWatch Watch App
+//  AthenaWatchApp.swift
+//  Athena Watch App
 //
 //  Created by Zach Wassynger on 9/16/26.
 //
@@ -8,7 +8,7 @@
 import SwiftUI
 
 @main
-struct AthenaAscendWatch_Watch_AppApp: App {
+struct AthenaWatchApp: App {
     init() {
         // Start the WCSession handshake as early as possible, rather than waiting for
         // ContentView to appear.

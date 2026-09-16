@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  AthenaAscendWatch Watch App
+//  Athena Watch Watch App
 //
 //  Created by Zach Wassynger on 9/16/26.
 //
