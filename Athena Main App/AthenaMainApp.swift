@@ -22,6 +22,7 @@ struct AthenaMainApp: App {
         // Start the WCSession handshake as early as possible, rather than waiting for the
         // first RoutineSessionView to appear.
         _ = SessionConnectivity.shared
+        SessionConnectivity.shared.onCommandReceived = { SessionCommandCenter.shared.submit($0) }
     }
 
     var body: some Scene {

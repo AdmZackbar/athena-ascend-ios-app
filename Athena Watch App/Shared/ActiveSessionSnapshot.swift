@@ -7,11 +7,14 @@
 
 import Foundation
 
-/// A phone -> watch snapshot of the currently active exercise session.
+/// A phone -> watch (and phone -> Live Activity) snapshot of the currently active exercise
+/// session.
 ///
 /// Built entirely from RoutineSessionView's live, unpersisted state, since none of this
 /// (current exercise, phase, timer) exists in the SwiftData model until a set is saved.
-nonisolated struct ActiveSessionSnapshot: Codable, Equatable {
+/// Hashable because this doubles as a Live Activity's ActivityAttributes.ContentState, which
+/// requires it.
+nonisolated struct ActiveSessionSnapshot: Codable, Hashable {
     var sessionStartTime: Date        // identity of the active session
     var routineName: String?
     var setName: String
@@ -40,6 +43,16 @@ nonisolated struct ActiveSessionSnapshot: Codable, Equatable {
 
     enum Phase: String, Codable {
         case ready, on, off, rest
+
+        /// Shared label mapping so the watch and the Live Activity always agree on phase text.
+        var displayName: String {
+            switch self {
+            case .ready: return "Ready"
+            case .on: return "Active"
+            case .off: return "Off"
+            case .rest: return "Rest"
+            }
+        }
     }
 }
 

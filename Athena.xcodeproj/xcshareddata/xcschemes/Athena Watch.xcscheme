@@ -64,6 +64,26 @@
                ReferencedContainer = "container:AthenaAscend.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "E8182437302F4A0C00DED693"
+               BuildableName = "AthenaTests.xctest"
+               ReferencedContainer = "container:Athena.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "E8182441302F4A0C00DED693"
+               BuildableName = "AthenaUITests.xctest"
+               ReferencedContainer = "container:Athena.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

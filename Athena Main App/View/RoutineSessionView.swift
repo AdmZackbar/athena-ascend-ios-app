@@ -163,23 +163,29 @@ struct RoutineSessionView: View {
     @State private var timerNextOverride: Bool = false
     @State private var deleteExercise: (Int, Int)? = nil
     
-    /// Applies the WatchConnectivity lifecycle hooks. Split out of `body` because folding
-    /// these directly into that already-long modifier chain made the whole expression too
-    /// complex for the type-checker.
+    /// Applies the WatchConnectivity and Live Activity lifecycle hooks. Split out of `body`
+    /// because folding these directly into that already-long modifier chain made the whole
+    /// expression too complex for the type-checker.
     @ViewBuilder
     private func connectivityHooks(_ content: some View) -> some View {
         content
             .onAppear {
                 SessionConnectivity.shared.send(activeSessionSnapshot)
+                SessionLiveActivity.shared.sync(activeSessionSnapshot)
+                // Drop anything submitted while no session view was around to apply it, so it
+                // can't fire late against whatever exercise happens to be on screen next.
+                commandCenter.consume()
             }
             .onChange(of: activeSessionSnapshot) { _, newValue in
                 SessionConnectivity.shared.send(newValue)
+                SessionLiveActivity.shared.sync(newValue)
             }
             .onChange(of: commandCenter.pendingCommand) { _, newValue in
                 handleRemoteCommand(newValue)
             }
             .onDisappear {
                 SessionConnectivity.shared.send(nil)
+                SessionLiveActivity.shared.sync(nil)
             }
     }
 

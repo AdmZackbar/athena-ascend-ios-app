@@ -74,7 +74,7 @@ struct ContentView: View {
                 }.font(.subheadline)
                 Text(snapshot.exerciseDetailText)
                     .font(.caption)
-                Text(phaseLabel(snapshot.phase))
+                Text(snapshot.phase.displayName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if snapshot.repMax > 0 {
@@ -192,15 +192,6 @@ struct ContentView: View {
             return ExerciseEntryData(numLeft: offCount, numRight: offCount, weightLeft: offWeight, weightRight: offWeight)
         }
         return nil
-    }
-
-    private func phaseLabel(_ phase: ActiveSessionSnapshot.Phase) -> String {
-        switch phase {
-        case .ready: return "Ready"
-        case .on: return "Active"
-        case .off: return "Off"
-        case .rest: return "Rest"
-        }
     }
 
     private func weightLabel(_ weight: Double) -> String {
