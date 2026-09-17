@@ -73,7 +73,7 @@ struct RoutineSessionView: View {
             sessionStartTime: session.startTime,
             routineName: session.routine?.name,
             setName: set.name,
-            setIndex: indices.exerciseSetIndex,
+            setIndex: indices.setExerciseIndex,
             setCount: currentExercise.numSets,
             exerciseName: currentExercise.name,
             exerciseDetailText: currentExercise.getDescription(setIndex: indices.exerciseSetIndex),
