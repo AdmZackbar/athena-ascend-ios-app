@@ -184,6 +184,19 @@ extension Session.Exercise {
         }
     }
     
+    var numCompletedSets: Int {
+        switch self {
+        case .generic(let d):
+            return d.actual.count
+        case .repeater(let d):
+            return d.actual.count
+        case .maxHang(let d):
+            return d.actual.count
+        case .campus(let d):
+            return d.actual.count
+        }
+    }
+    
     func getDescription(setIndex: Int) -> String {
         switch self {
         case .generic(let d):

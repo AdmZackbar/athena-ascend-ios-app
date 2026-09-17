@@ -372,6 +372,14 @@ struct RoutineSessionView: View {
                     }
                 }
             }
+        } else {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    next(skip: true)
+                } label: {
+                    Text("Skip")
+                }.disabled(nextIndices() == nil)
+            }
         }
         ToolbarItem(placement: .cancellationAction) {
             Button {
@@ -498,11 +506,27 @@ struct RoutineSessionView: View {
                     let exerciseIndex = offset
                     if !session.finished {
                         Menu {
-                            Button {
-                                // Go to exercise
-                                setState(newIndices: .init(setIndex, exerciseIndex))
-                            } label: {
-                                Label("Start Exercise", systemImage: "play")
+                            if exercise.numCompletedSets == exercise.numSets {
+                                Button {
+                                    // Go to exercise (set 1)
+                                    setState(newIndices: .init(setIndex, exerciseIndex))
+                                } label: {
+                                    Label("Re-start Exercise", systemImage: "play")
+                                }
+                            } else if exercise.numCompletedSets > 0 {
+                                Button {
+                                    // Go to exercise (next set)
+                                    setState(newIndices: .init(setIndex, exerciseIndex, exercise.numCompletedSets))
+                                } label: {
+                                    Label("Resume Exercise", systemImage: "play")
+                                }
+                            } else {
+                                Button {
+                                    // Go to exercise (set 1)
+                                    setState(newIndices: .init(setIndex, exerciseIndex))
+                                } label: {
+                                    Label("Start Exercise", systemImage: "play")
+                                }
                             }
                             Button {
                                 sheetType = .exercise(setIndex: setIndex, exerciseIndex: exerciseIndex)
