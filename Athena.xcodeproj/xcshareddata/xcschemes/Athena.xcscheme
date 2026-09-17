@@ -16,8 +16,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "E8182426302F4A0B00DED693"
-               BuildableName = "AthenaAscend.app"
-               ReferencedContainer = "container:AthenaAscend.xcodeproj">
+               BuildableName = "Athena.app"
+               ReferencedContainer = "container:Athena.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -67,8 +67,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "E8182426302F4A0B00DED693"
-            BuildableName = "AthenaAscend.app"
-            ReferencedContainer = "container:AthenaAscend.xcodeproj">
+            BuildableName = "Athena.app"
+            ReferencedContainer = "container:Athena.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -83,8 +83,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "E8182426302F4A0B00DED693"
-            BuildableName = "AthenaAscend.app"
-            ReferencedContainer = "container:AthenaAscend.xcodeproj">
+            BuildableName = "Athena.app"
+            ReferencedContainer = "container:Athena.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

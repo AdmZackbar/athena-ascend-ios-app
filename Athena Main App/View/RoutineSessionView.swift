@@ -77,7 +77,6 @@ struct RoutineSessionView: View {
             setCount: currentExercise.numSets,
             exerciseName: currentExercise.name,
             exerciseDetailText: currentExercise.getDescription(setIndex: indices.exerciseSetIndex),
-            prevSessionText: prevSession?.
             phase: snapshotPhase(for: exerciseState),
             repCurrent: repeaterRep.current,
             repMax: repeaterRep.max,

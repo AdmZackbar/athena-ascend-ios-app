@@ -1,6 +1,6 @@
 //
-//  AthenaAscendApp.swift
-//  AthenaAscend
+//  AthenaMainApp.swift
+//  Athena
 //
 //  Created by Zach Wassynger on 8/14/26.
 //
@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 
 @main
-struct AthenaAscendApp: App {
+struct AthenaMainApp: App {
     var sharedModelContainer: ModelContainer = {
         do {
             return try ModelStore.makeContainer()

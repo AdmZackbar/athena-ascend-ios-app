@@ -63,41 +63,41 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		E8182427302F4A0B00DED693 /* AthenaAscend.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AthenaAscend.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E8182438302F4A0C00DED693 /* AthenaAscendTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AthenaAscendTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		E8182442302F4A0C00DED693 /* AthenaAscendUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AthenaAscendUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E8182427302F4A0B00DED693 /* Athena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Athena.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E8182438302F4A0C00DED693 /* AthenaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AthenaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E8182442302F4A0C00DED693 /* AthenaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AthenaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8A939A4305B27F400648A16 /* Athena Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Athena Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8A939B0305B27F500648A16 /* Athena Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Athena Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8A939BA305B27F500648A16 /* Athena Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Athena Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		E818244A302F4A0C00DED693 /* Exceptions for "AthenaAscend" folder in "AthenaAscend" target */ = {
+		E818244A302F4A0C00DED693 /* Exceptions for "Athena Main App" folder in "Athena" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = E8182426302F4A0B00DED693 /* AthenaAscend */;
+			target = E8182426302F4A0B00DED693 /* Athena */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		E8182429302F4A0B00DED693 /* AthenaAscend */ = {
+		E8182429302F4A0B00DED693 /* Athena Main App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				E818244A302F4A0C00DED693 /* Exceptions for "AthenaAscend" folder in "AthenaAscend" target */,
+				E818244A302F4A0C00DED693 /* Exceptions for "Athena Main App" folder in "Athena" target */,
 			);
-			path = AthenaAscend;
+			path = "Athena Main App";
 			sourceTree = "<group>";
 		};
-		E818243B302F4A0C00DED693 /* AthenaAscendTests */ = {
+		E818243B302F4A0C00DED693 /* Athena Main Tests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = AthenaAscendTests;
+			path = "Athena Main Tests";
 			sourceTree = "<group>";
 		};
-		E8182445302F4A0C00DED693 /* AthenaAscendUITests */ = {
+		E8182445302F4A0C00DED693 /* Athena Main UITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = AthenaAscendUITests;
+			path = "Athena Main UITests";
 			sourceTree = "<group>";
 		};
 		E8A939A5305B27F400648A16 /* Athena Watch App */ = {
@@ -166,9 +166,9 @@
 		E818241E302F4A0B00DED693 = {
 			isa = PBXGroup;
 			children = (
-				E8182429302F4A0B00DED693 /* AthenaAscend */,
-				E818243B302F4A0C00DED693 /* AthenaAscendTests */,
-				E8182445302F4A0C00DED693 /* AthenaAscendUITests */,
+				E8182429302F4A0B00DED693 /* Athena Main App */,
+				E818243B302F4A0C00DED693 /* Athena Main Tests */,
+				E8182445302F4A0C00DED693 /* Athena Main UITests */,
 				E8A939A5305B27F400648A16 /* Athena Watch App */,
 				E8A939B3305B27F500648A16 /* Athena Watch AppTests */,
 				E8A939BD305B27F500648A16 /* Athena Watch AppUITests */,
@@ -179,9 +179,9 @@
 		E8182428302F4A0B00DED693 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				E8182427302F4A0B00DED693 /* AthenaAscend.app */,
-				E8182438302F4A0C00DED693 /* AthenaAscendTests.xctest */,
-				E8182442302F4A0C00DED693 /* AthenaAscendUITests.xctest */,
+				E8182427302F4A0B00DED693 /* Athena.app */,
+				E8182438302F4A0C00DED693 /* AthenaTests.xctest */,
+				E8182442302F4A0C00DED693 /* AthenaUITests.xctest */,
 				E8A939A4305B27F400648A16 /* Athena Watch App.app */,
 				E8A939B0305B27F500648A16 /* Athena Watch AppTests.xctest */,
 				E8A939BA305B27F500648A16 /* Athena Watch AppUITests.xctest */,
@@ -192,9 +192,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		E8182426302F4A0B00DED693 /* AthenaAscend */ = {
+		E8182426302F4A0B00DED693 /* Athena */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E818244B302F4A0C00DED693 /* Build configuration list for PBXNativeTarget "AthenaAscend" */;
+			buildConfigurationList = E818244B302F4A0C00DED693 /* Build configuration list for PBXNativeTarget "Athena" */;
 			buildPhases = (
 				E8182423302F4A0B00DED693 /* Sources */,
 				E8182424302F4A0B00DED693 /* Frameworks */,
@@ -207,18 +207,18 @@
 				E8A939C1305B27F500648A16 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				E8182429302F4A0B00DED693 /* AthenaAscend */,
+				E8182429302F4A0B00DED693 /* Athena Main App */,
 			);
-			name = AthenaAscend;
+			name = Athena;
 			packageProductDependencies = (
 			);
 			productName = AthenaAscend;
-			productReference = E8182427302F4A0B00DED693 /* AthenaAscend.app */;
+			productReference = E8182427302F4A0B00DED693 /* Athena.app */;
 			productType = "com.apple.product-type.application";
 		};
-		E8182437302F4A0C00DED693 /* AthenaAscendTests */ = {
+		E8182437302F4A0C00DED693 /* AthenaTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E8182450302F4A0C00DED693 /* Build configuration list for PBXNativeTarget "AthenaAscendTests" */;
+			buildConfigurationList = E8182450302F4A0C00DED693 /* Build configuration list for PBXNativeTarget "AthenaTests" */;
 			buildPhases = (
 				E8182434302F4A0C00DED693 /* Sources */,
 				E8182435302F4A0C00DED693 /* Frameworks */,
@@ -230,18 +230,18 @@
 				E818243A302F4A0C00DED693 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				E818243B302F4A0C00DED693 /* AthenaAscendTests */,
+				E818243B302F4A0C00DED693 /* Athena Main Tests */,
 			);
-			name = AthenaAscendTests;
+			name = AthenaTests;
 			packageProductDependencies = (
 			);
 			productName = AthenaAscendTests;
-			productReference = E8182438302F4A0C00DED693 /* AthenaAscendTests.xctest */;
+			productReference = E8182438302F4A0C00DED693 /* AthenaTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		E8182441302F4A0C00DED693 /* AthenaAscendUITests */ = {
+		E8182441302F4A0C00DED693 /* AthenaUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E8182453302F4A0C00DED693 /* Build configuration list for PBXNativeTarget "AthenaAscendUITests" */;
+			buildConfigurationList = E8182453302F4A0C00DED693 /* Build configuration list for PBXNativeTarget "AthenaUITests" */;
 			buildPhases = (
 				E818243E302F4A0C00DED693 /* Sources */,
 				E818243F302F4A0C00DED693 /* Frameworks */,
@@ -253,13 +253,13 @@
 				E8182444302F4A0C00DED693 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				E8182445302F4A0C00DED693 /* AthenaAscendUITests */,
+				E8182445302F4A0C00DED693 /* Athena Main UITests */,
 			);
-			name = AthenaAscendUITests;
+			name = AthenaUITests;
 			packageProductDependencies = (
 			);
 			productName = AthenaAscendUITests;
-			productReference = E8182442302F4A0C00DED693 /* AthenaAscendUITests.xctest */;
+			productReference = E8182442302F4A0C00DED693 /* AthenaUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 		E8A939A3305B27F400648A16 /* Athena Watch App */ = {
@@ -364,7 +364,7 @@
 					};
 				};
 			};
-			buildConfigurationList = E8182422302F4A0B00DED693 /* Build configuration list for PBXProject "AthenaAscend" */;
+			buildConfigurationList = E8182422302F4A0B00DED693 /* Build configuration list for PBXProject "Athena" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -378,9 +378,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				E8182426302F4A0B00DED693 /* AthenaAscend */,
-				E8182437302F4A0C00DED693 /* AthenaAscendTests */,
-				E8182441302F4A0C00DED693 /* AthenaAscendUITests */,
+				E8182426302F4A0B00DED693 /* Athena */,
+				E8182437302F4A0C00DED693 /* AthenaTests */,
+				E8182441302F4A0C00DED693 /* AthenaUITests */,
 				E8A939A3305B27F400648A16 /* Athena Watch App */,
 				E8A939AF305B27F500648A16 /* Athena Watch AppTests */,
 				E8A939B9305B27F500648A16 /* Athena Watch AppUITests */,
@@ -481,12 +481,12 @@
 /* Begin PBXTargetDependency section */
 		E818243A302F4A0C00DED693 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = E8182426302F4A0B00DED693 /* AthenaAscend */;
+			target = E8182426302F4A0B00DED693 /* Athena */;
 			targetProxy = E8182439302F4A0C00DED693 /* PBXContainerItemProxy */;
 		};
 		E8182444302F4A0C00DED693 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = E8182426302F4A0B00DED693 /* AthenaAscend */;
+			target = E8182426302F4A0B00DED693 /* Athena */;
 			targetProxy = E8182443302F4A0C00DED693 /* PBXContainerItemProxy */;
 		};
 		E8A939B2305B27F500648A16 /* PBXTargetDependency */ = {
@@ -512,18 +512,18 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = AthenaAscend/AthenaAscend.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "Athena Main App/Athena.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_ASSET_PATHS = "\"AthenaAscend/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Athena Main App/Preview Content\"";
 				DEVELOPMENT_TEAM = FU2B76F7PF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = AthenaAscend/Info.plist;
+				INFOPLIST_FILE = "Athena Main App/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Athena;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -562,18 +562,18 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = AthenaAscend/AthenaAscend.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "Athena Main App/Athena.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_ASSET_PATHS = "\"AthenaAscend/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Athena Main App/Preview Content\"";
 				DEVELOPMENT_TEAM = FU2B76F7PF;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = AthenaAscend/Info.plist;
+				INFOPLIST_FILE = "Athena Main App/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Athena;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -749,7 +749,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AthenaAscend.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AthenaAscend";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Athena.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Athena";
 				XROS_DEPLOYMENT_TARGET = 26.5;
 			};
 			name = Debug;
@@ -776,7 +776,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AthenaAscend.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AthenaAscend";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Athena.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Athena";
 				XROS_DEPLOYMENT_TARGET = 26.5;
 			};
 			name = Release;
@@ -995,7 +995,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		E8182422302F4A0B00DED693 /* Build configuration list for PBXProject "AthenaAscend" */ = {
+		E8182422302F4A0B00DED693 /* Build configuration list for PBXProject "Athena" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E818244E302F4A0C00DED693 /* Debug */,
@@ -1004,7 +1004,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E818244B302F4A0C00DED693 /* Build configuration list for PBXNativeTarget "AthenaAscend" */ = {
+		E818244B302F4A0C00DED693 /* Build configuration list for PBXNativeTarget "Athena" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E818244C302F4A0C00DED693 /* Debug */,
@@ -1013,7 +1013,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E8182450302F4A0C00DED693 /* Build configuration list for PBXNativeTarget "AthenaAscendTests" */ = {
+		E8182450302F4A0C00DED693 /* Build configuration list for PBXNativeTarget "AthenaTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E8182451302F4A0C00DED693 /* Debug */,
@@ -1022,7 +1022,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E8182453302F4A0C00DED693 /* Build configuration list for PBXNativeTarget "AthenaAscendUITests" */ = {
+		E8182453302F4A0C00DED693 /* Build configuration list for PBXNativeTarget "AthenaUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E8182454302F4A0C00DED693 /* Debug */,

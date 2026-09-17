@@ -17,8 +17,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "E8A939A3305B27F400648A16"
                BuildableName = "Athena Watch App.app"
-               BlueprintName = "Athena Watch App"
-               ReferencedContainer = "container:AthenaAscend.xcodeproj">
+               ReferencedContainer = "container:Athena.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -30,8 +29,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "E8182426302F4A0B00DED693"
-               BuildableName = "AthenaAscend.app"
-               ReferencedContainer = "container:AthenaAscend.xcodeproj">
+               BuildableName = "Athena.app"
+               ReferencedContainer = "container:Athena.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -84,7 +83,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "E8A939A3305B27F400648A16"
             BuildableName = "Athena Watch App.app"
-            ReferencedContainer = "container:AthenaAscend.xcodeproj">
+            ReferencedContainer = "container:Athena.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -100,7 +99,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "E8A939A3305B27F400648A16"
             BuildableName = "Athena Watch App.app"
-            ReferencedContainer = "container:AthenaAscend.xcodeproj">
+            ReferencedContainer = "container:Athena.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
