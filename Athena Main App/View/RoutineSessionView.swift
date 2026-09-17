@@ -376,6 +376,7 @@ struct RoutineSessionView: View {
         ToolbarItem(placement: .cancellationAction) {
             Button {
                 if indices != nil {
+                    stopAndResetTimer()
                     setState(newIndices: nil)
                 } else if !hasData {
                     modelContext.delete(session)
