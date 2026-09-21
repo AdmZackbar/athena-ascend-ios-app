@@ -104,8 +104,7 @@ struct RoutineEditView: View {
                 case .maxHang:
                     EditMaxHangSetsSheet(item: exercise.maxHang)
                 case .campus:
-                    // TODO
-                    EmptyView()
+                    EditCampusSetsSheet(item: exercise.campus)
                 }
             }
         }.navigationTitle(item.routine != nil ? "Edit Routine" : "Create Routine")
@@ -433,7 +432,43 @@ struct RoutineEditView: View {
             }.presentationDetents([.medium, .large])
         }
     }
-    
+
+    struct EditCampusSetsSheet: View {
+        @Binding var item: Routine.CampusSets
+        @State private var editIndex: Int? = nil
+        @State private var campusMoves: [CampusMove] = []
+        @State private var campusMoveType: CampusMoveType = .defined
+
+        var body: some View {
+            Form {
+                if let editIndex {
+                    Section {
+                        Button {
+                            if case .defined = item.sets[editIndex].moves {
+                                item.sets[editIndex].moves = .defined(campusMoves)
+                            }
+                            self.editIndex = nil
+                        } label: {
+                            Label("Done", systemImage: "checkmark")
+                        }
+                    }
+                    CampusPlannedSetEditor(item: $item, index: editIndex, moves: $campusMoves, moveType: $campusMoveType)
+                } else {
+                    CampusPlannedSetsList(item: $item) { offset in
+                        switch item.sets[offset].moves {
+                        case .defined(let m):
+                            campusMoves = m
+                            campusMoveType = .defined
+                        default:
+                            break
+                        }
+                        editIndex = offset
+                    }
+                }
+            }.presentationDetents([.medium, .large])
+        }
+    }
+
     private struct Item {
         var routine: Routine?
         var name: String
@@ -535,8 +570,7 @@ struct RoutineEditView: View {
                 case .maxHang:
                     maxHang.tag.isEmpty || maxHang.sets.isEmpty || maxHang.sets.contains(where: isInvalid)
                 case .campus:
-                    // TODO
-                    campus.sets.isEmpty
+                    campus.sets.isEmpty || campus.sets.contains(where: isInvalid)
                 }
             }
             
@@ -567,6 +601,13 @@ struct RoutineEditView: View {
             
             func isInvalid(_ set: Routine.MaxHangSet) -> Bool {
                 set.target <= 0
+            }
+
+            func isInvalid(_ set: Routine.CampusSets.PlannedSet) -> Bool {
+                if case .defined(let moves) = set.moves {
+                    return moves.count < 2
+                }
+                return false
             }
         }
     }

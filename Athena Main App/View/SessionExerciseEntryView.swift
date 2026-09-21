@@ -178,7 +178,7 @@ struct SessionExerciseEntryView: View {
                         let actual = d.actual[offset]
                         VStack(alignment: .leading) {
                             HStack {
-                                Text(actual.main.moves.text)
+                                Text(actual.text)
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
                                 Text(expected.text)

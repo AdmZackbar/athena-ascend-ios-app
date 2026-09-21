@@ -525,4 +525,11 @@ extension Session.CampusSetPair {
     var hasDiffSideData: Bool {
         alt != nil
     }
+
+    var text: String {
+        if let alt {
+            return "\(main.moves.text), \(alt.moves.text)"
+        }
+        return main.moves.text
+    }
 }

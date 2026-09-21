@@ -23,6 +23,7 @@ struct SessionExerciseSheet: View {
     @State private var multiSide: Bool
     @State private var editIndex: Int? = nil
     @State private var campusMoves: [CampusMove] = []
+    @State private var campusMovesAlt: [CampusMove] = []
     @State private var campusMoveType: CampusMoveType = .defined
     
     init(exercise: Binding<Session.Exercise>, showing: Binding<Bool>, showData: Bool = true) {
@@ -126,6 +127,7 @@ struct SessionExerciseSheet: View {
                 }
             case .data:
                 data[editIndex].campusSet.moves = campusMoves
+                data[editIndex].movesAlt = campusMovesAlt
             }
         }
         editIndex = nil
@@ -507,7 +509,6 @@ struct SessionExerciseSheet: View {
     
     @ViewBuilder
     func campusBoardEditSetView(index: Int) -> some View {
-//        CampusBoardView(board: .largeEdges, exercise: campus.type, moves: $campusMoves)
         switch editType {
         case .base:
             campusBoardEditBaseSetView(index: index)
@@ -518,30 +519,9 @@ struct SessionExerciseSheet: View {
     
     @ViewBuilder
     func campusBoardEditBaseSetView(index: Int) -> some View {
-        // TODO handle non-defined move set for base
-        Section("Set \(index + 1)") {
-            Picker("Board/Edges:", selection: $campus.sets[index].board) {
-                ForEach(CampusBoard.allCases, id: \.name) { board in
-                    Text(board.name).tag(board)
-                }
-            }
-            if campus.type.canMirror {
-                Toggle("Mirror Set:", isOn: $campus.sets[index].doMirror)
-            }
-            if CampusMoveType.allCases.count > 1 {
-                Picker("Moves:", selection: $campusMoveType) {
-                    ForEach(CampusMoveType.allCases, id: \.name) { moveType in
-                        Text(moveType.name).tag(moveType)
-                    }
-                }
-            }
-            switch campusMoveType {
-            case .defined:
-                CampusBoardView(board: campus.sets[index].board, exercise: campus.type, moves: $campusMoves)
-            }
-        }
+        CampusPlannedSetEditor(item: $campus, index: index, moves: $campusMoves, moveType: $campusMoveType)
     }
-    
+
     @ViewBuilder
     func campusBoardEditDataSetView(index: Int) -> some View {
         let set = data[index].campusSet
@@ -551,76 +531,40 @@ struct SessionExerciseSheet: View {
                     Text(board.name).tag(board)
                 }
             }
+            if campus.type.canMirror {
+                Toggle("Different Side Data:", isOn: $multiSide)
+            }
             CampusBoardView(board: set.board, exercise: campus.type, moves: $campusMoves)
+            if multiSide && campus.type.canMirror {
+                CampusBoardView(board: set.board, exercise: campus.type, moves: $campusMovesAlt)
+            }
+            TextField("Notes", text: $data[index].notes, axis: .vertical)
+                .lineLimit(1...3)
         }
     }
-    
+
     @ViewBuilder
     func campusBoardBaseView() -> some View {
-        Section {
-            Picker("Type:", selection: $campus.type) {
-                ForEach(Routine.CampusSets.Exercise.allCases, id: \.text) {
-                    Text($0.text).tag($0)
-                }
+        CampusPlannedSetsList(item: $campus) { offset in
+            switch campus.sets[offset].moves {
+            case .defined(let m):
+                campusMoves = m
+                campusMoveType = .defined
+            default:
+                // TODO
+                break
             }
-        }
-        Section {
-            ForEach(campus.sets.enumerated(), id: \.offset) { offset, set in
-                Button {
-                    switch campus.sets[offset].moves {
-                    case .defined(let m):
-                        campusMoves = m
-                        campusMoveType = .defined
-                    default:
-                        // TODO
-                        break
-                    }
-                    editIndex = offset
-                } label: {
-                    VStack(alignment: .leading) {
-                        Text(set.board.name)
-                            .font(.subheadline)
-                            .fontWeight(.regular)
-                            .italic()
-                        if let moves = set.moves.moves {
-                            Text(moves.text)
-                            if set.doMirror {
-                                Text(moves.flipped.text)
-                            }
-                        } else {
-                            Text(set.doMirror ? "\(set.moves.text) x2" : set.moves.text)
-                        }
-                    }.contentShape(Rectangle())
-                        .fontWeight(.semibold)
-                }.buttonStyle(.plain)
-            }
-        } header: {
-            VStack(alignment: .leading) {
-                HStack(spacing: 16) {
-                    Text("Sets")
-                    Spacer()
-                    Button {
-                        campus.sets.append(.init(moves: .defined([campus.type.start])))
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    Button {
-                        campus.sets.removeLast()
-                    } label: {
-                        Image(systemName: "minus")
-                    }.disabled(campus.sets.isEmpty)
-                }.buttonStyle(.plain)
-            }
+            editIndex = offset
         }
     }
-    
+
     @ViewBuilder
     func campusBoardDataView() -> some View {
         Section {
             ForEach(data.enumerated(), id: \.offset) { offset, set in
                 Button {
-                    // TODO
-                    campusMoves = data[offset].campusSet.moves
+                    campusMoves = set.campusSet.moves
+                    campusMovesAlt = set.movesAlt
                     editIndex = offset
                 } label: {
                     VStack(alignment: .leading) {
@@ -629,9 +573,8 @@ struct SessionExerciseSheet: View {
                             .fontWeight(.regular)
                             .italic()
                         Text(set.campusSet.moves.text)
-                        // TODO
-                        if campus.sets[offset].doMirror {
-                            Text(set.campusSet.moves.flipped.text)
+                        if !set.movesAlt.isEmpty {
+                            Text(set.movesAlt.text)
                         }
                     }.contentShape(Rectangle())
                         .fontWeight(.semibold)
@@ -644,40 +587,30 @@ struct SessionExerciseSheet: View {
                     Spacer()
                     Button {
                         let base = campus.sets[data.count]
-                        data.append(.init(campusSet: .init(board: base.board, moves: base.moves.moves ?? [])))
+                        let moves = base.moves.moves ?? []
+                        data.append(.init(campusSet: .init(board: base.board, moves: moves), movesAlt: base.doMirror && campus.type.canMirror ? moves.flipped : []))
                     } label: {
                         Image(systemName: "plus")
                     }.disabled(campus.sets.count <= data.count)
                     Button {
-                        campus.sets.removeLast()
+                        data.removeLast()
                     } label: {
                         Image(systemName: "minus")
-                    }.disabled(campus.sets.isEmpty)
+                    }.disabled(data.isEmpty)
                 }.buttonStyle(.plain)
             }
         }
     }
-    
+
     enum EditType: CaseIterable, Codable, Hashable, Equatable {
         case base, data
-        
+
         var name: String {
             switch self {
             case .base:
                 return "Expected"
             case .data:
                 return "Actual"
-            }
-        }
-    }
-    
-    enum CampusMoveType: CaseIterable, Hashable, Equatable {
-        case defined
-        
-        var name: String {
-            switch self {
-            case .defined:
-                return "Defined"
             }
         }
     }

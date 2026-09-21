@@ -55,7 +55,19 @@ struct CampusBoardView: View {
     
     var body: some View {
         VStack {
-            movesView()
+            if !moves.isEmpty {
+                movesView()
+            } else {
+                Button {
+                    // Do nothing
+                } label: {
+                    Text("No Moves Set")
+                        .font(.title2)
+                        .bold()
+                        .italic()
+                }.buttonStyle(.bordered)
+                    .tint(.primary)
+            }
             HStack {
                 VStack {
                     ForEach(((board.startRung.num + (board.startRung.isHalf ? 1 : 0))...board.endRung.num).reversed().map({ CampusRung.full($0) }), id: \.text) { rung in

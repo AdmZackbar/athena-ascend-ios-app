@@ -105,10 +105,11 @@ struct TestDataModifier: PreviewModifier {
                         return .maxHang(.init(expected: d.expected, actual: actual))
                     case .campus(let d):
                         var actual: [Session.CampusSetPair] = []
-                        // TODO
-//                        for exSet in d.expected.sets {
-//                            actual.append(.init(main: .init(moves: [.init(rung: .full(1), side: .both)])))
-//                        }
+                        for exSet in d.expected.sets {
+                            let moves = exSet.moves.moves ?? [d.expected.type.start]
+                            let alt = exSet.doMirror && d.expected.type.canMirror ? CampusSet(board: exSet.board, moves: moves.flipped) : nil
+                            actual.append(.init(main: .init(board: exSet.board, moves: moves), alt: alt))
+                        }
                         return .campus(.init(expected: d.expected, actual: actual))
                     }
                 }()

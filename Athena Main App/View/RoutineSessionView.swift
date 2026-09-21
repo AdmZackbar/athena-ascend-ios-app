@@ -281,6 +281,8 @@ struct RoutineSessionView: View {
                     }.presentationDetents([.large])
                 case .song:
                     editSongSheet()
+                case .campusMoves(let alt):
+                    campusMovesSheet(alt: alt)
                 }
             }
             .toolbar(content: buildToolbar)
@@ -319,6 +321,42 @@ struct RoutineSessionView: View {
                     }
                 }
         }.presentationDetents([.medium, .large])
+    }
+
+    @ViewBuilder
+    func campusMovesSheet(alt: Bool) -> some View {
+        let campusType: Routine.CampusSets.Exercise = {
+            if case .campus(let d) = currentExercise {
+                return d.expected.type
+            }
+            return .maxLadder
+        }()
+        NavigationStack {
+            Form {
+                CampusBoardView(board: genericData.campusSet.board, exercise: campusType, moves: alt ? $genericData.movesAlt : $genericData.campusSet.moves)
+            }.navigationTitle(alt ? "Alt Moves" : "Moves")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button {
+                            if alt {
+                                genericData.movesAlt = []
+                            } else {
+                                genericData.campusSet.moves = []
+                            }
+                        } label: {
+                            Label("Clear", systemImage: "clear")
+                        }
+                    }
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            sheetType = nil
+                        } label: {
+                            Label("Done", systemImage: "checkmark")
+                        }
+                    }
+                }
+        }.presentationDetents([.large])
     }
     
     @ToolbarContentBuilder
@@ -414,8 +452,7 @@ struct RoutineSessionView: View {
         case .maxHang(let data):
             maxHangExerciseView(data)
         case .campus(let data):
-            // TODO
-            EmptyView()
+            campusExerciseView(data)
         }
     }
     
@@ -583,6 +620,10 @@ struct RoutineSessionView: View {
                             }
                             Button("Max Hang") {
                                 set.exercises.append(.maxHang(.init(expected: .init())))
+                                sheetType = .exercise(setIndex: setIndex, exerciseIndex: set.exercises.count - 1)
+                            }
+                            Button("Campus") {
+                                set.exercises.append(.campus(.init(expected: .init())))
                                 sheetType = .exercise(setIndex: setIndex, exerciseIndex: set.exercises.count - 1)
                             }
                         } label: {
@@ -970,7 +1011,87 @@ struct RoutineSessionView: View {
         }
         editNotesButton()
     }
-    
+
+    @ViewBuilder
+    func campusExerciseView(_ data: Session.CampusSetData) -> some View {
+        VStack(alignment: .leading) {
+            campusHeaderView(data)
+            if exerciseState == .rest {
+                campusRecordView(data)
+                nextExerciseView()
+            }
+            if timerDuration > .zero {
+                timerView(text: exerciseState == .ready ? "Get Ready" : "Rest")
+            }
+            Spacer()
+            controlView {
+                if exerciseState == .rest {
+                    performNextAction()
+                } else if !allowTimerNext && timerDuration > .zero && elapsedSeconds < timerDuration {
+                    timerNextOverride = true
+                } else {
+                    next()
+                }
+            }
+        }.padding()
+    }
+
+    @ViewBuilder
+    func campusHeaderView(_ data: Session.CampusSetData) -> some View {
+        let index = indices!.exerciseSetIndex
+        Text(data.expected.type.text)
+            .font(.system(size: data.expected.type.text.count > 16 ? 32 : 40))
+            .bold()
+        Text("Set \(index + 1)/\(data.expected.sets.count)")
+            .font(.title)
+            .fontWeight(.semibold)
+        Text(data.expected.sets[index].text)
+            .font(.title2)
+            .fontWeight(.semibold)
+        if exerciseState == .ready, let prevData = tryGetPrevCampusData(indices!) {
+            campusPrevDataView(prevData)
+        }
+    }
+
+    @ViewBuilder
+    func campusPrevDataView(_ prevData: Session.CampusSetPair) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("\(prevSession!.startTime.formatted(date: .numeric, time: .omitted)): \(prevData.text)")
+                .font(.title3)
+            if !prevData.main.notes.isEmpty {
+                Text(prevData.main.notes)
+            }
+        }.italic()
+    }
+
+    @ViewBuilder
+    func campusRecordView(_ data: Session.CampusSetData) -> some View {
+        Picker("Board/Edges", selection: $genericData.campusSet.board) {
+            ForEach(CampusBoard.allCases, id: \.name) { board in
+                Text(board.name).tag(board)
+            }
+        }.font(.title3).bold()
+        Button {
+            sheetType = .campusMoves(alt: false)
+        } label: {
+            Text(genericData.campusSet.moves.text)
+                .font(.title3)
+                .bold()
+        }.buttonStyle(.bordered)
+            .tint(.primary)
+        if data.expected.type.canMirror {
+            Button {
+                sheetType = .campusMoves(alt: true)
+            } label: {
+                Text(genericData.movesAlt.text)
+                    .font(.title3)
+                    .bold()
+            }.buttonStyle(.bordered)
+                .tint(.primary)
+        }
+        editNotesButton()
+    }
+
     @ViewBuilder
     func nextExerciseView() -> some View {
         if let nextIndices = nextIndices() {
@@ -992,6 +1113,8 @@ struct RoutineSessionView: View {
                 repeaterPrevDataView(prevData)
             } else if let prevData = tryGetPrevMaxHangData(nextIndices) {
                 maxHangPrevDataView(prevData)
+            } else if let prevData = tryGetPrevCampusData(nextIndices) {
+                campusPrevDataView(prevData)
             }
         }
     }
@@ -1091,8 +1214,9 @@ struct RoutineSessionView: View {
             } else {
                 // Load from expected
                 let expected = d.expected.sets[indices.exerciseSetIndex]
+                let doMirror = expected.doMirror && d.expected.type.canMirror
                 if case .defined(let moves) = expected.moves {
-                    return .init(campusSet: .init(board: expected.board, moves: moves))
+                    return .init(campusSet: .init(board: expected.board, moves: moves), movesAlt: doMirror ? moves.flipped : nil)
                 }
                 return .init(campusSet: .init(board: expected.board))
             }
@@ -1119,7 +1243,11 @@ struct RoutineSessionView: View {
                 // sent, rather than silently collapsing to the left value for independent-side
                 // exercises. A no-op for exercises without independent sides, and a no-op for
                 // dataType.hasTime cases (toGeneric already forces useAlt there regardless).
-                allowMultiSide = true
+                // Skipped for campus: the watch has no way to enter moves, so this must not
+                // silently flip mirroring on.
+                if case .campus = currentExercise {} else {
+                    allowMultiSide = true
+                }
             }
             // Mirrors exactly what the phone's own controlView closure does in each phase:
             // .rest saves + maybe advances; .off's entry window saves + starts the get-ready
@@ -1247,8 +1375,24 @@ struct RoutineSessionView: View {
         }
         return nil
     }
-    
-    
+
+    func tryGetPrevCampusData(_ indices: ExerciseIndices) -> Session.CampusSetPair? {
+        if let prevSession {
+            if indices.routineSetIndex < prevSession.sets.count {
+                let set = prevSession.sets[indices.routineSetIndex]
+                if indices.setExerciseIndex < set.exercises.count {
+                    if case .campus(let d) = set.exercises[indices.setExerciseIndex] {
+                        if indices.exerciseSetIndex < d.actual.count {
+                            return d.actual[indices.exerciseSetIndex]
+                        }
+                    }
+                }
+            }
+        }
+        return nil
+    }
+
+
     // ********************** //
     // CONTROL FLOW FUNCTIONS //
     // ********************** //
@@ -1259,6 +1403,13 @@ struct RoutineSessionView: View {
             let newState = ExerciseState.ready
             self.timerDuration = computeTimerDuration(indices: newIndices, exerciseState: newState)
             self.genericData = loadData(newIndices)
+            if case .campus(let d) = session.sets[newIndices.routineSetIndex].exercises[newIndices.setExerciseIndex] {
+                if newIndices.exerciseSetIndex < d.actual.count {
+                    self.allowMultiSide = d.actual[newIndices.exerciseSetIndex].alt != nil
+                } else if newIndices.exerciseSetIndex < d.expected.sets.count {
+                    self.allowMultiSide = d.expected.sets[newIndices.exerciseSetIndex].doMirror && d.expected.type.canMirror
+                }
+            }
             self.exerciseState = newState
             self.indices = newIndices
             onStateChanged()
@@ -1342,6 +1493,15 @@ struct RoutineSessionView: View {
             default:
                 break
             }
+        case .campus(let d):
+            switch exerciseState {
+            case .ready:
+                return .init(max: d.expected.sets[indices!.exerciseSetIndex].doMirror ? 1 : 0)
+            case .off:
+                return repeaterRep.next()
+            default:
+                break
+            }
         default:
             break
         }
@@ -1410,7 +1570,7 @@ struct RoutineSessionView: View {
             case .rest, nil:
                 return nil
             }
-        case .repeater(_), .maxHang(_), .campus(_):
+        case .repeater(_), .maxHang(_):
             switch exerciseState {
             case .ready:
                 return .on
@@ -1418,6 +1578,15 @@ struct RoutineSessionView: View {
                 return repeaterRep.hasNext ? .off : .rest
             case .off:
                 return .on
+            case .rest, nil:
+                return nil
+            }
+        case .campus(let d):
+            switch exerciseState {
+            case .ready:
+                return repeaterRep.hasNext ? .off : .rest
+            case .on, .off:
+                return .rest
             case .rest, nil:
                 return nil
             }
@@ -1650,11 +1819,9 @@ struct RoutineSessionView: View {
             }
         case .campus(_):
             switch exerciseState {
-            case .ready:
-                return .seconds(5)
-            case .on:
+            case .ready, .on:
                 return .seconds(10)
-            case .off, .rest:
+            case .rest, .off:
                 return .seconds(set.restTime)
             }
         }
@@ -1796,14 +1963,17 @@ struct RoutineSessionView: View {
                 "notes"
             case .song:
                 "song"
+            case .campusMoves(let alt):
+                "campus-moves-\(alt)"
             }
         }
-        
+
         case date
         case weight
         case exercise(setIndex: Int, exerciseIndex: Int)
         case notes
         case song
+        case campusMoves(alt: Bool)
     }
     
     enum ExerciseState: String, Codable, Hashable, Equatable {

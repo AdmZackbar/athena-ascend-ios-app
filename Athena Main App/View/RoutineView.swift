@@ -169,12 +169,7 @@ struct RoutineView: View {
                 }
             case .campus(let data):
                 ForEach(data.actual.enumerated(), id: \.offset) { offset, d in
-                    HStack {
-                        Text(d.main.moves.text)
-                        if let alt = d.alt?.moves {
-                            Text(alt.text)
-                        }
-                    }
+                    Text(d.text)
                 }
             }
         }.font(.subheadline)
