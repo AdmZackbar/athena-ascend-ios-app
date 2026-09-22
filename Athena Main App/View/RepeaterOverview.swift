@@ -10,29 +10,31 @@ import SwiftUI
 
 struct RepeaterOverview: View {
     @Query(sort: \Session.startTime, order: .reverse) private var sessions: [Session]
-    
+
+    // Grouped by the exercise's stable library ID (falling back to the derived
+    // identity for anything that predates the library), so a rename no longer
+    // splits a repeater's history in two the way grouping by raw tag once did.
+    private var groupedRepeaters: (labels: [ExerciseGroupKey: String], map: [ExerciseGroupKey: [(Session, Session.RepeaterData)]]) {
+        let tagged: [(ExerciseGroupKey, Session, Session.RepeaterData)] = sessions.flatMap { session in
+            session.sets.flatMap(\.exercises).compactMap { exercise -> (ExerciseGroupKey, Session, Session.RepeaterData)? in
+                guard case .repeater(let d) = exercise, let key = ExerciseGroupKey(exercise) else { return nil }
+                return (key, session, d)
+            }
+        }
+        var labels: [ExerciseGroupKey: String] = [:]
+        for (key, _, d) in tagged where labels[key] == nil {
+            labels[key] = "\(d.expected.tag) \(d.expected.timeOn)s/\(d.expected.timeOff)s"
+        }
+        let map: [ExerciseGroupKey: [(Session, Session.RepeaterData)]] = Dictionary(grouping: tagged, by: { $0.0 })
+            .mapValues({ $0.map({ ($0.1, $0.2) }) })
+        return (labels, map)
+    }
+
     var body: some View {
-        let repeaters: [(Session, Session.RepeaterData)] = {
-            sessions.flatMap({ session in
-                let repeaters = session.sets
-                    .flatMap({ $0.exercises })
-                    .map({ exercise in
-                        switch exercise {
-                        case .repeater(let d):
-                            return d as Session.RepeaterData?
-                        default:
-                            return nil
-                        }
-                    })
-                    .filter({ $0 != nil })
-                    .map({ $0! })
-                return repeaters.map({ (session, $0) })
-            })
-        }()
-        let map = Dictionary(grouping: repeaters, by: { $0.1.expected.tag })
+        let grouped = groupedRepeaters
         Form {
-            ForEach(map.sorted(by: { $0.key < $1.key }), id: \.key) { tag, pairs in
-                Section(tag) {
+            ForEach(grouped.map.sorted(by: { (grouped.labels[$0.key] ?? "") < (grouped.labels[$1.key] ?? "") }), id: \.key) { key, pairs in
+                Section(grouped.labels[key] ?? "Unknown") {
                     ForEach(pairs.enumerated(), id: \.offset) { offset, pair in
                         VStack(alignment: .leading) {
                             let session = pair.0

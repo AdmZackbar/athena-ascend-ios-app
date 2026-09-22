@@ -8,8 +8,6 @@
 import Foundation
 import SwiftData
 
-typealias Session = SchemaV1.Session
-
 extension SchemaV1 {
     @Model
     final class Session {

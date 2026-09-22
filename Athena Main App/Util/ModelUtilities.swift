@@ -102,7 +102,65 @@ extension Routine.Exercise {
             return d.type.text
         }
     }
-    
+
+    /// Links this payload to its library entry. Nil for pre-V2 data that predates the
+    /// backfill, or for a freshly-added exercise that hasn't been saved to the library yet.
+    nonisolated var exerciseID: UUID? {
+        get {
+            switch self {
+            case .generic(let d): return d.exerciseID
+            case .repeater(let d): return d.exerciseID
+            case .maxHang(let d): return d.exerciseID
+            case .campus(let d): return d.exerciseID
+            }
+        }
+        set {
+            switch self {
+            case .generic(var d):
+                d.exerciseID = newValue
+                self = .generic(d)
+            case .repeater(var d):
+                d.exerciseID = newValue
+                self = .repeater(d)
+            case .maxHang(var d):
+                d.exerciseID = newValue
+                self = .maxHang(d)
+            case .campus(var d):
+                d.exerciseID = newValue
+                self = .campus(d)
+            }
+        }
+    }
+
+    /// The raw, settable identity field backing this exercise's library entry —
+    /// `name` for generic, `tag` for repeater/max hang. Campus has no free-text field
+    /// (its label is always derived from `type`), so the setter is a no-op there.
+    var rawLabel: String {
+        get {
+            switch self {
+            case .generic(let d): return d.name
+            case .repeater(let d): return d.tag
+            case .maxHang(let d): return d.tag
+            case .campus(let d): return d.type.text
+            }
+        }
+        set {
+            switch self {
+            case .generic(var d):
+                d.name = newValue
+                self = .generic(d)
+            case .repeater(var d):
+                d.tag = newValue
+                self = .repeater(d)
+            case .maxHang(var d):
+                d.tag = newValue
+                self = .maxHang(d)
+            case .campus:
+                break
+            }
+        }
+    }
+
     var numSets: Int {
         switch self {
         case .generic(let d):
@@ -143,7 +201,64 @@ extension Session.Exercise {
             return !d.actual.isEmpty
         }
     }
-    
+
+    /// Links this snapshot to its library entry, inherited from `expected` (a
+    /// `Routine.*Sets`, which carries the link). Nil for pre-V2 data.
+    nonisolated var exerciseID: UUID? {
+        get {
+            switch self {
+            case .generic(let d): return d.expected.exerciseID
+            case .repeater(let d): return d.expected.exerciseID
+            case .maxHang(let d): return d.expected.exerciseID
+            case .campus(let d): return d.expected.exerciseID
+            }
+        }
+        set {
+            switch self {
+            case .generic(var d):
+                d.expected.exerciseID = newValue
+                self = .generic(d)
+            case .repeater(var d):
+                d.expected.exerciseID = newValue
+                self = .repeater(d)
+            case .maxHang(var d):
+                d.expected.exerciseID = newValue
+                self = .maxHang(d)
+            case .campus(var d):
+                d.expected.exerciseID = newValue
+                self = .campus(d)
+            }
+        }
+    }
+
+    /// See `Routine.Exercise.rawLabel` — same semantics, applied to this snapshot's
+    /// `expected` payload rather than the routine's live prescription.
+    var rawLabel: String {
+        get {
+            switch self {
+            case .generic(let d): return d.expected.name
+            case .repeater(let d): return d.expected.tag
+            case .maxHang(let d): return d.expected.tag
+            case .campus(let d): return d.expected.type.text
+            }
+        }
+        set {
+            switch self {
+            case .generic(var d):
+                d.expected.name = newValue
+                self = .generic(d)
+            case .repeater(var d):
+                d.expected.tag = newValue
+                self = .repeater(d)
+            case .maxHang(var d):
+                d.expected.tag = newValue
+                self = .maxHang(d)
+            case .campus:
+                break
+            }
+        }
+    }
+
     var name: String {
         switch self {
         case .generic(let d):

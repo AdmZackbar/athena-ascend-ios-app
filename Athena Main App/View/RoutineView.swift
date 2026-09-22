@@ -11,42 +11,67 @@ import SwiftUI
 
 struct RoutineView: View {
     let routine: Routine
-    let groupedData: [String : [RepWeightChart.Data]]
-    @State private var selectedType: String? = nil
-    
+    let groupedData: [ExerciseGroupKey: [RepWeightChart.Data]]
+    let groupLabels: [ExerciseGroupKey: String]
+    @State private var selectedType: ExerciseGroupKey? = nil
+
     init(routine: Routine) {
         self.routine = routine
-        self.groupedData = {
-            let taggedData: [(String, RepWeightChart.Data)] = routine.sessions.sorted(by: { $0.startTime < $1.startTime }).flatMap({ session in
-                session.sets.flatMap({ set in
-                    set.exercises.flatMap({ exercise in
-                        switch exercise {
-                        case .repeater(let d):
-                            return d.actual.map({ (
-                                RepeaterChartType(tag: d.expected.tag, timeOn: d.expected.timeOn, timeOff: d.expected.timeOff).text,
-                                RepWeightChart.Data(date: session.startTime, reps: $0.numReps, weight: $0.weight)
-                            ) })
-                        case .generic(let d):
-                            switch d.expected.dataType {
-                            case .repWeight:
-                                // TODO L/R
-                                return d.actual.map({ (
-                                    d.expected.name,
-                                    RepWeightChart.Data(date: session.startTime, reps: $0.repsLeft, weight: $0.weightLeft)
-                                ) })
-                            default:
-                                return []
-                            }
-                        default: return []
+
+        // Prefer the routine's own current label for anything still prescribed —
+        // it's kept fresh by rename propagation. Session-only occurrences (the
+        // exercise was later removed from the routine) fall back to whatever label
+        // they were recorded under.
+        var labels: [ExerciseGroupKey: String] = [:]
+        for set in routine.sets {
+            for payload in set.exercises {
+                if let key = ExerciseGroupKey(payload) {
+                    labels[key] = payload.name
+                }
+            }
+        }
+
+        var taggedData: [(ExerciseGroupKey, RepWeightChart.Data)] = []
+        for session in routine.sessions.sorted(by: { $0.startTime < $1.startTime }) {
+            for set in session.sets {
+                for payload in set.exercises {
+                    guard let key = ExerciseGroupKey(payload) else { continue }
+                    if labels[key] == nil {
+                        labels[key] = payload.name
+                    }
+                    switch payload {
+                    case .repeater(let d):
+                        taggedData.append(contentsOf: d.actual.map({ (
+                            key,
+                            RepWeightChart.Data(date: session.startTime, reps: $0.numReps, weight: $0.weight)
+                        ) }))
+                    case .generic(let d):
+                        switch d.expected.dataType {
+                        case .repWeight:
+                            // TODO L/R
+                            taggedData.append(contentsOf: d.actual.map({ (
+                                key,
+                                RepWeightChart.Data(date: session.startTime, reps: $0.repsLeft, weight: $0.weightLeft)
+                            ) }))
+                        default:
+                            break
                         }
-                    })
-                })
-            })
-            let dict = Dictionary(grouping: taggedData) { $0.0 }
-            return dict.mapValues({ $0.map({ $0.1 }) })
-        }()
+                    default:
+                        break
+                    }
+                }
+            }
+        }
+
+        self.groupLabels = labels
+        let dict = Dictionary(grouping: taggedData, by: { $0.0 })
+        self.groupedData = dict.mapValues({ $0.map({ $0.1 }) })
     }
-    
+
+    private var sortedGroupKeys: [ExerciseGroupKey] {
+        groupedData.keys.sorted { (groupLabels[$0] ?? "") < (groupLabels[$1] ?? "") }
+    }
+
     var body: some View {
         Form {
             chartsView()
@@ -57,7 +82,23 @@ struct RoutineView: View {
                         let exerciseIndex = offset
                         VStack(alignment: .leading) {
                             headerView(exercise)
-                            let sessionExercises: [(Session, Session.Exercise)] = routine.sessions.sorted(by: { $0.startTime > $1.startTime }).map({ ($0, $0.sets[setIndex].exercises[exerciseIndex]) })
+                            let sessionExercises: [(Session, Session.Exercise)] = routine.sessions
+                                .sorted(by: { $0.startTime > $1.startTime })
+                                .compactMap { session in
+                                    if let exerciseID = exercise.exerciseID,
+                                       let match = session.sets.flatMap(\.exercises).first(where: { $0.exerciseID == exerciseID }) {
+                                        return (session, match)
+                                    }
+                                    // Pre-V2 data or a race between migration and a
+                                    // session's first save: fall back to a
+                                    // bounds-checked positional read rather than the
+                                    // unguarded index that used to trap here.
+                                    guard setIndex < session.sets.count,
+                                          exerciseIndex < session.sets[setIndex].exercises.count else {
+                                        return nil
+                                    }
+                                    return (session, session.sets[setIndex].exercises[exerciseIndex])
+                                }
                             ScrollView(.horizontal) {
                                 HStack(alignment: .top, spacing: 16) {
                                     expectedDataView(exercise: exercise)
@@ -72,31 +113,21 @@ struct RoutineView: View {
             }
         }.navigationTitle(routine.name)
             .onAppear {
-                selectedType = groupedData.keys.sorted().first
+                selectedType = sortedGroupKeys.first
             }
     }
-    
-    struct RepeaterChartType: Hashable, Equatable {
-        var tag: String
-        var timeOn: Int
-        var timeOff: Int
-        
-        var text: String {
-            "\(tag) \(timeOn)s/\(timeOff)s"
-        }
-    }
-    
+
     @ViewBuilder
     func chartsView() -> some View {
         if !groupedData.isEmpty {
             Section("Charts") {
                 Picker("Exercise", selection: $selectedType) {
-                    ForEach(groupedData.keys.sorted(), id: \.self) {
-                        Text($0).tag($0)
+                    ForEach(sortedGroupKeys, id: \.self) { key in
+                        Text(groupLabels[key] ?? "Unknown").tag(key as ExerciseGroupKey?)
                     }
                 }
-                if let selectedType {
-                    RepWeightChart(data: groupedData[selectedType]!)
+                if let selectedType, let data = groupedData[selectedType] {
+                    RepWeightChart(data: data)
                 }
             }
         }

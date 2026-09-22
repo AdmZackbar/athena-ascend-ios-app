@@ -8,9 +8,6 @@
 import Foundation
 import SwiftData
 
-typealias Routine = SchemaV1.Routine
-typealias CampusExercise = Routine.CampusSets.Exercise
-
 extension SchemaV1 {
     @Model
     final class Routine {
@@ -18,7 +15,7 @@ extension SchemaV1 {
         var name: String = ""
         /// The list of sets to execute for the routine
         var sets: [ExerciseSet] = []
-        @Relationship(deleteRule: .nullify, inverse: \Session.routine)
+        @Relationship(deleteRule: .nullify, inverse: \SchemaV1.Session.routine)
         var sessions: [Session]! = []
         
         init(name: String = "", sets: [ExerciseSet] = [], sessions: [Session] = []) {
@@ -224,18 +221,18 @@ extension SchemaV1 {
             }
             
             struct PlannedSet: Codable, Hashable, Equatable {
-                var board: CampusBoard
+                var board: SchemaV1.CampusSet.Board
                 var moves: Moves
                 var doMirror: Bool
                 
-                init(board: CampusBoard = .largeEdges, moves: Moves, doMirror: Bool = true) {
+                init(board: SchemaV1.CampusSet.Board = .init(name: "Large Edges"), moves: Moves, doMirror: Bool = true) {
                     self.board = board
                     self.moves = moves
                     self.doMirror = doMirror
                 }
                 
                 enum Moves: Codable, Hashable, Equatable {
-                    case defined(_ moves: [CampusMove])
+                    case defined(_ moves: [SchemaV1.CampusSet.Move])
                     case baseline(_ offsets: [Int])
                     case progressive
                 }

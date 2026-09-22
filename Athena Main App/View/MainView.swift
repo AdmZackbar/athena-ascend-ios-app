@@ -36,6 +36,11 @@ struct MainView: View {
                 .toolbar {
                     ToolbarItemGroup(placement: .primaryAction) {
                         Button {
+                            navigationStore.push(ViewType.exerciseLibrary)
+                        } label: {
+                            Label("Exercise Library", systemImage: "list.bullet")
+                        }
+                        Button {
                             navigationStore.push(ViewType.repeaters)
                         } label: {
                             Label("View Repeaters", systemImage: "magnifyingglass")
@@ -63,12 +68,24 @@ struct MainView: View {
     
     @ViewBuilder
     private func routinesView() -> some View {
-        ForEach(routines.sorted(by: { $0.name < $1.name })) { routine in
+        ForEach(routines.sorted(by: { lhs, rhs in
+            switch (lhs.lastUsedAt, rhs.lastUsedAt) {
+            case (let l?, let r?):
+                return l > r
+            case (nil, nil):
+                return lhs.name < rhs.name
+            case (.some, nil):
+                return true
+            case (nil, .some):
+                return false
+            }
+        })) { routine in
             Menu {
                 Button {
                     let recentBodyWeight = sessions.sorted(by: { $0.startTime > $1.startTime }).first?.bodyWeight
-                    let session = Session(sets: routine.sets.map(Session.ExerciseSet.init), bodyWeight: recentBodyWeight ?? 160)
+                    let session = Session(sets: routine.sets.map(Session.ExerciseSet.init), bodyWeight: recentBodyWeight ?? 160, routineName: routine.name)
                     routine.sessions.append(session)
+                    routine.lastUsedAt = .now
                     navigationStore.push(ViewType.session(session: session))
                 } label: {
                     Label("Start Session", systemImage: "plus")
@@ -86,6 +103,11 @@ struct MainView: View {
                 Divider()
                 Button(role: .destructive) {
                     withAnimation {
+                        // Belt-and-suspenders: make sure every session's name snapshot is
+                        // current before the `.nullify` delete rule severs `session.routine`.
+                        for session in routine.sessions {
+                            session.routineName = routine.name
+                        }
                         modelContext.delete(routine)
                     }
                 } label: {
@@ -128,6 +150,9 @@ struct MainView: View {
                     if let routine = session.routine {
                         Text(routine.name)
                             .italic()
+                    } else if let routineName = session.routineName {
+                        Text(routineName)
+                            .italic()
                     }
                     Spacer()
                     if let endTime = session.endTime {
@@ -163,6 +188,8 @@ struct MainView: View {
             RoutineSessionView(session: session)
         case .repeaters:
             RepeaterOverview()
+        case .exerciseLibrary:
+            ExerciseLibraryView()
         }
     }
 }
@@ -173,6 +200,7 @@ enum ViewType: Hashable {
     case routineView(routine: Routine)
     case session(session: Session)
     case repeaters
+    case exerciseLibrary
 }
 
 #Preview(traits: .sampleData) {

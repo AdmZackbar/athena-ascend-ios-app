@@ -13,8 +13,22 @@ struct RoutineEditView: View {
     @Environment(\.dismiss) var dismiss
     
     @State private var item: Item
-    @State private var editExercise: (Int, Int)? = nil
+    @State private var sheetState: SheetState? = nil
     @State private var deleteExercise: (Int, Int)? = nil
+
+    enum SheetState: Identifiable, Hashable {
+        case picker(setIndex: Int)
+        case edit(setIndex: Int, exerciseIndex: Int)
+
+        var id: String {
+            switch self {
+            case .picker(let setIndex):
+                return "picker-\(setIndex)"
+            case .edit(let setIndex, let exerciseIndex):
+                return "edit-\(setIndex)-\(exerciseIndex)"
+            }
+        }
+    }
     
     init(routine: Routine? = nil) {
         self.item = .init(routine: routine)
@@ -29,7 +43,7 @@ struct RoutineEditView: View {
                     ForEach($set.exercises.enumerated(), id: \.offset) { offset, $exercise in
                         let exerciseIndex = offset
                         Button {
-                            editExercise = (setIndex, exerciseIndex)
+                            sheetState = .edit(setIndex: setIndex, exerciseIndex: exerciseIndex)
                         } label: {
                             exerciseView(exercise)
                                 .contentShape(Rectangle())
@@ -43,29 +57,36 @@ struct RoutineEditView: View {
                             }
                     }
                     Menu("Add Exercise") {
-                        Button("Basic") {
-                            let exercise = Item.Exercise(.generic(.init()))
-                            let exerciseIndex = set.exercises.count
-                            set.exercises.append(exercise)
-                            editExercise = (setIndex, exerciseIndex)
+                        Button("From Library...") {
+                            sheetState = .picker(setIndex: setIndex)
                         }
-                        Button("Repeater") {
-                            let exercise = Item.Exercise(.repeater(.init()))
-                            let exerciseIndex = set.exercises.count
-                            set.exercises.append(exercise)
-                            editExercise = (setIndex, exerciseIndex)
-                        }
-                        Button("Max Hang") {
-                            let exercise = Item.Exercise(.maxHang(.init()))
-                            let exerciseIndex = set.exercises.count
-                            set.exercises.append(exercise)
-                            editExercise = (setIndex, exerciseIndex)
-                        }
-                        Button("Campus") {
-                            let exercise = Item.Exercise(.campus(.init()))
-                            let exerciseIndex = set.exercises.count
-                            set.exercises.append(exercise)
-                            editExercise = (setIndex, exerciseIndex)
+                        Menu {
+                            Button("Basic") {
+                                let exercise = Item.Exercise(.generic(.init()))
+                                let exerciseIndex = set.exercises.count
+                                set.exercises.append(exercise)
+                                sheetState = .edit(setIndex: setIndex, exerciseIndex: exerciseIndex)
+                            }
+                            Button("Repeater") {
+                                let exercise = Item.Exercise(.repeater(.init()))
+                                let exerciseIndex = set.exercises.count
+                                set.exercises.append(exercise)
+                                sheetState = .edit(setIndex: setIndex, exerciseIndex: exerciseIndex)
+                            }
+                            Button("Max Hang") {
+                                let exercise = Item.Exercise(.maxHang(.init()))
+                                let exerciseIndex = set.exercises.count
+                                set.exercises.append(exercise)
+                                sheetState = .edit(setIndex: setIndex, exerciseIndex: exerciseIndex)
+                            }
+                            Button("Campus") {
+                                let exercise = Item.Exercise(.campus(.init()))
+                                let exerciseIndex = set.exercises.count
+                                set.exercises.append(exercise)
+                                sheetState = .edit(setIndex: setIndex, exerciseIndex: exerciseIndex)
+                            }
+                        } label: {
+                            Label("New", systemImage: "plus")
                         }
                     }
                 } header: {
@@ -87,15 +108,10 @@ struct RoutineEditView: View {
             } label: {
                 Label("Add Set", systemImage: "plus")
             }
-        }.sheet(isPresented: .init(get: {
-            editExercise != nil
-        }, set: { newValue in
-            if !newValue {
-                editExercise = nil
-            }
-        })) {
-            if let editExercise {
-                let exercise = $item.sets[editExercise.0].exercises[editExercise.1]
+        }.sheet(item: $sheetState) { state in
+            switch state {
+            case .edit(let setIndex, let exerciseIndex):
+                let exercise = $item.sets[setIndex].exercises[exerciseIndex]
                 switch exercise.wrappedValue.type {
                 case .generic:
                     EditGenericSetsSheet(item: exercise.generic)
@@ -105,6 +121,14 @@ struct RoutineEditView: View {
                     EditMaxHangSetsSheet(item: exercise.maxHang)
                 case .campus:
                     EditCampusSetsSheet(item: exercise.campus)
+                }
+            case .picker(let setIndex):
+                ExercisePickerView<Exercise> { exercise in
+                    guard let routineExercise = ExerciseLibrary.makeRoutineExercise(from: exercise) else { return }
+                    exercise.lastUsedAt = .now
+                    let exerciseIndex = item.sets[setIndex].exercises.count
+                    item.sets[setIndex].exercises.append(.init(routineExercise))
+                    sheetState = .edit(setIndex: setIndex, exerciseIndex: exerciseIndex)
                 }
             }
         }.navigationTitle(item.routine != nil ? "Edit Routine" : "Create Routine")
@@ -498,11 +522,29 @@ struct RoutineEditView: View {
         }
         
         mutating func save(_ modelContext: ModelContext) {
+            var routineSets = sets.map(toRoutineSet)
+            // Exercises added via the "New" submenu aren't in the library yet — link
+            // them now rather than on creation, so an exercise added and immediately
+            // deleted never litters the library.
+            for setIndex in routineSets.indices {
+                for exIndex in routineSets[setIndex].exercises.indices {
+                    guard routineSets[setIndex].exercises[exIndex].exerciseID == nil,
+                          let exercise = ExerciseLibrary.findOrCreate(for: routineSets[setIndex].exercises[exIndex], in: modelContext)
+                    else { continue }
+                    routineSets[setIndex].exercises[exIndex].exerciseID = exercise.uuid
+                }
+            }
             if let routine {
                 routine.name = name
-                routine.sets = sets.map(toRoutineSet)
+                routine.sets = routineSets
+                // Keep every session's name snapshot in sync while the routine still
+                // exists. Unlike an Exercise's prescription, a routine's name has
+                // nothing to "diverge" from, so there's no reason to freeze it early.
+                for session in routine.sessions {
+                    session.routineName = name
+                }
             } else {
-                let newRoutine = Routine(name: name, sets: sets.map(toRoutineSet))
+                let newRoutine = Routine(name: name, sets: routineSets)
                 self.routine = newRoutine
                 modelContext.insert(newRoutine)
             }

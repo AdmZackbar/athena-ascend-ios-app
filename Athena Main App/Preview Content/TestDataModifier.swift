@@ -20,6 +20,7 @@ struct TestDataModifier: PreviewModifier {
     }
     
     static func populateContainer(_ container: ModelContainer) {
+        let sessionStartTime = Date.now.addingTimeInterval(-3600)
         let routine: Routine = .init(name: "Spring 2026 Monday", sets: [
             .init(name: "Warmup Set", exercises: [
                 .generic(.init(name: "Pancake Fold", dataType: .time, sets: [
@@ -79,8 +80,8 @@ struct TestDataModifier: PreviewModifier {
                     ]))
                 ]))
             ], restTime: 100, order: .dfs)
-        ])
-        let session = Session(startTime: .now.addingTimeInterval(-3600), endTime: .now, sets: routine.sets.map({ .init(base: $0) }), bodyWeight: 155, standoutSong: .init(name: "Permanent", artist: "A Day to Remember"))
+        ], createdAt: sessionStartTime, lastUsedAt: sessionStartTime)
+        let session = Session(startTime: sessionStartTime, endTime: .now, sets: routine.sets.map({ .init(base: $0) }), bodyWeight: 155, standoutSong: .init(name: "Permanent", artist: "A Day to Remember"), routineName: routine.name)
         session.sets.indices.forEach({ setIndex in
             session.sets[setIndex].exercises.indices.forEach { exIndex in
                 let newExercise: Session.Exercise = {
@@ -117,7 +118,26 @@ struct TestDataModifier: PreviewModifier {
             }
         })
         routine.sessions.append(session)
-        container.mainContext.insert(routine)
+
+        // Run the same findOrCreate sweep the app uses at routine-save/session-finish
+        // time, so previews exercise the linked path rather than hand-assigning UUIDs.
+        let context = container.mainContext
+        for setIndex in routine.sets.indices {
+            for exIndex in routine.sets[setIndex].exercises.indices {
+                guard let exercise = ExerciseLibrary.findOrCreate(for: routine.sets[setIndex].exercises[exIndex], in: context) else { continue }
+                routine.sets[setIndex].exercises[exIndex].exerciseID = exercise.uuid
+                exercise.lastUsedAt = sessionStartTime
+            }
+        }
+        for setIndex in session.sets.indices {
+            for exIndex in session.sets[setIndex].exercises.indices {
+                guard let exercise = ExerciseLibrary.findOrCreate(for: session.sets[setIndex].exercises[exIndex], in: context) else { continue }
+                session.sets[setIndex].exercises[exIndex].exerciseID = exercise.uuid
+                exercise.lastUsedAt = sessionStartTime
+            }
+        }
+
+        context.insert(routine)
     }
     
     func body(content: Content, context: ModelContainer) -> some View {

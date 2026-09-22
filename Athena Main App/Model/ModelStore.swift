@@ -54,7 +54,7 @@ enum ModelStore {
 
         let schema = Schema(CurrentSchema.models)
         let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
-        return try ModelContainer(for: schema, configurations: [configuration])
+        return try ModelContainer(for: schema, migrationPlan: AthenaMigrationPlan.self, configurations: [configuration])
     }
 
     /// Copies a pre-app-group store into the group container, once.

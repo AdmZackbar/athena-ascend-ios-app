@@ -5,11 +5,6 @@
 //  Created by Zach Wassynger on 8/25/26.
 //
 
-typealias CampusSet = SchemaV1.CampusSet
-typealias CampusBoard = CampusSet.Board
-typealias CampusMove = CampusSet.Move
-typealias CampusRung = CampusSet.Rung
-
 extension SchemaV1 {
     /// A set of moves on a campus board
     struct CampusSet: Codable, Hashable, Equatable {
@@ -21,7 +16,7 @@ extension SchemaV1 {
         /// Any additional details about this set
         var notes: String
         
-        init(board: Board = .largeEdges, moves: [Move] = [], tempo: Tempo? = nil, notes: String = "") {
+        init(board: Board = .init(name: "Large Edges"), moves: [Move] = [], tempo: Tempo? = nil, notes: String = "") {
             self.board = board
             self.moves = moves
             self.tempo = tempo
@@ -33,13 +28,13 @@ extension SchemaV1 {
             /// e.g. large edges, sloper rungs, sloper balls, small edges
             var name: String
             /// The lowest rung of the board
-            var startRung: CampusRung
+            var startRung: Rung
             /// The highest rung of the board
-            var endRung: CampusRung
+            var endRung: Rung
             /// If the board has 'half' rungs
             var hasHalf: Bool
             
-            init(name: String, startRung: CampusRung = .full(1), endRung: CampusRung = .full(10), hasHalf: Bool = true) {
+            init(name: String, startRung: Rung = .full(1), endRung: Rung = .full(10), hasHalf: Bool = true) {
                 self.name = name
                 self.startRung = startRung
                 self.endRung = endRung

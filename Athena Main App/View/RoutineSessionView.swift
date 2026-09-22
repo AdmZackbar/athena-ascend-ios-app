@@ -71,7 +71,7 @@ struct RoutineSessionView: View {
         let showsSuggestedData = exerciseState == .rest || (exerciseState == .off && hasOffPhaseEntry && timerEndDate == nil)
         return ActiveSessionSnapshot(
             sessionStartTime: session.startTime,
-            routineName: session.routine?.name,
+            routineName: session.routine?.name ?? session.routineName,
             setName: set.name,
             setIndex: indices.setExerciseIndex,
             setCount: currentExercise.numSets,
@@ -283,6 +283,13 @@ struct RoutineSessionView: View {
                     editSongSheet()
                 case .campusMoves(let alt):
                     campusMovesSheet(alt: alt)
+                case .exercisePicker(let setIndex):
+                    ExercisePickerView<Exercise> { exercise in
+                        guard let newExercise = ExerciseLibrary.makeSessionExercise(from: exercise) else { return }
+                        exercise.lastUsedAt = .now
+                        session.sets[setIndex].exercises.append(newExercise)
+                        sheetType = .exercise(setIndex: setIndex, exerciseIndex: session.sets[setIndex].exercises.count - 1)
+                    }
                 }
             }
             .toolbar(content: buildToolbar)
@@ -358,7 +365,24 @@ struct RoutineSessionView: View {
                 }
         }.presentationDetents([.large])
     }
-    
+
+    /// Sweeps for exercises added via the "New" submenu during this session that
+    /// haven't been saved to the library yet, and links them. Run at finish time
+    /// rather than on creation, so an exercise added and then immediately deleted
+    /// mid-session never litters the library.
+    private func linkNewExercisesToLibrary() {
+        for setIndex in session.sets.indices {
+            for exIndex in session.sets[setIndex].exercises.indices {
+                let payload = session.sets[setIndex].exercises[exIndex]
+                guard payload.exerciseID == nil,
+                      let exercise = ExerciseLibrary.findOrCreate(for: payload, in: modelContext)
+                else { continue }
+                session.sets[setIndex].exercises[exIndex].exerciseID = exercise.uuid
+                exercise.lastUsedAt = .now
+            }
+        }
+    }
+
     @ToolbarContentBuilder
     func buildToolbar() -> some ToolbarContent {
         if indices == nil {
@@ -366,6 +390,7 @@ struct RoutineSessionView: View {
                 Menu {
                     if !session.finished {
                         Button {
+                            linkNewExercisesToLibrary()
                             session.endTime = .now
                         } label: {
                             Label("Finish Session", systemImage: "checkmark")
@@ -471,6 +496,7 @@ struct RoutineSessionView: View {
                     .textInputAutocapitalization(.sentences)
                 if hasData {
                     Button {
+                        linkNewExercisesToLibrary()
                         session.endTime = .now
                     } label: {
                         Label("Finish Session", systemImage: "checkmark")
@@ -479,12 +505,14 @@ struct RoutineSessionView: View {
             } header: {
                 if let routine = session.routine {
                     Text(routine.name)
+                } else if let routineName = session.routineName {
+                    Text(routineName)
                 }
             }
             setSummaryView()
         }
     }
-    
+
     @ViewBuilder
     func closedHomePage() -> some View {
         Form {
@@ -520,6 +548,8 @@ struct RoutineSessionView: View {
                     HStack {
                         if let routine = session.routine {
                             Text(routine.name)
+                        } else if let routineName = session.routineName {
+                            Text(routineName)
                         } else {
                             Text(session.startTime.formatted(date: .numeric, time: .shortened))
                         }
@@ -609,6 +639,9 @@ struct RoutineSessionView: View {
                         Text("\(set.restTime)s Rest")
                     }
                     Menu {
+                        Button("From Library...") {
+                            sheetType = .exercisePicker(setIndex: setIndex)
+                        }
                         Menu {
                             Button("Basic") {
                                 set.exercises.append(.generic(.init(expected: .init())))
@@ -627,7 +660,7 @@ struct RoutineSessionView: View {
                                 sheetType = .exercise(setIndex: setIndex, exerciseIndex: set.exercises.count - 1)
                             }
                         } label: {
-                            Label("Add Exercise...", systemImage: "plus")
+                            Label("New", systemImage: "plus")
                         }
                         Divider()
                         Button(role: .destructive) {
@@ -1581,7 +1614,7 @@ struct RoutineSessionView: View {
             case .rest, nil:
                 return nil
             }
-        case .campus(let d):
+        case .campus(_):
             switch exerciseState {
             case .ready:
                 return repeaterRep.hasNext ? .off : .rest
@@ -1965,6 +1998,8 @@ struct RoutineSessionView: View {
                 "song"
             case .campusMoves(let alt):
                 "campus-moves-\(alt)"
+            case .exercisePicker(let setIndex):
+                "exercise-picker-\(setIndex)"
             }
         }
 
@@ -1974,6 +2009,7 @@ struct RoutineSessionView: View {
         case notes
         case song
         case campusMoves(alt: Bool)
+        case exercisePicker(setIndex: Int)
     }
     
     enum ExerciseState: String, Codable, Hashable, Equatable {
