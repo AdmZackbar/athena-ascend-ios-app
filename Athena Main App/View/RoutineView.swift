@@ -11,12 +11,19 @@ import SwiftUI
 
 struct RoutineView: View {
     let routine: Routine
+    /// `routine.sessions` scoped to the current athlete — spans every athlete
+    /// otherwise, so every read in this view goes through this instead. Team-session
+    /// entries are never in `routine.sessions` (they hang off the parent `TeamSession`
+    /// instead), so no separate filter is needed for those.
+    let athleteSessions: [Session]
     let groupedData: [ExerciseGroupKey: [RepWeightChart.Data]]
     let groupLabels: [ExerciseGroupKey: String]
     @State private var selectedType: ExerciseGroupKey? = nil
 
-    init(routine: Routine) {
+    init(routine: Routine, athlete: Athlete) {
         self.routine = routine
+        let sessions = routine.sessions.filter { $0.athlete?.uuid == athlete.uuid }
+        self.athleteSessions = sessions
 
         // Prefer the routine's own current label for anything still prescribed —
         // it's kept fresh by rename propagation. Session-only occurrences (the
@@ -32,7 +39,7 @@ struct RoutineView: View {
         }
 
         var taggedData: [(ExerciseGroupKey, RepWeightChart.Data)] = []
-        for session in routine.sessions.sorted(by: { $0.startTime < $1.startTime }) {
+        for session in sessions.sorted(by: { $0.startTime < $1.startTime }) {
             for set in session.sets {
                 for payload in set.exercises {
                     guard let key = ExerciseGroupKey(payload) else { continue }
@@ -82,7 +89,7 @@ struct RoutineView: View {
                         let exerciseIndex = offset
                         VStack(alignment: .leading) {
                             headerView(exercise)
-                            let sessionExercises: [(Session, Session.Exercise)] = routine.sessions
+                            let sessionExercises: [(Session, Session.Exercise)] = athleteSessions
                                 .sorted(by: { $0.startTime > $1.startTime })
                                 .compactMap { session in
                                     if let exerciseID = exercise.exerciseID,
@@ -237,7 +244,8 @@ struct RoutineView: View {
 
 #Preview(traits: .sampleData) {
     @Previewable @Query var routines: [Routine]
+    @Previewable @Query var athletes: [Athlete]
     NavigationStack {
-        RoutineView(routine: routines.first!)
+        RoutineView(routine: routines.first!, athlete: athletes.first!)
     }
 }

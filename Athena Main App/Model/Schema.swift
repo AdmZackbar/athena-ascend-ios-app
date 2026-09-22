@@ -26,6 +26,7 @@ enum SchemaV2: VersionedSchema {
 
     static var models: [any PersistentModel.Type] {
         [Routine.self, Session.self, Exercise.self,
-         GenericExercise.self, RepeaterExercise.self, MaxHangExercise.self, CampusLibraryExercise.self]
+         GenericExercise.self, RepeaterExercise.self, MaxHangExercise.self, CampusLibraryExercise.self,
+         TeamSession.self, Athlete.self]
     }
 }

@@ -123,7 +123,7 @@ struct RoutineEditView: View {
                     EditCampusSetsSheet(item: exercise.campus)
                 }
             case .picker(let setIndex):
-                ExercisePickerView<Exercise> { exercise in
+                LibraryPickerView<Exercise> { exercise in
                     guard let routineExercise = ExerciseLibrary.makeRoutineExercise(from: exercise) else { return }
                     exercise.lastUsedAt = .now
                     let exerciseIndex = item.sets[setIndex].exercises.count

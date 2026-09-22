@@ -81,47 +81,16 @@ struct TestDataModifier: PreviewModifier {
                 ]))
             ], restTime: 100, order: .dfs)
         ], createdAt: sessionStartTime, lastUsedAt: sessionStartTime)
-        let session = Session(startTime: sessionStartTime, endTime: .now, sets: routine.sets.map({ .init(base: $0) }), bodyWeight: 155, standoutSong: .init(name: "Permanent", artist: "A Day to Remember"), routineName: routine.name)
-        session.sets.indices.forEach({ setIndex in
-            session.sets[setIndex].exercises.indices.forEach { exIndex in
-                let newExercise: Session.Exercise = {
-                    switch session.sets[setIndex].exercises[exIndex] {
-                    case .generic(let d):
-                        var actual: [Session.GenericDataSet] = []
-                        for exSet in d.expected.sets {
-                            actual.append(.init(numReps: Int.random(in: exSet.min...exSet.max), weight: Double(Int.random(in: 0...12) * 5)))
-                        }
-                        return .generic(.init(expected: d.expected, actual: actual))
-                    case .repeater(let d):
-                        var actual: [Session.RepeaterSet] = []
-                        for exSet in d.expected.sets {
-                            actual.append(.init(numReps: Int.random(in: (exSet.numReps - 2)...exSet.numReps), weight: Double(Int.random(in: -8...8) * 5)))
-                        }
-                        return .repeater(.init(expected: d.expected, actual: actual))
-                    case .maxHang(let d):
-                        var actual: [Session.MaxHangSet] = []
-                        for exSet in d.expected.sets {
-                            actual.append(.init(time: Int.random(in: exSet.target - 5...exSet.target), weight: Double(Int.random(in: 0...6) * 5)))
-                        }
-                        return .maxHang(.init(expected: d.expected, actual: actual))
-                    case .campus(let d):
-                        var actual: [Session.CampusSetPair] = []
-                        for exSet in d.expected.sets {
-                            let moves = exSet.moves.moves ?? [d.expected.type.start]
-                            let alt = exSet.doMirror && d.expected.type.canMirror ? CampusSet(board: exSet.board, moves: moves.flipped) : nil
-                            actual.append(.init(main: .init(board: exSet.board, moves: moves), alt: alt))
-                        }
-                        return .campus(.init(expected: d.expected, actual: actual))
-                    }
-                }()
-                session.sets[setIndex].exercises[exIndex] = newExercise
-            }
-        })
+
+        let zach = Athlete(name: Athlete.defaultName, createdAt: sessionStartTime, lastUsedAt: .now)
+        let session = Session(startTime: sessionStartTime, endTime: .now, sets: routine.sets.map({ .init(base: $0) }), bodyWeight: 155, standoutSong: .init(name: "Permanent", artist: "A Day to Remember"), routineName: routine.name, athlete: zach)
+        fillRandomActuals(session)
         routine.sessions.append(session)
 
         // Run the same findOrCreate sweep the app uses at routine-save/session-finish
         // time, so previews exercise the linked path rather than hand-assigning UUIDs.
         let context = container.mainContext
+        context.insert(zach)
         for setIndex in routine.sets.indices {
             for exIndex in routine.sets[setIndex].exercises.indices {
                 guard let exercise = ExerciseLibrary.findOrCreate(for: routine.sets[setIndex].exercises[exIndex], in: context) else { continue }
@@ -137,9 +106,71 @@ struct TestDataModifier: PreviewModifier {
             }
         }
 
+        // A finished team session over the same routine, for two athletes who aren't
+        // the store's owner — exercises the multi-person entry/review path.
+        let teamStartTime = Date.now.addingTimeInterval(-1800)
+        let alex = Athlete(name: "Alex Chen", createdAt: teamStartTime, lastUsedAt: .now)
+        let jordan = Athlete(name: "Jordan Lee", createdAt: teamStartTime, lastUsedAt: .now)
+        context.insert(alex)
+        context.insert(jordan)
+
+        let teamSession = TeamSession(routineName: routine.name, startTime: teamStartTime, endTime: .now, sets: routine.sets.map(Session.ExerciseSet.init))
+        routine.teamSessions.append(teamSession)
+        for athlete in [alex, jordan] {
+            let entry = teamSession.addAthlete(athlete, context: context)
+            entry.startTime = teamStartTime
+            entry.endTime = .now
+            fillRandomActuals(entry)
+        }
+        ExerciseLibrary.linkUnlinkedExercises(in: &teamSession.sets, context: context)
+        for entry in teamSession.entries {
+            ExerciseLibrary.linkUnlinkedExercises(in: entry, context: context)
+        }
+
         context.insert(routine)
     }
-    
+
+    /// Fills every exercise in a session with plausible randomized results, in place —
+    /// shared by the solo sample session and each team-session entry.
+    private static func fillRandomActuals(_ session: Session) {
+        session.sets.indices.forEach { setIndex in
+            session.sets[setIndex].exercises.indices.forEach { exIndex in
+                session.sets[setIndex].exercises[exIndex] = randomizedActual(for: session.sets[setIndex].exercises[exIndex])
+            }
+        }
+    }
+
+    private static func randomizedActual(for exercise: Session.Exercise) -> Session.Exercise {
+        switch exercise {
+        case .generic(let d):
+            var actual: [Session.GenericDataSet] = []
+            for exSet in d.expected.sets {
+                actual.append(.init(numReps: Int.random(in: exSet.min...exSet.max), weight: Double(Int.random(in: 0...12) * 5)))
+            }
+            return .generic(.init(expected: d.expected, actual: actual))
+        case .repeater(let d):
+            var actual: [Session.RepeaterSet] = []
+            for exSet in d.expected.sets {
+                actual.append(.init(numReps: Int.random(in: (exSet.numReps - 2)...exSet.numReps), weight: Double(Int.random(in: -8...8) * 5)))
+            }
+            return .repeater(.init(expected: d.expected, actual: actual))
+        case .maxHang(let d):
+            var actual: [Session.MaxHangSet] = []
+            for exSet in d.expected.sets {
+                actual.append(.init(time: Int.random(in: exSet.target - 5...exSet.target), weight: Double(Int.random(in: 0...6) * 5)))
+            }
+            return .maxHang(.init(expected: d.expected, actual: actual))
+        case .campus(let d):
+            var actual: [Session.CampusSetPair] = []
+            for exSet in d.expected.sets {
+                let moves = exSet.moves.moves ?? [d.expected.type.start]
+                let alt = exSet.doMirror && d.expected.type.canMirror ? CampusSet(board: exSet.board, moves: moves.flipped) : nil
+                actual.append(.init(main: .init(board: exSet.board, moves: moves), alt: alt))
+            }
+            return .campus(.init(expected: d.expected, actual: actual))
+        }
+    }
+
     func body(content: Content, context: ModelContainer) -> some View {
         content.modelContainer(context)
     }

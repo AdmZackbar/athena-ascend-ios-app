@@ -191,8 +191,10 @@ struct RoutineSessionView: View {
 
     init(session: Session) {
         self.session = session
+        // Scoped to the same athlete — `routine.sessions` spans everyone who's ever
+        // run it, and another person's numbers are not a "previous session" target.
         self.prevSession = session.routine?.sessions
-            .filter({ $0 != session })
+            .filter({ $0 != session && $0.athlete?.uuid == session.athlete?.uuid })
             .sorted(by: { $0.startTime < $1.startTime })
             .last
     }
@@ -284,7 +286,7 @@ struct RoutineSessionView: View {
                 case .campusMoves(let alt):
                     campusMovesSheet(alt: alt)
                 case .exercisePicker(let setIndex):
-                    ExercisePickerView<Exercise> { exercise in
+                    LibraryPickerView<Exercise> { exercise in
                         guard let newExercise = ExerciseLibrary.makeSessionExercise(from: exercise) else { return }
                         exercise.lastUsedAt = .now
                         session.sets[setIndex].exercises.append(newExercise)
@@ -371,16 +373,7 @@ struct RoutineSessionView: View {
     /// rather than on creation, so an exercise added and then immediately deleted
     /// mid-session never litters the library.
     private func linkNewExercisesToLibrary() {
-        for setIndex in session.sets.indices {
-            for exIndex in session.sets[setIndex].exercises.indices {
-                let payload = session.sets[setIndex].exercises[exIndex]
-                guard payload.exerciseID == nil,
-                      let exercise = ExerciseLibrary.findOrCreate(for: payload, in: modelContext)
-                else { continue }
-                session.sets[setIndex].exercises[exIndex].exerciseID = exercise.uuid
-                exercise.lastUsedAt = .now
-            }
-        }
+        ExerciseLibrary.linkUnlinkedExercises(in: session, context: modelContext)
     }
 
     @ToolbarContentBuilder

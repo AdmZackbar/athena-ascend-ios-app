@@ -228,6 +228,38 @@ enum ExerciseLibrary {
         context.delete(source)
     }
 
+    /// Sweeps for exercises added mid-session (e.g. via the "New" submenu) that haven't
+    /// been saved to the library yet, and links them. Shared by `RoutineSessionView` and
+    /// `TeamSession` — run at finish time rather than on creation, so an exercise added
+    /// and then immediately deleted mid-session never litters the library.
+    static func linkUnlinkedExercises(in session: Session, context: ModelContext) {
+        for setIndex in session.sets.indices {
+            for exIndex in session.sets[setIndex].exercises.indices {
+                let payload = session.sets[setIndex].exercises[exIndex]
+                guard payload.exerciseID == nil,
+                      let exercise = findOrCreate(for: payload, in: context)
+                else { continue }
+                session.sets[setIndex].exercises[exIndex].exerciseID = exercise.uuid
+                exercise.lastUsedAt = .now
+            }
+        }
+    }
+
+    /// Same as above, for a bare `[Session.ExerciseSet]` — used for `TeamSession.sets`,
+    /// which holds the shared prescription rather than a `Session`.
+    static func linkUnlinkedExercises(in sets: inout [Session.ExerciseSet], context: ModelContext) {
+        for setIndex in sets.indices {
+            for exIndex in sets[setIndex].exercises.indices {
+                let payload = sets[setIndex].exercises[exIndex]
+                guard payload.exerciseID == nil,
+                      let exercise = findOrCreate(for: payload, in: context)
+                else { continue }
+                sets[setIndex].exercises[exIndex].exerciseID = exercise.uuid
+                exercise.lastUsedAt = .now
+            }
+        }
+    }
+
     /// Un-links every routine/session payload pointing at `exercise`, leaving their
     /// name and config untouched — they just go back to unlinked. Call before deleting
     /// `exercise` so nothing is left holding a dangling UUID.

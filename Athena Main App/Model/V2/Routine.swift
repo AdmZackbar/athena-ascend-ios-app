@@ -20,16 +20,19 @@ extension SchemaV2 {
         var sets: [ExerciseSet] = []
         @Relationship(deleteRule: .nullify, inverse: \Session.routine)
         var sessions: [Session]! = []
+        @Relationship(deleteRule: .nullify, inverse: \TeamSession.routine)
+        var teamSessions: [TeamSession]! = []
         /// When this routine was first created. Backfilled for pre-V2 routines from their
         /// earliest session's start time, else the migration run time.
         var createdAt: Date = Date()
         /// When a session was last started from this routine, if ever.
         var lastUsedAt: Date? = nil
-        
-        init(name: String = "", sets: [ExerciseSet] = [], sessions: [Session] = [], createdAt: Date = .now, lastUsedAt: Date? = nil) {
+
+        init(name: String = "", sets: [ExerciseSet] = [], sessions: [Session] = [], teamSessions: [TeamSession] = [], createdAt: Date = .now, lastUsedAt: Date? = nil) {
             self.name = name
             self.sets = sets
             self.sessions = sessions
+            self.teamSessions = teamSessions
             self.createdAt = createdAt
             self.lastUsedAt = lastUsedAt
         }

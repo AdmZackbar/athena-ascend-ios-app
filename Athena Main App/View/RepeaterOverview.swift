@@ -9,7 +9,15 @@ import SwiftData
 import SwiftUI
 
 struct RepeaterOverview: View {
-    @Query(sort: \Session.startTime, order: .reverse) private var sessions: [Session]
+    let athlete: Athlete
+    @Query(sort: \Session.startTime, order: .reverse) private var allSessions: [Session]
+
+    /// This athlete's full history, solo sessions and team-session entries alike —
+    /// unlike the routine-scoped views, there's no reason to exclude team data here:
+    /// it's all this person's own numbers.
+    private var sessions: [Session] {
+        allSessions.filter { $0.athlete?.uuid == athlete.uuid }
+    }
 
     // Grouped by the exercise's stable library ID (falling back to the derived
     // identity for anything that predates the library), so a rename no longer
@@ -56,7 +64,8 @@ struct RepeaterOverview: View {
 }
 
 #Preview(traits: .sampleData) {
+    @Previewable @Query var athletes: [Athlete]
     NavigationStack {
-        RepeaterOverview()
+        RepeaterOverview(athlete: athletes.first!)
     }
 }

@@ -145,22 +145,22 @@ struct ExerciseLibraryView: View {
     private func mergeTargetPicker(for source: Exercise) -> some View {
         switch source {
         case is GenericExercise:
-            ExercisePickerView<GenericExercise>(exclude: { $0.uuid == source.uuid }) { target in
+            LibraryPickerView<GenericExercise>(exclude: { $0.uuid == source.uuid }) { target in
                 ExerciseLibrary.merge(source, into: target, routines: routines, sessions: sessions, context: modelContext)
                 mergeSource = nil
             }
         case is RepeaterExercise:
-            ExercisePickerView<RepeaterExercise>(exclude: { $0.uuid == source.uuid }) { target in
+            LibraryPickerView<RepeaterExercise>(exclude: { $0.uuid == source.uuid }) { target in
                 ExerciseLibrary.merge(source, into: target, routines: routines, sessions: sessions, context: modelContext)
                 mergeSource = nil
             }
         case is MaxHangExercise:
-            ExercisePickerView<MaxHangExercise>(exclude: { $0.uuid == source.uuid }) { target in
+            LibraryPickerView<MaxHangExercise>(exclude: { $0.uuid == source.uuid }) { target in
                 ExerciseLibrary.merge(source, into: target, routines: routines, sessions: sessions, context: modelContext)
                 mergeSource = nil
             }
         case is CampusLibraryExercise:
-            ExercisePickerView<CampusLibraryExercise>(exclude: { $0.uuid == source.uuid }) { target in
+            LibraryPickerView<CampusLibraryExercise>(exclude: { $0.uuid == source.uuid }) { target in
                 ExerciseLibrary.merge(source, into: target, routines: routines, sessions: sessions, context: modelContext)
                 mergeSource = nil
             }

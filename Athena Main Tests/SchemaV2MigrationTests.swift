@@ -114,6 +114,16 @@ struct SchemaV2MigrationTests {
         #expect(session.routineName == "Test Routine")
         #expect(routine.lastUsedAt != nil)
         #expect(routine.createdAt <= (routine.lastUsedAt ?? .distantFuture))
+
+        // Every pre-V2 session belongs to a single seeded owner athlete, and none of
+        // it looks like team data.
+        let athletes = try context.fetch(FetchDescriptor<Athlete>())
+        #expect(athletes.count == 1)
+        let owner = try #require(athletes.first)
+        #expect(owner.name == Athlete.defaultName)
+        #expect(session.athlete?.uuid == owner.uuid)
+        #expect(session.isTeamEntry == false)
+        #expect(try context.fetch(FetchDescriptor<TeamSession>()).isEmpty)
     }
 
     @Test @MainActor func migrationDoesNotRerunOrDuplicateOnReopen() throws {
@@ -122,17 +132,22 @@ struct SchemaV2MigrationTests {
 
         let schema = Schema(SchemaV2.models)
         let firstCount: Int
+        let firstAthleteCount: Int
         do {
             let config = ModelConfiguration(schema: schema, url: url)
             let container = try ModelContainer(for: schema, migrationPlan: AthenaMigrationPlan.self, configurations: [config])
             firstCount = try container.mainContext.fetch(FetchDescriptor<Exercise>()).count
+            firstAthleteCount = try container.mainContext.fetch(FetchDescriptor<Athlete>()).count
         }
 
         let config = ModelConfiguration(schema: schema, url: url)
         let container = try ModelContainer(for: schema, migrationPlan: AthenaMigrationPlan.self, configurations: [config])
         let secondCount = try container.mainContext.fetch(FetchDescriptor<Exercise>()).count
+        let secondAthleteCount = try container.mainContext.fetch(FetchDescriptor<Athlete>()).count
 
         #expect(firstCount == secondCount)
+        #expect(firstAthleteCount == 1)
+        #expect(secondAthleteCount == 1)
     }
 
     /// The bug this migration exists partly to fix: `RoutineView.swift:60` used to

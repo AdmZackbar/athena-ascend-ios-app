@@ -69,7 +69,19 @@ extension Session {
     var finished: Bool {
         endTime != nil
     }
-    
+
+    /// True when this session is one athlete's slice of a `TeamSession` rather than a
+    /// standalone session.
+    var isTeamEntry: Bool {
+        teamSession != nil
+    }
+
+    /// Non-nil in practice — the athlete cascade-deletes its sessions, so the fallback
+    /// only covers the brief window between `init` and assignment.
+    var athleteDisplayName: String {
+        athlete?.name ?? "Unknown"
+    }
+
     func getExercises(exercise: Routine.Exercise) -> [Session.Exercise] {
         switch exercise {
         case .generic(let expectedData):
@@ -325,6 +337,30 @@ extension Session.Exercise {
         }
     }
     
+    /// Overwrites the prescription (`expected`) with `template`'s, preserving this
+    /// entry's own recorded data (`actual`/`notes`). Used by `TeamSession` when the
+    /// shared exercise plan changes after athlete entries already exist. Falls back to
+    /// replacing the whole payload if the two are different exercise kinds (shouldn't
+    /// happen in practice — the caller always passes the same slot's template).
+    mutating func updatingPrescription(from template: Session.Exercise) {
+        switch (self, template) {
+        case (.generic(var d), .generic(let t)):
+            d.expected = t.expected
+            self = .generic(d)
+        case (.repeater(var d), .repeater(let t)):
+            d.expected = t.expected
+            self = .repeater(d)
+        case (.maxHang(var d), .maxHang(let t)):
+            d.expected = t.expected
+            self = .maxHang(d)
+        case (.campus(var d), .campus(let t)):
+            d.expected = t.expected
+            self = .campus(d)
+        default:
+            self = template
+        }
+    }
+
     func isBasedOn(_ basis: Routine.Exercise) -> Bool {
         switch basis {
         case .generic(let data):

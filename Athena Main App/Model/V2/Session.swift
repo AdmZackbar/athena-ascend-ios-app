@@ -24,8 +24,15 @@ extension SchemaV2 {
         var notes: String = ""
         var bodyWeight: Double = 160
         var standoutSong: Song? = nil
-        
-        init(startTime: Date = .now, endTime: Date? = nil, sets: [ExerciseSet] = [], notes: String = "", bodyWeight: Double = 160, standoutSong: Song? = nil, routineName: String? = nil) {
+        /// Non-nil only while this session is one athlete's slice of a `TeamSession`.
+        var teamSession: TeamSession? = nil
+        /// The athlete this session belongs to. Optional only for the brief window between
+        /// `init` and assignment, and during the V1→V2 backfill before it runs — every
+        /// live session has one, and `Athlete.sessions` cascades on delete so a session
+        /// never outlives its athlete. See `athleteDisplayName` in ModelUtilities.swift.
+        var athlete: Athlete? = nil
+
+        init(startTime: Date = .now, endTime: Date? = nil, sets: [ExerciseSet] = [], notes: String = "", bodyWeight: Double = 160, standoutSong: Song? = nil, routineName: String? = nil, athlete: Athlete? = nil) {
             self.startTime = startTime
             self.endTime = endTime
             self.sets = sets
@@ -33,6 +40,7 @@ extension SchemaV2 {
             self.bodyWeight = bodyWeight
             self.standoutSong = standoutSong
             self.routineName = routineName
+            self.athlete = athlete
         }
         
         struct ExerciseSet: Codable, Hashable, Equatable {

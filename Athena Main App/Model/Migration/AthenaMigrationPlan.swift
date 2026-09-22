@@ -17,9 +17,11 @@ enum AthenaMigrationPlan: SchemaMigrationPlan {
         [v1ToV2]
     }
 
-    /// Additive at the store level (new entities, new scalar columns; the Codable blob
+    /// Additive at the store level (new entities — `Exercise` and its subclasses,
+    /// `TeamSession`, `Athlete` — and new scalar/relationship columns; the Codable blob
     /// column is untouched), so this is lightweight-compatible — the custom stage exists
-    /// only to backfill the exercise library and the routine/session bookkeeping fields.
+    /// only to backfill the exercise library, the owning `Athlete`, and the
+    /// routine/session bookkeeping fields.
     static let v1ToV2 = MigrationStage.custom(
         fromVersion: SchemaV1.self,
         toVersion: SchemaV2.self,
@@ -64,6 +66,18 @@ enum AthenaMigrationPlan: SchemaMigrationPlan {
             return newExercise
         }
 
+        // Every pre-V2 session belongs to the store's sole owner. Skip creation when
+        // there are no sessions — a first-launch seed (CurrentAthlete.resolve) covers
+        // that store with the identical name, so there's nothing to backfill here.
+        let owner: Athlete? = sessions.isEmpty ? nil : Athlete(
+            name: Athlete.defaultName,
+            createdAt: sessions.map(\.startTime).min() ?? .now,
+            lastUsedAt: sessions.map(\.startTime).max()
+        )
+        if let owner {
+            context.insert(owner)
+        }
+
         for routine in routines {
             for setIndex in routine.sets.indices {
                 for exIndex in routine.sets[setIndex].exercises.indices {
@@ -86,6 +100,7 @@ enum AthenaMigrationPlan: SchemaMigrationPlan {
                 }
             }
             session.routineName = session.routine?.name
+            session.athlete = owner
         }
 
         try context.save()
