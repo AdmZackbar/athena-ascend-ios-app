@@ -25,6 +25,7 @@ struct SessionExerciseSheet: View {
     @State private var campusMoves: [CampusMove] = []
     @State private var campusMovesAlt: [CampusMove] = []
     @State private var campusMoveType: CampusMoveType = .defined
+    @State private var weightStepSize: Double = 5
     
     init(exercise: Binding<Session.Exercise>, showing: Binding<Bool>, showData: Bool = true) {
         self._exercise = exercise
@@ -235,13 +236,13 @@ struct SessionExerciseSheet: View {
                             VStack(alignment: .leading, spacing: 16) {
                                 Stepper("\(set.numLeft) \(generic.setDetailText)", value: $set.numLeft, in: 0...1000, step: 1)
                                 if generic.dataType.hasWeight {
-                                    Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
+                                    weightStepper($set.weightLeft)
                                 }
                             }
                             VStack(alignment: .trailing, spacing: 16) {
                                 Stepper("\(set.numRight) \(generic.setDetailText)", value: $set.numRight, in: 0...1000, step: 1)
                                 if generic.dataType.hasWeight {
-                                    Stepper(set.weightRight.lbsFormat, value: $set.weightRight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
+                                    weightStepper($set.weightRight)
                                 }
                             }
                         }
@@ -249,7 +250,7 @@ struct SessionExerciseSheet: View {
                         HStack {
                             Stepper("\(set.numLeft) \(generic.setDetailText)", value: $set.numLeft, in: 0...1000, step: 1)
                             if generic.dataType.hasWeight {
-                                Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
+                                weightStepper($set.weightLeft)
                             }
                         }
                     }
@@ -278,6 +279,17 @@ struct SessionExerciseSheet: View {
         Section("Notes") {
             TextField("optional", text: $notes, axis: .vertical)
                 .lineLimit(3...6)
+        }
+    }
+    
+    func weightStepper(_ value: Binding<Double>) -> some View {
+        Stepper(value.wrappedValue.lbsFormat, value: value, in: -200...200, step: weightStepSize, format: .number.precision(.fractionLength(0...2)))
+            .contextMenu {
+            ForEach([5.0, 2.5, 1.0], id: \.self) { v in
+                Button(v.lbsFormat) {
+                    weightStepSize = v
+                }
+            }
         }
     }
     
@@ -348,7 +360,7 @@ struct SessionExerciseSheet: View {
                 VStack {
                     HStack {
                         Stepper("\(set.numLeft) reps", value: $set.numLeft, in: 0...30, step: 1)
-                        Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0...2)))
+                        weightStepper($set.weightLeft)
                     }
                     TextField("Notes", text: $set.notes, axis: .vertical)
                         .lineLimit(1...3)
@@ -394,7 +406,7 @@ struct SessionExerciseSheet: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 16) {
                             Stepper("\(set.target)s", value: $set.target, in: 0...1000, step: 1)
-                            Stepper(set.weight.lbsFormat, value: $set.weight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                            weightStepper($set.weight)
                         }
                         VStack(alignment: .trailing, spacing: 16) {
                             Stepper("\(set.targetAlt ?? set.target)s", value: .init(get: {
@@ -412,7 +424,7 @@ struct SessionExerciseSheet: View {
                 } else {
                     HStack {
                         Stepper("\(set.target)s", value: $set.target, in: 0...1000, step: 1)
-                        Stepper(set.weight.lbsFormat, value: $set.weight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                        weightStepper($set.weight)
                     }
                 }
             }
@@ -452,17 +464,17 @@ struct SessionExerciseSheet: View {
                         HStack {
                             VStack {
                                 Stepper("\(set.numLeft)s", value: $set.numLeft, in: 0...30, step: 1)
-                                Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                                weightStepper($set.weightLeft)
                             }
                             VStack {
                                 Stepper("\(set.numRight)s", value: $set.numRight, in: 0...30, step: 1)
-                                Stepper(set.weightRight.lbsFormat, value: $set.weightRight, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                                weightStepper($set.weightRight)
                             }
                         }
                     } else {
                         HStack {
                             Stepper("\(set.numLeft)s", value: $set.numLeft, in: 0...30, step: 1)
-                            Stepper(set.weightLeft.lbsFormat, value: $set.weightLeft, in: -200...200, step: 5, format: .number.precision(.fractionLength(0)))
+                            weightStepper($set.weightLeft)
                         }
                     }
                     TextField("Notes", text: $set.notes, axis: .vertical)
