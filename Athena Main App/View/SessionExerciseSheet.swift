@@ -18,7 +18,7 @@ struct SessionExerciseSheet: View {
     @State private var repeater: Routine.RepeaterSets
     @State private var maxHang: Routine.MaxHangSets
     @State private var campus: Routine.CampusSets
-    @State private var data: [RoutineSessionView.GenericDataSet]
+    @State private var data: [ExerciseEntryDraft]
     @State private var notes: String
     @State private var multiSide: Bool
     @State private var editIndex: Int? = nil

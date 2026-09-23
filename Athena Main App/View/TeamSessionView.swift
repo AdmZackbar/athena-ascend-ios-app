@@ -248,36 +248,11 @@ struct TeamSessionView: View {
                     }
                     Spacer()
                     if !finished {
-                        Menu {
-                            Button("From Library...") {
-                                sheetType = .exercisePicker(setIndex: setIndex)
-                            }
-                            Menu {
-                                Button("Basic") {
-                                    addNewExercise(.generic(.init(expected: .init())), toSet: setIndex)
-                                }
-                                Button("Repeater") {
-                                    addNewExercise(.repeater(.init(expected: .init())), toSet: setIndex)
-                                }
-                                Button("Max Hang") {
-                                    addNewExercise(.maxHang(.init(expected: .init())), toSet: setIndex)
-                                }
-                                Button("Campus") {
-                                    addNewExercise(.campus(.init(expected: .init())), toSet: setIndex)
-                                }
-                            } label: {
-                                Label("New", systemImage: "plus")
-                            }
-                            Divider()
-                            Button(role: .destructive) {
-                                teamSession.removeSet(at: setIndex)
-                            } label: {
-                                Label("Delete Set", systemImage: "trash")
-                            }
-                        } label: {
-                            Label("Options", systemImage: "ellipsis.circle")
-                                .labelStyle(.iconOnly)
-                        }
+                        ExerciseSetHeaderMenu(
+                            onPickFromLibrary: { sheetType = .exercisePicker(setIndex: setIndex) },
+                            onAddNew: { addNewExercise($0, toSet: setIndex) },
+                            onDeleteSet: { teamSession.removeSet(at: setIndex) }
+                        )
                     }
                 }
             }
@@ -300,14 +275,7 @@ struct TeamSessionView: View {
     private func sheetContent(_ type: SheetType) -> some View {
         switch type {
         case .date:
-            Form {
-                DatePicker("Start:", selection: $teamSession.startTime, displayedComponents: [.date, .hourAndMinute])
-                DatePicker("End:", selection: .init(get: {
-                    teamSession.endTime ?? .now
-                }, set: { newValue in
-                    teamSession.endTime = newValue
-                }), displayedComponents: [.date, .hourAndMinute])
-            }.presentationDetents([.medium])
+            SessionDateSheet(start: $teamSession.startTime, end: $teamSession.endTime)
         case .athletePicker:
             LibraryPickerView<Athlete>(title: "Choose Athlete", emptyText: "No athletes yet", exclude: { athlete in
                 teamSession.entries.contains { $0.athlete?.uuid == athlete.uuid }

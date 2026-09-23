@@ -35,6 +35,11 @@ struct RoutineSessionView: View {
         return nil
     }
 
+    /// Pure traversal/phase/timer-duration logic over a snapshot of the session's sets.
+    private var runner: SessionRunner {
+        SessionRunner(sets: session.sets)
+    }
+
     /// Snapshot of the live session state, sent to the watch whenever it changes.
     /// Returns nil when there's nothing to mirror (no active exercise, or the session is done).
     var activeSessionSnapshot: ActiveSessionSnapshot? {
@@ -93,9 +98,9 @@ struct RoutineSessionView: View {
         )
     }
 
-    /// Maps this view's private ExerciseState to the shared, Codable DTO's Phase, keeping
+    /// Maps this view's ExercisePhase to the shared, Codable DTO's Phase, keeping
     /// the Shared/ types free of any dependency on this view's private types.
-    private func snapshotPhase(for state: ExerciseState) -> ActiveSessionSnapshot.Phase {
+    private func snapshotPhase(for state: ExercisePhase) -> ActiveSessionSnapshot.Phase {
         switch state {
         case .ready: return .ready
         case .on: return .on
@@ -137,7 +142,7 @@ struct RoutineSessionView: View {
     /// If nil, we are not in progress and the home page is shown.
     @State private var indices: ExerciseIndices? = nil
     /// Contains additional state information about the current exercise
-    @State private var exerciseState: ExerciseState? = nil
+    @State private var exerciseState: ExercisePhase? = nil
     @State private var repeaterRep: RepeaterRep = .zero
     /// Set to the start time of the timer (in seconds)
     @State private var timerDuration: Duration = .zero
@@ -153,7 +158,7 @@ struct RoutineSessionView: View {
     /// If true, a data entry component for left and right should be used
     @State private var allowMultiSide: Bool = false
     /// Contains data in an indeterminate state that is loaded to and saved from for the current exercise
-    @State private var genericData: GenericDataSet = .init()
+    @State private var genericData: ExerciseEntryDraft = .init()
     /// The current sheet that should be shown - if nil, nothing is shown
     @State private var sheetType: SheetType? = nil
     /// Used for editing song details
@@ -207,12 +212,12 @@ struct RoutineSessionView: View {
                 .navigationBarBackButtonHidden()
                 .background(background)
                 .onChange(of: exerciseState, { oldValue, newValue in
-                    if oldValue == ExerciseState.on && newValue == ExerciseState.rest {
+                    if oldValue == ExercisePhase.on && newValue == ExercisePhase.rest {
                         audioManager.playSystemSound(1428)
                     }
                 })
                 .sensoryFeedback(.success, trigger: exerciseState, condition: { oldValue, newValue in
-                    oldValue == ExerciseState.on && newValue == ExerciseState.rest
+                    oldValue == ExercisePhase.on && newValue == ExercisePhase.rest
                 })
         )
             .alert("Are you sure you want to delete this session?", isPresented: $showAlert, actions: {
@@ -241,14 +246,7 @@ struct RoutineSessionView: View {
             .sheet(item: $sheetType) { t in
                 switch t {
                 case .date:
-                    Form {
-                        DatePicker("Start:", selection: $session.startTime, displayedComponents: [.date, .hourAndMinute])
-                        DatePicker("End:", selection: .init(get: {
-                            session.endTime ?? .now
-                        }, set: { newValue in
-                            session.endTime = newValue
-                        }), displayedComponents: [.date, .hourAndMinute])
-                    }.presentationDetents([.medium])
+                    SessionDateSheet(start: $session.startTime, end: $session.endTime)
                 case .weight:
                     Form {
                         Stepper(value: $session.bodyWeight, in: 0...1000, step: 1) {
@@ -458,11 +456,10 @@ struct RoutineSessionView: View {
     func mainView() -> some View {
         switch currentExercise {
         case nil:
-            if session.finished {
-                closedHomePage()
-            } else {
-                activeHomePage()
-            }
+            SessionHomeView(session: session, sheetType: $sheetType, song: $song, deleteExercise: $deleteExercise, onSelect: { setState(newIndices: $0) }, onFinish: {
+                linkNewExercisesToLibrary()
+                session.endTime = .now
+            })
         case .generic(let data):
             genericExerciseView(data)
         case .repeater(let data):
@@ -471,209 +468,6 @@ struct RoutineSessionView: View {
             maxHangExerciseView(data)
         case .campus(let data):
             campusExerciseView(data)
-        }
-    }
-    
-    func activeHomePage() -> some View {
-        Form {
-            Section {
-                DatePicker("Start:", selection: $session.startTime, displayedComponents: [.date, .hourAndMinute])
-                Stepper(value: $session.bodyWeight, in: 0...1000, step: 1) {
-                    HStack {
-                        Text("Body Weight: \(session.bodyWeight.lbsFormat)")
-                    }
-                }
-                TextField("Notes", text: $session.notes, axis: .vertical)
-                    .lineLimit((session.sets.isEmpty ? 9 : 3)...12)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.sentences)
-                if hasData {
-                    Button {
-                        linkNewExercisesToLibrary()
-                        session.endTime = .now
-                    } label: {
-                        Label("Finish Session", systemImage: "checkmark")
-                    }
-                }
-            } header: {
-                if let routine = session.routine {
-                    Text(routine.name)
-                } else if let routineName = session.routineName {
-                    Text(routineName)
-                }
-            }
-            setSummaryView()
-        }
-    }
-
-    @ViewBuilder
-    func closedHomePage() -> some View {
-        Form {
-            Section {
-                TextField("Notes", text: $session.notes, axis: .vertical)
-                    .lineLimit((session.sets.isEmpty ? 9 : 3)...12)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.sentences)
-                Button {
-                    song = session.standoutSong ?? .init()
-                    sheetType = .song
-                } label: {
-                    if let standoutSong = session.standoutSong {
-                        VStack(alignment: .leading) {
-                            Text("Standout Song")
-                                .bold()
-                            Text(standoutSong.artist)
-                                .font(.subheadline)
-                                .italic()
-                            Text(standoutSong.name)
-                                .font(.headline)
-                                .bold()
-                        }
-                    } else {
-                        Label("Choose Standout Song...", systemImage: "music.note")
-                    }
-                }.buttonStyle(.plain)
-            } header: {
-                VStack(alignment: .leading) {
-                    Text("Body Weight: \(session.bodyWeight.lbsFormat)")
-                        .font(.subheadline)
-                        .italic()
-                    HStack {
-                        if let routine = session.routine {
-                            Text(routine.name)
-                        } else if let routineName = session.routineName {
-                            Text(routineName)
-                        } else {
-                            Text(session.startTime.formatted(date: .numeric, time: .shortened))
-                        }
-                        Spacer()
-                        if let endTime = session.endTime {
-                            Text(Duration.seconds(endTime.timeIntervalSince(session.startTime)).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
-                        }
-                    }
-                }
-            }
-            setSummaryView()
-        }
-    }
-    
-    @ViewBuilder
-    func setSummaryView() -> some View {
-        ForEach($session.sets.enumerated(), id: \.offset) { offset, $set in
-            let setIndex = offset
-            Section {
-                ForEach(set.exercises.enumerated(), id: \.offset) { offset, exercise in
-                    let exerciseIndex = offset
-                    if !session.finished {
-                        Menu {
-                            if exercise.numCompletedSets == exercise.numSets {
-                                Button {
-                                    // Go to exercise (set 1)
-                                    setState(newIndices: .init(setIndex, exerciseIndex))
-                                } label: {
-                                    Label("Re-start Exercise", systemImage: "play")
-                                }
-                            } else if exercise.numCompletedSets > 0 {
-                                Button {
-                                    // Go to exercise (next set)
-                                    setState(newIndices: .init(setIndex, exerciseIndex, exercise.numCompletedSets))
-                                } label: {
-                                    Label("Resume Exercise", systemImage: "play")
-                                }
-                            } else {
-                                Button {
-                                    // Go to exercise (set 1)
-                                    setState(newIndices: .init(setIndex, exerciseIndex))
-                                } label: {
-                                    Label("Start Exercise", systemImage: "play")
-                                }
-                            }
-                            Button {
-                                sheetType = .exercise(setIndex: setIndex, exerciseIndex: exerciseIndex)
-                            } label: {
-                                Label("Edit Exercise", systemImage: "pencil")
-                            }
-                        } label: {
-                            HStack {
-                                SessionExerciseEntryView(exercise: exercise)
-                                Spacer()
-                            }.contentShape(Rectangle())
-                        }.buttonStyle(.plain)
-                            .swipeActions {
-                                Button("Delete", systemImage: "trash") {
-                                    deleteExercise = (setIndex, exerciseIndex)
-                                }.tint(.red)
-                            }
-                    } else {
-                        Button {
-                            sheetType = .exercise(setIndex: setIndex, exerciseIndex: exerciseIndex)
-                        } label: {
-                            HStack {
-                                SessionExerciseEntryView(exercise: exercise)
-                                Spacer()
-                            }.contentShape(Rectangle())
-                        }.buttonStyle(.plain)
-                            .swipeActions {
-                                Button("Delete", systemImage: "trash") {
-                                    deleteExercise = (setIndex, exerciseIndex)
-                                }.tint(.red)
-                            }
-                    }
-                }
-            } header: {
-                HStack {
-                    if session.finished {
-                        Text(set.name)
-                    } else {
-                        TextField("Set Name", text: $set.name)
-                    }
-                    Spacer()
-                    if set.restTime > 0 {
-                        Text("\(set.restTime)s Rest")
-                    }
-                    Menu {
-                        Button("From Library...") {
-                            sheetType = .exercisePicker(setIndex: setIndex)
-                        }
-                        Menu {
-                            Button("Basic") {
-                                set.exercises.append(.generic(.init(expected: .init())))
-                                sheetType = .exercise(setIndex: setIndex, exerciseIndex: set.exercises.count - 1)
-                            }
-                            Button("Repeater") {
-                                set.exercises.append(.repeater(.init(expected: .init())))
-                                sheetType = .exercise(setIndex: setIndex, exerciseIndex: set.exercises.count - 1)
-                            }
-                            Button("Max Hang") {
-                                set.exercises.append(.maxHang(.init(expected: .init())))
-                                sheetType = .exercise(setIndex: setIndex, exerciseIndex: set.exercises.count - 1)
-                            }
-                            Button("Campus") {
-                                set.exercises.append(.campus(.init(expected: .init())))
-                                sheetType = .exercise(setIndex: setIndex, exerciseIndex: set.exercises.count - 1)
-                            }
-                        } label: {
-                            Label("New", systemImage: "plus")
-                        }
-                        Divider()
-                        Button(role: .destructive) {
-                            session.sets.remove(at: setIndex)
-                        } label: {
-                            Label("Delete Set", systemImage: "trash")
-                        }
-                    } label: {
-                        Label("Options", systemImage: "ellipsis.circle")
-                            .labelStyle(.iconOnly)
-                    }
-                }
-            }
-        }
-        if !session.finished {
-            Button {
-                session.sets.append(.init(base: .init()))
-            } label: {
-                Label("Add New Set", systemImage: "plus")
-            }
         }
     }
     
@@ -1147,46 +941,12 @@ struct RoutineSessionView: View {
     
     @ViewBuilder
     func timerView(text: String, textCountDown: Bool = true) -> some View {
-        ZStack {
-            RingShape(progress: 1.0)
-                .stroke(.secondary, lineWidth: 8)
-            RingShape(progress: 1.0 - progress)
-                .stroke(.primary, style: .init(lineWidth: 12, lineCap: .round))
-            VStack(spacing: 0) {
-                Text(text)
-                    .font(.system(size: 40))
-                    .bold()
-                Text(textCountDown ? timerDuration - elapsedSeconds : elapsedSeconds, format: .time(pattern: .minuteSecond(padMinuteToLength: 2)))
-                    .contentTransition(.numericText())
-                    .monospaced()
-                    .font(.system(size: 60))
-                    .bold()
-            }
-        }
+        TimerRingView(text: text, textCountDown: textCountDown, timerDuration: timerDuration, elapsedSeconds: elapsedSeconds, progress: progress)
     }
     
     @ViewBuilder
     func controlView(nextAction: @escaping () -> Void) -> some View {
-        HStack(spacing: 16) {
-            Spacer()
-            Button {
-                prev()
-            } label: {
-                Image(systemName: "arrowshape.backward.circle")
-                    .font(.system(size: 64))
-            }
-            Button {
-                toggleTimer()
-            } label: {
-                Image(systemName: isTimerValid ? "pause.circle" : "play.circle")
-                    .font(.system(size: 96))
-            }.disabled(elapsedSeconds >= timerDuration)
-            Button(action: nextAction) {
-                Image(systemName: allowTimerNext || elapsedSeconds >= timerDuration ? "arrowshape.forward.circle" : "checkmark.circle")
-                    .font(.system(size: 64))
-            }
-            Spacer()
-        }.buttonStyle(.plain)
+        SessionControlBar(isTimerRunning: isTimerValid, allowTimerNext: allowTimerNext, elapsedSeconds: elapsedSeconds, timerDuration: timerDuration, onPrev: prev, onToggle: toggleTimer, onNext: nextAction)
     }
     
     
@@ -1194,59 +954,8 @@ struct RoutineSessionView: View {
     // DATA FUNCTIONS //
     // ************** //
     
-    func loadData(_ indices: ExerciseIndices?) -> GenericDataSet {
-        guard let indices else { return .init() }
-        let exercise = session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex]
-        switch exercise {
-        case .generic(let d):
-            // Try to load from previous session if it exists
-            if let prevData = tryGetPrevGenericData(indices) {
-                return .init(prevData.1, format: prevData.0.expected, includeNotes: false)
-            }
-            if indices.exerciseSetIndex < d.actual.count {
-                // Load from current data
-                return .init(d.actual[indices.exerciseSetIndex], format: d.expected, includeNotes: true)
-            } else {
-                // Load from expected (and prev data if possible)
-                var data = GenericDataSet(numLeft: d.expected.sets[indices.exerciseSetIndex].avg)
-                if let latest = d.actual.last {
-                    data.weightLeft = latest.weightLeft
-                    data.weightRight = latest.weightRight
-                }
-                return data
-            }
-        case .repeater(let d):
-            if indices.exerciseSetIndex < d.actual.count {
-                // Load from current data
-                return .init(d.actual[indices.exerciseSetIndex])
-            } else {
-                // Load from expected
-                let expected = d.expected.sets[indices.exerciseSetIndex]
-                return .init(numLeft: expected.numReps, weightLeft: expected.weight)
-            }
-        case .maxHang(let d):
-            if indices.exerciseSetIndex < d.actual.count {
-                // Load from current data
-                return .init(d.actual[indices.exerciseSetIndex])
-            } else {
-                // Load from expected
-                let expected = d.expected.sets[indices.exerciseSetIndex]
-                return .init(numLeft: expected.target, weightLeft: expected.weight)
-            }
-        case .campus(let d):
-            if indices.exerciseSetIndex < d.actual.count {
-                // Load from current data
-                return .init(d.actual[indices.exerciseSetIndex])
-            } else {
-                // Load from expected
-                let expected = d.expected.sets[indices.exerciseSetIndex]
-                let doMirror = expected.doMirror && d.expected.type.canMirror
-                if case .defined(let moves) = expected.moves {
-                    return .init(campusSet: .init(board: expected.board, moves: moves), movesAlt: doMirror ? moves.flipped : nil)
-                }
-                return .init(campusSet: .init(board: expected.board))
-            }
-        }
+    func loadData(_ indices: ExerciseIndices?) -> ExerciseEntryDraft {
+        runner.draft(at: indices, previous: PreviousSessionLookup(prevSession))
     }
     
     /// Applies a command received from the watch, exactly as if the phone's own matching
@@ -1313,109 +1022,23 @@ struct RoutineSessionView: View {
 
     func trySaveData() {
         guard let indices else { return }
-        let exercise = session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex]
-        switch exercise {
-        case .generic(let d):
-            var newActual: [Session.GenericDataSet] = d.actual
-            let updatedData: Session.GenericDataSet = genericData.toGeneric(d.expected, useAlt: d.expected.sideType == .independent && (d.expected.dataType.hasTime || allowMultiSide))
-            // TODO handle this case better
-            if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = updatedData
-            } else {
-                newActual.append(updatedData)
-            }
-            session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .generic(.init(expected: d.expected, actual: newActual, notes: d.notes))
-        case .repeater(let d):
-            var newActual: [Session.RepeaterSet] = d.actual
-            if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = genericData.toRepeater()
-            } else {
-                newActual.append(genericData.toRepeater())
-            }
-            session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .repeater(.init(expected: d.expected, actual: newActual, notes: d.notes))
-        case .maxHang(let d):
-            var newActual: [Session.MaxHangSet] = d.actual
-            let updatedData = genericData.toMaxHang(d.expected, useAlt: d.expected.isSingleArm && allowMultiSide)
-            if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = updatedData
-            } else {
-                newActual.append(updatedData)
-            }
-            session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .maxHang(.init(expected: d.expected, actual: newActual, notes: d.notes))
-        case .campus(let d):
-            var newActual: [Session.CampusSetPair] = d.actual
-            let updatedData = genericData.toCampus(d.expected, useAlt: d.expected.type.canMirror && allowMultiSide)
-            if indices.exerciseSetIndex < d.actual.count {
-                newActual[indices.exerciseSetIndex] = updatedData
-            } else {
-                newActual.append(updatedData)
-            }
-            session.sets[indices.routineSetIndex].exercises[indices.setExerciseIndex] = .campus(.init(expected: d.expected, actual: newActual, notes: d.notes))
-        }
+        SessionRunner.apply(genericData, at: indices, allowMultiSide: allowMultiSide, to: &session.sets)
     }
     
     func tryGetPrevGenericData(_ indices: ExerciseIndices) -> (Session.GenericData, Session.GenericDataSet)? {
-        if let prevSession {
-            if indices.routineSetIndex < prevSession.sets.count {
-                let set = prevSession.sets[indices.routineSetIndex]
-                if indices.setExerciseIndex < set.exercises.count {
-                    if case .generic(let d) = set.exercises[indices.setExerciseIndex] {
-                        if indices.exerciseSetIndex < d.actual.count {
-                            return (d, d.actual[indices.exerciseSetIndex])
-                        }
-                    }
-                }
-            }
-        }
-        return nil
+        PreviousSessionLookup(prevSession).generic(at: indices)
     }
     
     func tryGetPrevRepeaterData(_ indices: ExerciseIndices) -> Session.RepeaterSet? {
-        if let prevSession {
-            if indices.routineSetIndex < prevSession.sets.count {
-                let set = prevSession.sets[indices.routineSetIndex]
-                if indices.setExerciseIndex < set.exercises.count {
-                    if case .repeater(let d) = set.exercises[indices.setExerciseIndex] {
-                        if indices.exerciseSetIndex < d.actual.count {
-                            return d.actual[indices.exerciseSetIndex]
-                        }
-                    }
-                }
-            }
-        }
-        return nil
+        PreviousSessionLookup(prevSession).repeater(at: indices)
     }
     
     func tryGetPrevMaxHangData(_ indices: ExerciseIndices) -> Session.MaxHangSet? {
-        if let prevSession {
-            if indices.routineSetIndex < prevSession.sets.count {
-                let set = prevSession.sets[indices.routineSetIndex]
-                if indices.setExerciseIndex < set.exercises.count {
-                    if case .maxHang(let d) = set.exercises[indices.setExerciseIndex] {
-                        if indices.exerciseSetIndex < d.actual.count {
-                            return d.actual[indices.exerciseSetIndex]
-                        }
-                    }
-                }
-            }
-        }
-        return nil
+        PreviousSessionLookup(prevSession).maxHang(at: indices)
     }
 
     func tryGetPrevCampusData(_ indices: ExerciseIndices) -> Session.CampusSetPair? {
-        if let prevSession {
-            if indices.routineSetIndex < prevSession.sets.count {
-                let set = prevSession.sets[indices.routineSetIndex]
-                if indices.setExerciseIndex < set.exercises.count {
-                    if case .campus(let d) = set.exercises[indices.setExerciseIndex] {
-                        if indices.exerciseSetIndex < d.actual.count {
-                            return d.actual[indices.exerciseSetIndex]
-                        }
-                    }
-                }
-            }
-        }
-        return nil
+        PreviousSessionLookup(prevSession).campus(at: indices)
     }
 
 
@@ -1426,7 +1049,7 @@ struct RoutineSessionView: View {
     /// Updates state to a different exercise
     func setState(newIndices: ExerciseIndices?) {
         if let newIndices {
-            let newState = ExerciseState.ready
+            let newState = ExercisePhase.ready
             self.timerDuration = computeTimerDuration(indices: newIndices, exerciseState: newState)
             self.genericData = loadData(newIndices)
             if case .campus(let d) = session.sets[newIndices.routineSetIndex].exercises[newIndices.setExerciseIndex] {
@@ -1450,7 +1073,7 @@ struct RoutineSessionView: View {
     }
     
     /// Updates state for the same exerecise
-    func setState(newState: ExerciseState) {
+    func setState(newState: ExercisePhase) {
         self.timerDuration = computeTimerDuration(indices: indices, exerciseState: newState)
         self.exerciseState = newState
         onStateChanged()
@@ -1477,61 +1100,7 @@ struct RoutineSessionView: View {
     
     /// Computes the next state of the repeater rep field
     private func nextRepeaterRep() -> RepeaterRep {
-        switch currentExercise {
-        case .generic(let d):
-            switch exerciseState {
-            case .ready:
-                let max: Int = {
-                    switch d.expected.dataType {
-                    case .time, .timeWeight:
-                        return d.expected.sideType == .independent ? 2 : 1
-                    case .rep, .repWeight:
-                        return 0
-                    }
-                }()
-                return .init(max: max)
-            case .on:
-                return repeaterRep.next()
-            case .off:
-                return repeaterRep
-            default:
-                break
-            }
-        case .repeater(let d):
-            switch exerciseState {
-            case .ready:
-                return .init(max: d.expected.sets[indices!.exerciseSetIndex].numReps)
-            case .on:
-                return repeaterRep.next()
-            case .off:
-                return repeaterRep
-            default:
-                break
-            }
-        case .maxHang(let d):
-            switch exerciseState {
-            case .ready:
-                return .init(max: d.expected.isSingleArm ? 2 : 1)
-            case .on:
-                return repeaterRep.next()
-            case .off:
-                return repeaterRep
-            default:
-                break
-            }
-        case .campus(let d):
-            switch exerciseState {
-            case .ready:
-                return .init(max: d.expected.sets[indices!.exerciseSetIndex].doMirror ? 1 : 0)
-            case .off:
-                return repeaterRep.next()
-            default:
-                break
-            }
-        default:
-            break
-        }
-        return .zero
+        runner.repeaterRep(at: indices, phase: exerciseState, current: repeaterRep)
     }
     
     func prev() {
@@ -1543,30 +1112,12 @@ struct RoutineSessionView: View {
         }
     }
     
-    func prevState() -> ExerciseState? {
-        switch exerciseState {
-        case .ready, nil:
-            return nil
-        default:
-            return .ready
-        }
+    func prevState() -> ExercisePhase? {
+        runner.prevPhase(from: exerciseState)
     }
     
     var prevIndices: ExerciseIndices? {
-        if let indices {
-            // Moving to new exercise set, exercise, or routine set
-            // Next exercise is determined by set order
-            let set = session.sets[indices.routineSetIndex]
-            switch set.order {
-            case .bfs:
-                return getPrevBfs(indices)
-            case .dfs:
-                return getPrevDfs(indices)
-            }
-        } else {
-            // Can't go backward from start
-            return nil
-        }
+        runner.prevIndices(from: indices)
     }
     
     func next(skip: Bool = false) {
@@ -1578,147 +1129,12 @@ struct RoutineSessionView: View {
         }
     }
     
-    func nextState() -> ExerciseState? {
-        switch currentExercise {
-        case .generic(let d):
-            switch exerciseState {
-            case .ready:
-                switch d.expected.dataType {
-                case .time, .timeWeight:
-                    return .on
-                case .rep, .repWeight:
-                    return .rest
-                }
-            case .on:
-                return repeaterRep.hasNext ? .off : .rest
-            case .off:
-                return .on
-            case .rest, nil:
-                return nil
-            }
-        case .repeater(_), .maxHang(_):
-            switch exerciseState {
-            case .ready:
-                return .on
-            case .on:
-                return repeaterRep.hasNext ? .off : .rest
-            case .off:
-                return .on
-            case .rest, nil:
-                return nil
-            }
-        case .campus(_):
-            switch exerciseState {
-            case .ready:
-                return repeaterRep.hasNext ? .off : .rest
-            case .on, .off:
-                return .rest
-            case .rest, nil:
-                return nil
-            }
-        case nil:
-            return nil
-        }
+    func nextState() -> ExercisePhase? {
+        runner.nextPhase(at: indices, phase: exerciseState, rep: repeaterRep)
     }
     
     func nextIndices() -> ExerciseIndices? {
-        if let indices {
-            // Moving to new exercise set, exercise, or routine set
-            // Next exercise is determined by set order
-            let set = session.sets[indices.routineSetIndex]
-            switch set.order {
-            case .bfs:
-                return getNextBfs(indices)
-            case .dfs:
-                return getNextDfs(indices)
-            }
-        } else {
-            // Start at beginning
-            return .init()
-        }
-    }
-    
-    func getPrevBfs(_ indices: ExerciseIndices) -> ExerciseIndices? {
-        let set = session.sets[indices.routineSetIndex]
-        var targetIndex = indices.exerciseSetIndex
-        // First check behind
-        for i in (0..<indices.setExerciseIndex).reversed() {
-            if targetIndex < set.exercises[i].numSets {
-                return .init(indices.routineSetIndex, i, targetIndex)
-            }
-        }
-        targetIndex -= 1
-        if targetIndex < 0 {
-            // Exit early if impossible
-            return nil
-        }
-        // Then loop back around to 0 for the next set
-        for i in (0..<set.exercises.count).reversed() {
-            if targetIndex < set.exercises[i].numSets {
-                return .init(indices.routineSetIndex, i, targetIndex)
-            }
-        }
-        // Start screen
-        return nil
-    }
-    
-    func getNextBfs(_ indices: ExerciseIndices) -> ExerciseIndices? {
-        let set = session.sets[indices.routineSetIndex]
-        var targetIndex = indices.exerciseSetIndex
-        // First check ahead
-        for i in (indices.setExerciseIndex + 1)..<set.exercises.count {
-            if targetIndex < set.exercises[i].numSets {
-                return .init(indices.routineSetIndex, i, targetIndex)
-            }
-        }
-        targetIndex += 1
-        // Then loop back around from 0 for the next set
-        for i in 0..<set.exercises.count {
-            if targetIndex < set.exercises[i].numSets {
-                return .init(indices.routineSetIndex, i, targetIndex)
-            }
-        }
-        // No other exercises go this high
-        if indices.routineSetIndex < session.sets.count - 1 {
-            // Move to next routine set
-            return .init(indices.routineSetIndex + 1)
-        }
-        // Finish screen
-        return nil
-    }
-    
-    func getPrevDfs(_ indices: ExerciseIndices) -> ExerciseIndices? {
-        if indices.exerciseSetIndex > 0 {
-            // Prev set within the exercise
-            return .init(indices.routineSetIndex, indices.setExerciseIndex, indices.exerciseSetIndex - 1)
-        } else if indices.setExerciseIndex > 0 {
-            // Next exercise within the routine set
-            return .init(indices.routineSetIndex, indices.setExerciseIndex - 1)
-        } else if indices.routineSetIndex > 0 {
-            // Next set wtihin the routine
-            return .init(indices.routineSetIndex - 1)
-        } else {
-            // Finish screen
-            return nil
-        }
-    }
-    
-    func getNextDfs(_ indices: ExerciseIndices) -> ExerciseIndices? {
-        let set = session.sets[indices.routineSetIndex]
-        let exercise = set.exercises[indices.setExerciseIndex]
-        if indices.exerciseSetIndex < exercise.numSets - 1 {
-            // Next set within the exercise
-            return .init(indices.routineSetIndex, indices.setExerciseIndex, indices.exerciseSetIndex + 1)
-        } else if indices.setExerciseIndex < set.exercises.count - 1 {
-            // Next exercise within the routine set
-            return .init(indices.routineSetIndex, indices.setExerciseIndex + 1)
-        } else if indices.routineSetIndex < session.sets.count - 1 {
-            // Next set wtihin the routine
-            return .init(indices.routineSetIndex + 1)
-        } else {
-            // Finish screen
-            return nil
-        }
+        runner.nextIndices(from: indices)
     }
     
     
@@ -1773,10 +1189,6 @@ struct RoutineSessionView: View {
         cancellable != nil
     }
 
-    private func shouldShowCancelButton() -> Bool {
-        return isTimerValid || elapsedSeconds > .zero
-    }
-    
     private var shouldStopTimer: Bool {
         .milliseconds(elapsedMilliseconds) == timerDuration
     }
@@ -1803,177 +1215,8 @@ struct RoutineSessionView: View {
         }
     }
     
-    private func computeTimerDuration(indices: ExerciseIndices?, exerciseState: ExerciseState?) -> Duration {
-        guard let indices, let exerciseState else { return .zero }
-        let set = session.sets[indices.routineSetIndex]
-        let exercise = set.exercises[indices.setExerciseIndex]
-        switch exercise {
-        case .generic(let d):
-            if d.expected.dataType.hasTime {
-                switch exerciseState {
-                case .ready, .off:
-                    return .seconds(5)
-                case .on:
-                    return .seconds(d.expected.sets[indices.exerciseSetIndex].max)
-                case .rest:
-                    return .seconds(set.restTime)
-                }
-            } else {
-                return exerciseState == .rest ? .seconds(set.restTime) : .zero
-            }
-        case .repeater(let d):
-            switch exerciseState {
-            case .ready:
-                return .seconds(10)
-            case .on:
-                return .seconds(d.expected.timeOn)
-            case .off:
-                return .seconds(d.expected.timeOff)
-            case .rest:
-                return .seconds(set.restTime)
-            }
-        case .maxHang(let d):
-            switch exerciseState {
-            case .ready:
-                return .seconds(10)
-            case .on:
-                return .seconds(d.expected.sets[indices.exerciseSetIndex].target)
-            case .off:
-                return .seconds(20)
-            case .rest:
-                return .seconds(set.restTime)
-            }
-        case .campus(_):
-            switch exerciseState {
-            case .ready, .on:
-                return .seconds(10)
-            case .rest, .off:
-                return .seconds(set.restTime)
-            }
-        }
-    }
-    
-    struct ExerciseIndices: Codable, Hashable, Equatable {
-        var routineSetIndex: Int
-        var setExerciseIndex: Int
-        var exerciseSetIndex: Int
-        
-        init(_ routineSetIndex: Int = 0, _ setExerciseIndex: Int = 0, _ exerciseSetIndex: Int = 0) {
-            self.routineSetIndex = routineSetIndex
-            self.setExerciseIndex = setExerciseIndex
-            self.exerciseSetIndex = exerciseSetIndex
-        }
-    }
-    
-    struct GenericDataSet: Codable, Hashable, Equatable {
-        var numLeft: Int
-        var numRight: Int
-        var weightLeft: Double
-        var weightRight: Double
-        var campusSet: CampusSet
-        var movesAlt: [CampusMove]
-        var notes: String
-        
-        init(_ data: Session.GenericDataSet, format: Routine.GenericSets, includeNotes: Bool) {
-            let notes = includeNotes ? data.notes : ""
-            switch format.dataType {
-            case .rep, .repWeight:
-                self.init(numLeft: data.repsLeft, numRight: data.repsRight, weightLeft: data.weightLeft, weightRight: data.weightRight, notes: notes)
-            case .time, .timeWeight:
-                self.init(numLeft: data.timeLeft, numRight: data.timeRight, weightLeft: data.weightLeft, weightRight: data.weightRight, notes: notes)
-            }
-        }
-        
-        init(_ data: Session.RepeaterSet) {
-            self.init(numLeft: data.numReps, weightLeft: data.weight, notes: data.notes)
-        }
-        
-        init(_ data: Session.MaxHangSet) {
-            self.init(numLeft: data.time, numRight: data.timeAlt, weightLeft: data.weight, weightRight: data.weightAlt, notes: data.notes)
-        }
-        
-        init(_ data: Session.CampusSetPair) {
-            self.init(campusSet: data.main, movesAlt: data.alt?.moves, notes: data.main.notes)
-        }
-        
-        init(numLeft: Int? = nil, numRight: Int? = nil, weightLeft: Double? = nil, weightRight: Double? = nil, campusSet: CampusSet? = nil, movesAlt: [CampusMove]? = nil, notes: String = "") {
-            self.numLeft = numLeft ?? 0
-            self.numRight = numRight ?? numLeft ?? 0
-            self.weightLeft = weightLeft ?? 0
-            self.weightRight = weightRight ?? weightLeft ?? 0
-            self.campusSet = campusSet ?? .init()
-            self.movesAlt = movesAlt ?? []
-            self.notes = notes
-        }
-        
-        func toGeneric(_ data: Routine.GenericSets, useAlt: Bool) -> Session.GenericDataSet {
-            switch data.dataType {
-            case .rep:
-                if data.sideType == .independent && useAlt && numLeft != numRight {
-                    return .init(numReps: numLeft, numRepsAlt: numRight, notes: notes)
-                }
-                return .init(numReps: numLeft, notes: notes)
-            case .repWeight:
-                if data.sideType == .independent && useAlt {
-                    var dataSet = Session.GenericDataSet(notes: notes)
-                    if numLeft != numRight {
-                        dataSet.numReps = numLeft
-                        dataSet.numRepsAlt = numRight
-                    } else {
-                        dataSet.numReps = numLeft
-                    }
-                    if weightLeft != weightRight {
-                        dataSet.weight = weightLeft
-                        dataSet.weightAlt = weightRight
-                    } else {
-                        dataSet.weight = weightLeft
-                    }
-                    return dataSet
-                }
-                return .init(numReps: numLeft, weight: weightLeft, notes: notes)
-            case .time:
-                if data.sideType == .independent && useAlt && numLeft != numRight {
-                    return .init(time: numLeft, timeAlt: numRight, notes: notes)
-                }
-                return .init(time: numLeft, notes: notes)
-            case .timeWeight:
-                if data.sideType == .independent && useAlt {
-                    var dataSet = Session.GenericDataSet(notes: notes)
-                    if numLeft != numRight {
-                        dataSet.time = numLeft
-                        dataSet.timeAlt = numRight
-                    } else {
-                        dataSet.time = numLeft
-                    }
-                    if weightLeft != weightRight {
-                        dataSet.weight = weightLeft
-                        dataSet.weightAlt = weightRight
-                    } else {
-                        dataSet.weight = weightLeft
-                    }
-                    return dataSet
-                }
-                return .init(time: numLeft, weight: weightLeft, notes: notes)
-            }
-        }
-        
-        func toRepeater() -> Session.RepeaterSet {
-            return .init(numReps: numLeft, weight: weightLeft, notes: notes)
-        }
-        
-        func toMaxHang(_ data: Routine.MaxHangSets, useAlt: Bool) -> Session.MaxHangSet {
-            if data.isSingleArm && useAlt {
-                return .init(time: numLeft, timeAlt: numRight, weight: weightLeft, weightAlt: weightRight, notes: notes)
-            }
-            return .init(time: numLeft, weight: weightLeft, notes: notes)
-        }
-        
-        func toCampus(_ data: Routine.CampusSets, useAlt: Bool) -> Session.CampusSetPair {
-            if data.type.canMirror && useAlt {
-                return .init(main: .init(board: campusSet.board, moves: campusSet.moves, tempo: campusSet.tempo, notes: notes), alt: .init(board: campusSet.board, moves: movesAlt, tempo: campusSet.tempo, notes: notes))
-            }
-            return .init(main: .init(board: campusSet.board, moves: campusSet.moves, tempo: campusSet.tempo, notes: notes))
-        }
+    private func computeTimerDuration(indices: ExerciseIndices?, exerciseState: ExercisePhase?) -> Duration {
+        runner.timerDuration(at: indices, phase: exerciseState)
     }
     
     enum SheetType: Identifiable, Codable, Hashable, Equatable {
@@ -2005,56 +1248,6 @@ struct RoutineSessionView: View {
         case exercisePicker(setIndex: Int)
     }
     
-    enum ExerciseState: String, Codable, Hashable, Equatable {
-        case ready
-        case on
-        case off
-        case rest
-    }
-    
-    struct RepeaterRep: Codable, Hashable, Equatable {
-        static let zero = RepeaterRep(max: 0)
-        
-        let current: Int
-        let max: Int
-        
-        init(current: Int = 0, max: Int) {
-            self.current = current
-            self.max = max
-        }
-        
-        var hasNext: Bool {
-            current < max
-        }
-        
-        func next() -> RepeaterRep {
-            if hasNext {
-                return .init(current: current + 1, max: max)
-            }
-            return self
-        }
-    }
-}
-
-struct RingShape: Shape {
-    var progress: Double // Value from 0.0 to 1.0
-    
-    func path(in rect: CGRect) -> Path {
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2
-        let startAngle = Angle(degrees: -90)
-        let endAngle = Angle(degrees: (progress * 360) - 90)
-        
-        var path = Path()
-        path.addArc(
-            center: center,
-            radius: radius,
-            startAngle: startAngle,
-            endAngle: endAngle,
-            clockwise: false
-        )
-        return path
-    }
 }
 
 #Preview(traits: .sampleData) {

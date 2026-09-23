@@ -152,7 +152,7 @@ struct SchemaV2MigrationTests {
 
     /// The bug this migration exists partly to fix: `RoutineView.swift:60` used to
     /// correlate a session's exercises to the routine's purely by array position.
-    /// Deleting "Set A" from the session (as `RoutineSessionView.swift:634` allows
+    /// Deleting "Set A" from the session (as `SessionHomeView.swift:198` allows
     /// mid-session) shifts "Set B" from session index 1 down to index 0 — the old
     /// code would read `session.sets[1]` (now out of range, or the wrong set if a
     /// third set existed) for anything the routine still has at index 1. Confirms
