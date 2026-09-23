@@ -38,7 +38,7 @@ struct MainView: View {
                             Label(type.name, systemImage: type.icon)
                         }
                 }
-            }.navigationTitle(currentAthlete?.name ?? "Select Athlete")
+            }.navigationTitle(currentAthlete?.fullName ?? currentAthlete?.name ?? "Select Athlete")
                 .navigationBarTitleDisplayMode(.inline)
                 .handleDestinations(navigationStore)
                 .toolbar {
@@ -54,18 +54,21 @@ struct MainView: View {
                                 }
                             }
                         }
-                        Divider()
-                        Button {
-                            navigationStore.push(ViewType.athleteLibrary(athlete: currentAthlete!))
-                        } label: {
-                            Label("Manage Athletes…", systemImage: "person.2")
-                        }.disabled(currentAthlete == nil)
                     }
                     ToolbarItemGroup(placement: .topBarLeading) {
-                        Button {
-                            navigationStore.push(ViewType.exerciseLibrary)
+                        Menu {
+                            Button {
+                                navigationStore.push(ViewType.exerciseLibrary)
+                            } label: {
+                                Label("View Exercises", systemImage: "tablecells")
+                            }
+                            Button {
+                                navigationStore.push(ViewType.athleteList(athlete: currentAthlete!))
+                            } label: {
+                                Label("Manage Athletes", systemImage: "person.2")
+                            }.disabled(currentAthlete == nil)
                         } label: {
-                            Label("View Exercises", systemImage: "tablecells")
+                            Label("Options", systemImage: "ellipsis")
                         }
                     }
                     ToolbarItemGroup(placement: .topBarTrailing) {

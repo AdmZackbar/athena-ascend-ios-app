@@ -82,7 +82,7 @@ struct TestDataModifier: PreviewModifier {
             ], restTime: 100, order: .dfs)
         ], createdAt: sessionStartTime, lastUsedAt: sessionStartTime)
 
-        let zach = Athlete(name: Athlete.defaultName, createdAt: sessionStartTime, lastUsedAt: .now)
+        let zach = Athlete(name: "Zach", firstName: "Zach", lastName: "Wassynger", createdAt: sessionStartTime, lastUsedAt: .now)
         let session = Session(startTime: sessionStartTime, endTime: .now, sets: routine.sets.map({ .init(base: $0) }), bodyWeight: 155, standoutSong: .init(name: "Permanent", artist: "A Day to Remember"), routineName: routine.name, athlete: zach)
         fillRandomActuals(session)
         routine.sessions.append(session)
@@ -109,14 +109,14 @@ struct TestDataModifier: PreviewModifier {
         // A finished team session over the same routine, for two athletes who aren't
         // the store's owner — exercises the multi-person entry/review path.
         let teamStartTime = Date.now.addingTimeInterval(-1800)
-        let alex = Athlete(name: "Alex Chen", createdAt: teamStartTime, lastUsedAt: .now)
-        let jordan = Athlete(name: "Jordan Lee", createdAt: teamStartTime, lastUsedAt: .now)
-        context.insert(alex)
-        context.insert(jordan)
+        let linsay = Athlete(name: "Linsay", createdAt: teamStartTime, lastUsedAt: .now)
+        let allie = Athlete(name: "Allie", createdAt: teamStartTime, lastUsedAt: .now)
+        context.insert(linsay)
+        context.insert(allie)
 
         let teamSession = TeamSession(routineName: routine.name, startTime: teamStartTime, endTime: .now, sets: routine.sets.map(Session.ExerciseSet.init))
         routine.teamSessions.append(teamSession)
-        for athlete in [alex, jordan] {
+        for athlete in [linsay, allie] {
             let entry = teamSession.addAthlete(athlete, context: context)
             entry.startTime = teamStartTime
             entry.endTime = .now

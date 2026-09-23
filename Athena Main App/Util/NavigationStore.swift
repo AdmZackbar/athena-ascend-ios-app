@@ -48,6 +48,10 @@ final class NavigationStore: ObservableObject {
     @ViewBuilder
     func handleView(_ view: ViewType) -> some View {
         switch view {
+        case .athleteList(let athlete):
+            AthleteListView(currentAthleteID: athlete.uuid)
+        case .athlete(let athlete):
+            AthleteView(athlete: athlete)
         case .routineAdd:
             RoutineEditView()
         case .routineEdit(let routine):
@@ -62,13 +66,13 @@ final class NavigationStore: ObservableObject {
             RepeaterOverview(athlete: athlete)
         case .exerciseLibrary:
             ExerciseLibraryView()
-        case .athleteLibrary(let athlete):
-            AthleteLibraryView(currentAthleteID: athlete.uuid)
         }
     }
 }
 
 enum ViewType: Hashable {
+    case athleteList(athlete: Athlete)
+    case athlete(athlete: Athlete)
     case routineAdd
     case routineEdit(routine: Routine)
     case routineView(routine: Routine, athlete: Athlete? = nil)
@@ -76,7 +80,6 @@ enum ViewType: Hashable {
     case teamSession(session: TeamSession)
     case repeaters(athlete: Athlete)
     case exerciseLibrary
-    case athleteLibrary(athlete: Athlete)
 }
 
 extension View {

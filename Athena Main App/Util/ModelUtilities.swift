@@ -14,6 +14,20 @@ extension Double {
 }
 
 // ******* //
+// ATHLETE //
+// ******* //
+
+extension Athlete {
+    var fullName: String? {
+        if let firstName, let lastName {
+            return "\(firstName) \(lastName)"
+        }
+        return nil
+    }
+}
+
+
+// ******* //
 // ROUTINE //
 // ******* //
 

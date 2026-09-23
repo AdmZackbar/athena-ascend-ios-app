@@ -1,5 +1,5 @@
 //
-//  AthleteLibraryView.swift
+//  AthleteListView.swift
 //  AthenaAscend
 //
 //  Created by Zach Wassynger on 9/22/26.
@@ -8,14 +8,11 @@
 import SwiftData
 import SwiftUI
 
-/// Roster management for athletes, modelled on `ExerciseLibraryView`: browse, rename,
-/// delete, and drill into any athlete's session history.
-struct AthleteLibraryView: View {
+struct AthleteListView: View {
+    @EnvironmentObject private var navigationStore: NavigationStore
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: [
-        SortDescriptor(\Athlete.lastUsedAt, order: .reverse),
-        SortDescriptor(\Athlete.name)
-    ]) private var athletes: [Athlete]
+    
+    @Query(sort: \Athlete.name) private var athletes: [Athlete]
 
     /// So the roster can mark which entry is currently selected on `MainView`.
     /// Switching athletes happens from `MainView`'s title menu, not here.
@@ -28,12 +25,12 @@ struct AthleteLibraryView: View {
     var body: some View {
         List {
             ForEach(athletes) { athlete in
-                NavigationLink {
-                    AthleteHistoryView(athlete: athlete)
+                Button {
+                    navigationStore.push(ViewType.athlete(athlete: athlete))
                 } label: {
                     row(for: athlete)
                         .contentShape(Rectangle())
-                }
+                }.buttonStyle(.plain)
                     .contextMenu {
                         Button {
                             renameText = athlete.name
@@ -106,73 +103,18 @@ struct AthleteLibraryView: View {
                         .padding(.vertical, 2)
                         .background(.tertiary, in: .capsule)
                 }
+                Spacer()
+            }
+            if let fullName = athlete.fullName {
+                Text(fullName)
+                    .font(.subheadline)
+                    .italic()
             }
             if let lastUsedAt = athlete.lastUsedAt {
                 Text("Last used \(lastUsedAt.formatted(date: .abbreviated, time: .omitted))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-        }
-    }
-}
-
-/// One athlete's history: every solo session plus every team-session entry they
-/// took part in, newest first.
-struct AthleteHistoryView: View {
-    let athlete: Athlete
-
-    private var soloSessions: [Session] {
-        athlete.sessions.filter { !$0.isTeamEntry }.sorted(by: { $0.startTime > $1.startTime })
-    }
-
-    private var teamEntries: [Session] {
-        athlete.sessions.filter(\.isTeamEntry).sorted(by: { $0.startTime > $1.startTime })
-    }
-
-    var body: some View {
-        List {
-            if soloSessions.isEmpty && teamEntries.isEmpty {
-                Text("No sessions yet")
-                    .foregroundStyle(.secondary)
-            }
-            if !soloSessions.isEmpty {
-                Section("Sessions") {
-                    ForEach(soloSessions) { session in
-                        NavigationLink {
-                            SessionView(session: session)
-                        } label: {
-                            historyRow(date: session.startTime, label: session.routine?.name ?? session.routineName)
-                        }
-                    }
-                }
-            }
-            if !teamEntries.isEmpty {
-                Section("Team Sessions") {
-                    ForEach(teamEntries) { entry in
-                        if let teamSession = entry.teamSession {
-                            NavigationLink {
-                                TeamAthleteDetailView(entry: entry)
-                            } label: {
-                                historyRow(date: teamSession.startTime, label: teamSession.routine?.name ?? teamSession.routineName)
-                            }
-                        }
-                    }
-                }
-            }
-        }.navigationTitle(athlete.name)
-            .navigationBarTitleDisplayMode(.inline)
-    }
-
-    @ViewBuilder
-    private func historyRow(date: Date, label: String?) -> some View {
-        VStack(alignment: .leading) {
-            if let label {
-                Text(label)
-                    .italic()
-                    .font(.subheadline)
-            }
-            Text(date.formatted(date: .abbreviated, time: .shortened))
-                .fontWeight(.semibold)
         }
     }
 }
