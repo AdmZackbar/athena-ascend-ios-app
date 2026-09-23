@@ -61,7 +61,14 @@ struct MainView: View {
                             Label("Manage Athletes…", systemImage: "person.2")
                         }.disabled(currentAthlete == nil)
                     }
-                    ToolbarItemGroup(placement: .primaryAction) {
+                    ToolbarItemGroup(placement: .topBarLeading) {
+                        Button {
+                            navigationStore.push(ViewType.exerciseLibrary)
+                        } label: {
+                            Label("View Exercises", systemImage: "tablecells")
+                        }
+                    }
+                    ToolbarItemGroup(placement: .topBarTrailing) {
                         Menu {
                             Button {
                                 let session = Session(athlete: currentAthlete!)
@@ -104,31 +111,23 @@ struct MainView: View {
     
     @ViewBuilder
     private func getView(_ type: MainViewType) -> some View {
-        switch type {
-        case .exercise:
-            ExerciseLibraryView()
-        case .routine:
-            if let currentAthlete {
+        if let currentAthlete {
+            switch type {
+            case .routine:
                 RoutineListView(athlete: currentAthlete)
-            } else {
-                ProgressView()
-            }
-        case .session:
-            if let currentAthlete {
+            case .session:
                 SessionListView(athlete: currentAthlete)
-            } else {
-                ProgressView()
             }
+        } else {
+            ProgressView()
         }
     }
     
     private enum MainViewType: CaseIterable, Hashable {
-        case session, routine, exercise
+        case session, routine
         
         var name: String {
             switch self {
-            case .exercise:
-                return "Exercises"
             case .routine:
                 return "Routines"
             case .session:
@@ -138,8 +137,6 @@ struct MainView: View {
         
         var icon: String {
             switch self {
-            case .exercise:
-                return "tablecells"
             case .routine:
                 return "book"
             case .session:
