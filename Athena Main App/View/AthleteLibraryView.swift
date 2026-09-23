@@ -139,7 +139,7 @@ struct AthleteHistoryView: View {
                 Section("Sessions") {
                     ForEach(soloSessions) { session in
                         NavigationLink {
-                            RoutineSessionView(session: session)
+                            SessionView(session: session)
                         } label: {
                             historyRow(date: session.startTime, label: session.routine?.name ?? session.routineName)
                         }

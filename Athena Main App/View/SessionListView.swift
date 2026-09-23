@@ -154,6 +154,34 @@ struct SessionListView: View {
             case .team(let teamSession): return teamSession.endTime
             }
         }
+        
+        static func == (lhs: SessionRow, rhs: SessionRow) -> Bool {
+            switch lhs {
+            case .solo(let a):
+                switch rhs {
+                case .solo(let b):
+                    return a.persistentModelID == b.persistentModelID
+                case .team(_):
+                    return false
+                }
+            case .team(let a):
+                switch rhs {
+                case .solo(_):
+                    return false
+                case .team(let b):
+                    return a.persistentModelID == b.persistentModelID
+                }
+            }
+        }
+        
+        func hash(into hasher: inout Hasher) {
+            switch self {
+            case .solo(let s):
+                hasher.combine(s.persistentModelID)
+            case .team(let t):
+                hasher.combine(t.persistentModelID)
+            }
+        }
     }
 
     /// This athlete's own sessions plus every team session that includes them

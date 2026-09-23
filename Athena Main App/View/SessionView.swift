@@ -1,5 +1,5 @@
 //
-//  RoutineSessionView.swift
+//  SessionView.swift
 //  AthenaAscend
 //
 //  Created by Zach Wassynger on 8/16/26.
@@ -10,7 +10,7 @@ import SwiftData
 import SwiftUI
 internal import Combine
 
-struct RoutineSessionView: View {
+struct SessionView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     
@@ -167,37 +167,9 @@ struct RoutineSessionView: View {
     @State private var showAlert: Bool = false
     @State private var timerNextOverride: Bool = false
     @State private var deleteExercise: (Int, Int)? = nil
-    
-    /// Applies the WatchConnectivity and Live Activity lifecycle hooks. Split out of `body`
-    /// because folding these directly into that already-long modifier chain made the whole
-    /// expression too complex for the type-checker.
-    @ViewBuilder
-    private func connectivityHooks(_ content: some View) -> some View {
-        content
-            .onAppear {
-                SessionConnectivity.shared.send(activeSessionSnapshot)
-                SessionLiveActivity.shared.sync(activeSessionSnapshot)
-                // Drop anything submitted while no session view was around to apply it, so it
-                // can't fire late against whatever exercise happens to be on screen next.
-                commandCenter.consume()
-            }
-            .onChange(of: activeSessionSnapshot) { _, newValue in
-                SessionConnectivity.shared.send(newValue)
-                SessionLiveActivity.shared.sync(newValue)
-            }
-            .onChange(of: commandCenter.pendingCommand) { _, newValue in
-                handleRemoteCommand(newValue)
-            }
-            .onDisappear {
-                SessionConnectivity.shared.send(nil)
-                SessionLiveActivity.shared.sync(nil)
-            }
-    }
 
     init(session: Session) {
         self.session = session
-        // Scoped to the same athlete — `routine.sessions` spans everyone who's ever
-        // run it, and another person's numbers are not a "previous session" target.
         self.prevSession = session.routine?.sessions
             .filter({ $0 != session && $0.athlete?.uuid == session.athlete?.uuid })
             .sorted(by: { $0.startTime < $1.startTime })
@@ -205,21 +177,19 @@ struct RoutineSessionView: View {
     }
     
     var body: some View {
-        connectivityHooks(
-            mainView()
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
-                .navigationBarBackButtonHidden()
-                .background(background)
-                .onChange(of: exerciseState, { oldValue, newValue in
-                    if oldValue == ExercisePhase.on && newValue == ExercisePhase.rest {
-                        audioManager.playSystemSound(1428)
-                    }
-                })
-                .sensoryFeedback(.success, trigger: exerciseState, condition: { oldValue, newValue in
-                    oldValue == ExercisePhase.on && newValue == ExercisePhase.rest
-                })
-        )
+        mainView()
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden()
+            .background(background)
+            .onChange(of: exerciseState, { oldValue, newValue in
+                if oldValue == ExercisePhase.on && newValue == ExercisePhase.rest {
+                    audioManager.playSystemSound(1428)
+                }
+            })
+            .sensoryFeedback(.success, trigger: exerciseState, condition: { oldValue, newValue in
+                oldValue == ExercisePhase.on && newValue == ExercisePhase.rest
+            })
             .alert("Are you sure you want to delete this session?", isPresented: $showAlert, actions: {
                 Button(role: .destructive) {
                     modelContext.delete(session)
@@ -243,56 +213,77 @@ struct RoutineSessionView: View {
                     Label("Delete", systemImage: "trash")
                 }
             }
-            .sheet(item: $sheetType) { t in
-                switch t {
-                case .date:
-                    SessionDateSheet(start: $session.startTime, end: $session.endTime)
-                case .weight:
-                    Form {
-                        Stepper(value: $session.bodyWeight, in: 0...1000, step: 1) {
-                            HStack {
-                                Text("Body Weight: \(session.bodyWeight.lbsFormat)")
-                            }
-                        }
-                    }.presentationDetents([.medium])
-                case .exercise(let setIndex, let exerciseIndex):
-                    SessionExerciseSheet(exercise: .init(get: {
-                        session.sets[setIndex].exercises[exerciseIndex]
-                    }, set: { newValue in
-                        session.sets[setIndex].exercises[exerciseIndex] = newValue
-                    }), showing: .init(get: {
-                        switch sheetType {
-                        case .exercise(_, _):
-                            return true
-                        default:
-                            return false
-                        }
-                    }, set: { newValue in
-                        if !newValue {
-                            sheetType = nil
-                        }
-                    }), showData: session.finished)
-                case .notes:
-                    Form {
-                        TextField("Notes", text: $genericData.notes, axis: .vertical)
-                            .lineLimit(10...14)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                    }.presentationDetents([.large])
-                case .song:
-                    editSongSheet()
-                case .campusMoves(let alt):
-                    campusMovesSheet(alt: alt)
-                case .exercisePicker(let setIndex):
-                    LibraryPickerView<Exercise> { exercise in
-                        guard let newExercise = ExerciseLibrary.makeSessionExercise(from: exercise) else { return }
-                        exercise.lastUsedAt = .now
-                        session.sets[setIndex].exercises.append(newExercise)
-                        sheetType = .exercise(setIndex: setIndex, exerciseIndex: session.sets[setIndex].exercises.count - 1)
+            .sheet(item: $sheetType, content: sheetView)
+            .toolbar(content: buildToolbar)
+            .onAppear {
+                SessionConnectivity.shared.send(activeSessionSnapshot)
+                SessionLiveActivity.shared.sync(activeSessionSnapshot)
+                // Drop anything submitted while no session view was around to apply it, so it
+                // can't fire late against whatever exercise happens to be on screen next.
+                commandCenter.consume()
+            }
+            .onChange(of: activeSessionSnapshot) { _, newValue in
+                SessionConnectivity.shared.send(newValue)
+                SessionLiveActivity.shared.sync(newValue)
+            }
+            .onChange(of: commandCenter.pendingCommand) { _, newValue in
+                handleRemoteCommand(newValue)
+            }
+            .onDisappear {
+                SessionConnectivity.shared.send(nil)
+                SessionLiveActivity.shared.sync(nil)
+            }
+    }
+    
+    @ViewBuilder
+    func sheetView(_ t: SheetType) -> some View {
+        switch t {
+        case .date:
+            SessionDateSheet(start: $session.startTime, end: $session.endTime)
+        case .weight:
+            Form {
+                Stepper(value: $session.bodyWeight, in: 0...1000, step: 1) {
+                    HStack {
+                        Text("Body Weight: \(session.bodyWeight.lbsFormat)")
                     }
                 }
+            }.presentationDetents([.medium])
+        case .exercise(let setIndex, let exerciseIndex):
+            SessionExerciseSheet(exercise: .init(get: {
+                session.sets[setIndex].exercises[exerciseIndex]
+            }, set: { newValue in
+                session.sets[setIndex].exercises[exerciseIndex] = newValue
+            }), showing: .init(get: {
+                switch sheetType {
+                case .exercise(_, _):
+                    return true
+                default:
+                    return false
+                }
+            }, set: { newValue in
+                if !newValue {
+                    sheetType = nil
+                }
+            }), showData: session.finished)
+        case .notes:
+            Form {
+                TextField("Notes", text: $genericData.notes, axis: .vertical)
+                    .lineLimit(10...14)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+            }.presentationDetents([.large])
+        case .song:
+            editSongSheet()
+        case .campusMoves(let alt):
+            campusMovesSheet(alt: alt)
+        case .exercisePicker(let setIndex):
+            LibraryPickerView<Exercise> { exercise in
+                guard let newExercise = ExerciseLibrary.makeSessionExercise(from: exercise) else { return }
+                exercise.lastUsedAt = .now
+                session.sets[setIndex].exercises.append(newExercise)
+                sheetType = .exercise(setIndex: setIndex, exerciseIndex: session.sets[setIndex].exercises.count - 1)
             }
-            .toolbar(content: buildToolbar)
+        }
     }
     
     @ViewBuilder
@@ -1260,12 +1251,12 @@ struct RoutineSessionView: View {
             session.sets = routine.sets.map(Session.ExerciseSet.init)
             return session
         }()
-        RoutineSessionView(session: session)
+        SessionView(session: session)
     }
 }
 
 #Preview("Fresh") {
     NavigationStack {
-        RoutineSessionView(session: Session())
+        SessionView(session: Session())
     }
 }

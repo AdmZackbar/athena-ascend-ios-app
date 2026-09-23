@@ -55,7 +55,7 @@ final class NavigationStore: ObservableObject {
         case .routineView(let routine, let athlete):
             RoutineView(routine: routine, athlete: athlete)
         case .session(let session):
-            RoutineSessionView(session: session)
+            SessionView(session: session)
         case .teamSession(let teamSession):
             TeamSessionView(teamSession: teamSession)
         case .repeaters(let athlete):

@@ -5,13 +5,19 @@
 //  Created by Zach Wassynger on 8/16/26.
 //
 
+import SwiftData
 import SwiftUI
 
 /// The home page shown when no exercise is in progress: session metadata, notes, and a summary
 /// of every set/exercise with actions to start, resume, edit, or delete them.
 struct SessionHomeView: View {
+    @Query(sort: [
+        SortDescriptor(\Athlete.lastUsedAt, order: .reverse),
+        SortDescriptor(\Athlete.name)
+    ]) private var athletes: [Athlete]
+    
     @Bindable var session: Session
-    @Binding var sheetType: RoutineSessionView.SheetType?
+    @Binding var sheetType: SessionView.SheetType?
     @Binding var song: Session.Song
     @Binding var deleteExercise: (Int, Int)?
     /// Jumps into the given exercise/set, exactly as if its "Start"/"Resume"/"Re-start" button
@@ -38,6 +44,11 @@ struct SessionHomeView: View {
     private func activeHomePage() -> some View {
         Form {
             Section {
+                Picker("Athlete:", selection: $session.athlete) {
+                    ForEach(athletes) { athlete in
+                        Text(athlete.name).tag(athlete as Athlete?)
+                    }
+                }
                 DatePicker("Start:", selection: $session.startTime, displayedComponents: [.date, .hourAndMinute])
                 Stepper(value: $session.bodyWeight, in: 0...1000, step: 1) {
                     HStack {
@@ -93,8 +104,11 @@ struct SessionHomeView: View {
                 }.buttonStyle(.plain)
             } header: {
                 VStack(alignment: .leading) {
-                    Text("Body Weight: \(session.bodyWeight.lbsFormat)")
-                        .font(.subheadline)
+                    HStack {
+                        Text(session.athleteDisplayName)
+                        Spacer()
+                        Text(session.bodyWeight.lbsFormat)
+                    }.font(.subheadline)
                         .italic()
                     HStack {
                         if let routine = session.routine {
