@@ -14,12 +14,9 @@ struct AthleteListView: View {
     
     @Query(sort: \Athlete.name) private var athletes: [Athlete]
 
-    /// So the roster can mark which entry is currently selected on `MainView`.
-    /// Switching athletes happens from `MainView`'s title menu, not here.
+    /// So the roster can mark which entry is currently selected on `MainView`
     let currentAthleteID: UUID
 
-    @State private var renamingAthlete: Athlete? = nil
-    @State private var renameText: String = ""
     @State private var deleteTarget: Athlete? = nil
 
     var body: some View {
@@ -32,12 +29,6 @@ struct AthleteListView: View {
                         .contentShape(Rectangle())
                 }.buttonStyle(.plain)
                     .contextMenu {
-                        Button {
-                            renameText = athlete.name
-                            renamingAthlete = athlete
-                        } label: {
-                            Label("Rename", systemImage: "pencil")
-                        }
                         Button(role: .destructive) {
                             deleteTarget = athlete
                         } label: {
@@ -47,24 +38,6 @@ struct AthleteListView: View {
             }
         }.navigationTitle("Athletes")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Rename Athlete", isPresented: .init(get: {
-                renamingAthlete != nil
-            }, set: { newValue in
-                if !newValue {
-                    renamingAthlete = nil
-                }
-            })) {
-                TextField("Name", text: $renameText)
-                Button("Cancel", role: .cancel) {
-                    renamingAthlete = nil
-                }
-                Button("Save") {
-                    if let renamingAthlete, !renameText.isEmpty {
-                        renamingAthlete.name = renameText
-                    }
-                    renamingAthlete = nil
-                }
-            }
             .alert("Delete Athlete?", isPresented: .init(get: {
                 deleteTarget != nil
             }, set: { newValue in
