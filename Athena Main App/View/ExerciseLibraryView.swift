@@ -11,7 +11,9 @@ import SwiftUI
 /// Browse, rename, merge, and delete the exercises trained across every routine and
 /// session.
 struct ExerciseLibraryView: View {
+    @EnvironmentObject private var navigationStore: NavigationStore
     @Environment(\.modelContext) private var modelContext
+    
     @Query(sort: [
         SortDescriptor(\Exercise.lastUsedAt, order: .reverse),
         SortDescriptor(\Exercise.name)

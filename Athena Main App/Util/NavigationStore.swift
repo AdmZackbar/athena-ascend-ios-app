@@ -44,4 +44,43 @@ final class NavigationStore: ObservableObject {
         pop()
         push(value)
     }
+    
+    @ViewBuilder
+    func handleView(_ view: ViewType) -> some View {
+        switch view {
+        case .routineAdd:
+            RoutineEditView()
+        case .routineEdit(let routine):
+            RoutineEditView(routine: routine)
+        case .routineView(let routine, let athlete):
+            RoutineView(routine: routine, athlete: athlete)
+        case .session(let session):
+            RoutineSessionView(session: session)
+        case .teamSession(let teamSession):
+            TeamSessionView(teamSession: teamSession)
+        case .repeaters(let athlete):
+            RepeaterOverview(athlete: athlete)
+        case .exerciseLibrary:
+            ExerciseLibraryView()
+        case .athleteLibrary(let athlete):
+            AthleteLibraryView(currentAthleteID: athlete.uuid)
+        }
+    }
+}
+
+enum ViewType: Hashable {
+    case routineAdd
+    case routineEdit(routine: Routine)
+    case routineView(routine: Routine, athlete: Athlete? = nil)
+    case session(session: Session)
+    case teamSession(session: TeamSession)
+    case repeaters(athlete: Athlete)
+    case exerciseLibrary
+    case athleteLibrary(athlete: Athlete)
+}
+
+extension View {
+    func handleDestinations(_ navigationStore: NavigationStore) -> some View {
+        self.navigationDestination(for: ViewType.self, destination: navigationStore.handleView)
+    }
 }
