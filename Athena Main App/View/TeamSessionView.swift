@@ -159,7 +159,11 @@ struct TeamSessionView: View {
                     Text(Duration.seconds(endTime.timeIntervalSince(teamSession.startTime)).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
                 }
             } else {
-                DatePicker("Start:", selection: $teamSession.startTime, displayedComponents: [.date, .hourAndMinute])
+                DatePicker("Start:", selection: .init(get: {
+                    teamSession.startTime
+                }, set: { newValue in
+                    teamSession.updateStartTime(newValue)
+                }), displayedComponents: [.date, .hourAndMinute])
             }
             TextField("Notes", text: $teamSession.notes, axis: .vertical)
                 .lineLimit((teamSession.sets.isEmpty ? 9 : 3)...12)
@@ -275,7 +279,18 @@ struct TeamSessionView: View {
     private func sheetContent(_ type: SheetType) -> some View {
         switch type {
         case .date:
-            SessionDateSheet(start: $teamSession.startTime, end: $teamSession.endTime)
+            SessionDateSheet(
+                start: .init(get: {
+                    teamSession.startTime
+                }, set: { newValue in
+                    teamSession.updateStartTime(newValue)
+                }),
+                end: .init(get: {
+                    teamSession.endTime
+                }, set: { newValue in
+                    teamSession.updateEndTime(newValue)
+                })
+            )
         case .athletePicker:
             LibraryPickerView<Athlete>(title: "Choose Athlete", emptyText: "No athletes yet", exclude: { athlete in
                 teamSession.entries.contains { $0.athlete?.uuid == athlete.uuid }

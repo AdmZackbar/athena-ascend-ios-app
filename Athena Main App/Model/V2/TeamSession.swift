@@ -116,6 +116,24 @@ extension TeamSession {
         }
     }
 
+    /// Mirrors a manual start-date edit to every entry, so each athlete's own
+    /// `Session` stays in sync with the shared parent instead of drifting.
+    func updateStartTime(_ date: Date) {
+        startTime = date
+        for entry in entries {
+            entry.startTime = date
+        }
+    }
+
+    /// Mirrors a manual end-date edit to every entry. Symmetric with `updateStartTime`;
+    /// `finish`/`reopen` below cover the automatic finish/reopen flows.
+    func updateEndTime(_ date: Date?) {
+        endTime = date
+        for entry in entries {
+            entry.endTime = date
+        }
+    }
+
     /// Mirrors `endTime` to every entry and sweeps unlinked exercises into the library —
     /// both the shared template and each athlete's own copy, so entries converge onto
     /// the same library row by identity even though they're independent value copies.

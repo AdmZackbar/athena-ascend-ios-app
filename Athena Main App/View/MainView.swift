@@ -116,6 +116,8 @@ struct MainView: View {
     private func getView(_ type: MainViewType) -> some View {
         if let currentAthlete {
             switch type {
+            case .exercise:
+                ExerciseListView(athlete: currentAthlete)
             case .routine:
                 RoutineListView(athlete: currentAthlete)
             case .session:
@@ -127,10 +129,12 @@ struct MainView: View {
     }
     
     private enum MainViewType: CaseIterable, Hashable {
-        case session, routine
+        case session, routine, exercise
         
         var name: String {
             switch self {
+            case .exercise:
+                return "Exercises"
             case .routine:
                 return "Routines"
             case .session:
@@ -140,6 +144,8 @@ struct MainView: View {
         
         var icon: String {
             switch self {
+            case .exercise:
+                return "tablecells"
             case .routine:
                 return "book"
             case .session:

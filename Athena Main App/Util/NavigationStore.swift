@@ -52,6 +52,10 @@ final class NavigationStore: ObservableObject {
             AthleteListView(currentAthleteID: athlete.uuid)
         case .athlete(let athlete):
             AthleteView(athlete: athlete)
+        case .exercise(let exercise, let athlete):
+            ExerciseView(exercise: exercise, athlete: athlete)
+        case .exerciseList(let athlete):
+            ExerciseListView(athlete: athlete)
         case .routineAdd:
             RoutineEditView()
         case .routineEdit(let routine):
@@ -73,6 +77,8 @@ final class NavigationStore: ObservableObject {
 enum ViewType: Hashable {
     case athleteList(athlete: Athlete)
     case athlete(athlete: Athlete)
+    case exercise(exercise: Exercise, athlete: Athlete)
+    case exerciseList(athlete: Athlete)
     case routineAdd
     case routineEdit(routine: Routine)
     case routineView(routine: Routine, athlete: Athlete? = nil)

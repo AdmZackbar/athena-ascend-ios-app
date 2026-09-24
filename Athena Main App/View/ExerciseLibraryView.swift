@@ -27,15 +27,8 @@ struct ExerciseLibraryView: View {
     @State private var deleteTarget: Exercise? = nil
 
     var body: some View {
-        List {
-            if exercises.isEmpty {
-                Text("No exercises yet")
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(exercises) { exercise in
-                row(for: exercise)
-            }
-        }.navigationTitle("Exercise Library")
+        mainView()
+            .navigationTitle("Exercise Library")
             .navigationBarTitleDisplayMode(.inline)
             .alert("Rename Exercise", isPresented: .init(get: {
                 renamingExercise != nil
@@ -81,6 +74,19 @@ struct ExerciseLibraryView: View {
                     Text("Used in \(usage.routines) routine(s) and \(usage.sessions) session(s). They'll keep their name and config — they just won't be linked to this entry anymore.")
                 }
             }
+    }
+    
+    @ViewBuilder
+    func mainView() -> some View {
+        if exercises.isEmpty {
+            ContentUnavailableView("No Exercises Yet", systemImage: "scalemass")
+        } else {
+            List {
+                ForEach(exercises) { exercise in
+                    row(for: exercise)
+                }
+            }
+        }
     }
 
     @ViewBuilder
