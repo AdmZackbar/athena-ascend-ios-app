@@ -75,19 +75,14 @@ struct SessionListView: View {
     func sessionView(_ session: Session) -> some View {
         HStack {
             VStack(alignment: .leading) {
-                HStack {
+                Group {
                     if let routine = session.routine {
                         Text(routine.name)
-                            .italic()
                     } else if let routineName = session.routineName {
                         Text(routineName)
-                            .italic()
-                    }
-                    Spacer()
-                    if let endTime = session.endTime {
-                        Text(Duration.seconds(endTime.timeIntervalSince(session.startTime)).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
                     }
                 }.font(.subheadline)
+                    .italic()
                 HStack {
                     Text(session.startTime.formatted(date: .long, time: .omitted))
                     Spacer()
@@ -97,6 +92,9 @@ struct SessionListView: View {
                     Text(session.bodyWeight.lbsFormat)
                         .fontWeight(.light)
                     Spacer()
+                    if let endTime = session.endTime {
+                        Text(Duration.seconds(endTime.timeIntervalSince(session.startTime)).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
+                    }
                 }.font(.subheadline)
             }
             Spacer()
@@ -107,19 +105,14 @@ struct SessionListView: View {
     func teamSessionView(_ teamSession: TeamSession) -> some View {
         HStack {
             VStack(alignment: .leading) {
-                HStack {
+                Group {
                     if let routine = teamSession.routine {
                         Text(routine.name)
-                            .italic()
                     } else if let routineName = teamSession.routineName {
                         Text(routineName)
-                            .italic()
-                    }
-                    Spacer()
-                    if let endTime = teamSession.endTime {
-                        Text(Duration.seconds(endTime.timeIntervalSince(teamSession.startTime)).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
                     }
                 }.font(.subheadline)
+                    .italic()
                 HStack {
                     Text(teamSession.startTime.formatted(date: .long, time: .omitted))
                     Spacer()
@@ -129,6 +122,9 @@ struct SessionListView: View {
                     Text("\(teamSession.entries.count) athlete(s)")
                         .fontWeight(.light)
                     Spacer()
+                    if let endTime = teamSession.endTime {
+                        Text(Duration.seconds(endTime.timeIntervalSince(teamSession.startTime)).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
+                    }
                 }.font(.subheadline)
             }
             Spacer()
