@@ -27,6 +27,7 @@ struct MainView: View {
     }
     
     @State private var viewType: MainViewType = .session
+    @State private var exportAlert: ExportAlert?
 
     var body: some View {
         NavigationStack(path: $navigationStore.path) {
@@ -67,6 +68,11 @@ struct MainView: View {
                             } label: {
                                 Label("Manage Athletes", systemImage: "person.2")
                             }.disabled(currentAthlete == nil)
+                            Button {
+                                exportAllData()
+                            } label: {
+                                Label("Export Data", systemImage: "square.and.arrow.up")
+                            }
                         } label: {
                             Label("Options", systemImage: "ellipsis")
                         }
@@ -103,6 +109,9 @@ struct MainView: View {
                 .onChange(of: athletes) { _, _ in
                     resolveCurrentAthlete()
                 }
+                .alert(item: $exportAlert) { alert in
+                    Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
+                }
         }.environmentObject(navigationStore)
     }
     
@@ -110,6 +119,15 @@ struct MainView: View {
         guard currentAthlete == nil else { return }
         let resolved = CurrentAthlete.resolve(storedID: currentAthleteID, athletes: athletes, context: modelContext)
         currentAthleteID = resolved.uuid.uuidString
+    }
+
+    private func exportAllData() {
+        do {
+            let directory = try DataExporter.exportAllModels(context: modelContext)
+            exportAlert = ExportAlert(title: "Export Complete", message: "Data exported to:\n\(directory.lastPathComponent)")
+        } catch {
+            exportAlert = ExportAlert(title: "Export Failed", message: error.localizedDescription)
+        }
     }
     
     @ViewBuilder
@@ -152,6 +170,12 @@ struct MainView: View {
                 return "calendar"
             }
         }
+    }
+
+    private struct ExportAlert: Identifiable {
+        let id = UUID()
+        let title: String
+        let message: String
     }
 }
 
