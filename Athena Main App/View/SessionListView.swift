@@ -39,7 +39,7 @@ struct SessionListView: View {
     private func rowsView(_ rows: [SessionRow]) -> some View {
         ForEach(rows, id: \.self) { row in
             switch row {
-            case .solo(let session):
+            case .solo(_, let session):
                 Button {
                     navigationStore.push(ViewType.session(session: session))
                 } label: {
@@ -53,7 +53,7 @@ struct SessionListView: View {
                             Label("Delete", systemImage: "trash")
                         }
                     }
-            case .team(let teamSession):
+            case .team(_, let teamSession):
                 Button {
                     navigationStore.push(ViewType.teamSession(session: teamSession))
                 } label: {
@@ -134,48 +134,48 @@ struct SessionListView: View {
     /// A row in the session list is either a solo `Session` or a `TeamSession` — the
     /// latter's per-athlete `Session` entries are never shown as standalone rows here.
     private enum SessionRow: Hashable {
-        case solo(_ session: Session)
-        case team(_ teamSession: TeamSession)
+        case solo(index: Int, session: Session)
+        case team(index: Int, teamSession: TeamSession)
 
         var startTime: Date {
             switch self {
-            case .solo(let session): return session.startTime
-            case .team(let teamSession): return teamSession.startTime
+            case .solo(_, let session): return session.startTime
+            case .team(_, let teamSession): return teamSession.startTime
             }
         }
 
         var endTime: Date? {
             switch self {
-            case .solo(let session): return session.endTime
-            case .team(let teamSession): return teamSession.endTime
+            case .solo(_, let session): return session.endTime
+            case .team(_, let teamSession): return teamSession.endTime
             }
         }
         
         static func == (lhs: SessionRow, rhs: SessionRow) -> Bool {
             switch lhs {
-            case .solo(let a):
+            case .solo(let a, _):
                 switch rhs {
-                case .solo(let b):
-                    return a.persistentModelID == b.persistentModelID
-                case .team(_):
+                case .solo(let b, _):
+                    return a == b
+                case .team(_, _):
                     return false
                 }
-            case .team(let a):
+            case .team(let a, _):
                 switch rhs {
-                case .solo(_):
+                case .solo(_, _):
                     return false
-                case .team(let b):
-                    return a.persistentModelID == b.persistentModelID
+                case .team(let b, _):
+                    return a == b
                 }
             }
         }
         
         func hash(into hasher: inout Hasher) {
             switch self {
-            case .solo(let s):
-                hasher.combine(s.persistentModelID)
-            case .team(let t):
-                hasher.combine(t.persistentModelID)
+            case .solo(let i, _):
+                hasher.combine(i)
+            case .team(let i, _):
+                hasher.combine(i)
             }
         }
     }
@@ -184,10 +184,12 @@ struct SessionListView: View {
     private func rows(currentAthlete: Athlete) -> [SessionRow] {
         let solo = sessions
             .filter { !$0.isTeamEntry && $0.athlete?.uuid == currentAthlete.uuid }
-            .map(SessionRow.solo)
+            .enumerated()
+            .map { SessionRow.solo(index: $0, session: $1) }
         let team = teamSessions
             .filter { $0.entries.contains(where: { $0.athlete?.uuid == currentAthlete.uuid }) }
-            .map(SessionRow.team)
+            .enumerated()
+            .map { SessionRow.team(index: $0 + solo.count, teamSession: $1) }
         return solo + team
     }
 }
