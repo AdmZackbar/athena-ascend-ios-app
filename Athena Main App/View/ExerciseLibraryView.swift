@@ -25,11 +25,27 @@ struct ExerciseLibraryView: View {
     @State private var renameText: String = ""
     @State private var mergeSource: Exercise? = nil
     @State private var deleteTarget: Exercise? = nil
+    @State private var showingNewExercise = false
+    @State private var newlyCreatedID: UUID? = nil
 
     var body: some View {
         mainView()
             .navigationTitle("Exercise Library")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingNewExercise = true
+                    } label: {
+                        Label("New Exercise", systemImage: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingNewExercise) {
+                NewExerciseSheet(existingIdentities: exercises.map(\.identity)) { newExercise in
+                    newlyCreatedID = newExercise.uuid
+                }
+            }
             .alert("Rename Exercise", isPresented: .init(get: {
                 renamingExercise != nil
             }, set: { newValue in
@@ -79,11 +95,25 @@ struct ExerciseLibraryView: View {
     @ViewBuilder
     func mainView() -> some View {
         if exercises.isEmpty {
-            ContentUnavailableView("No Exercises Yet", systemImage: "scalemass")
+            ContentUnavailableView {
+                Label("No Exercises Yet", systemImage: "scalemass")
+            } actions: {
+                Button("New Exercise") {
+                    showingNewExercise = true
+                }
+            }
         } else {
-            List {
-                ForEach(exercises) { exercise in
-                    row(for: exercise)
+            ScrollViewReader { proxy in
+                List {
+                    ForEach(exercises) { exercise in
+                        row(for: exercise)
+                            .id(exercise.uuid)
+                    }
+                }.onChange(of: newlyCreatedID) { _, newValue in
+                    guard let newValue else { return }
+                    withAnimation {
+                        proxy.scrollTo(newValue, anchor: .center)
+                    }
                 }
             }
         }

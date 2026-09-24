@@ -62,4 +62,29 @@ struct ExerciseLibraryTests {
         // Campus has no free-text field, so it never fails.
         #expect(ExerciseIdentity(Routine.Exercise.campus(.init(type: .maxLadder))) != nil)
     }
+
+    @Test func isDuplicateAcrossAllFourKinds() {
+        let existing: [ExerciseIdentity] = [
+            .generic(name: "Bench", dataType: .repWeight, sideType: nil),
+            .repeater(tag: "HC", timeOn: 7, timeOff: 3),
+            .maxHang(tag: "BM", isSingleArm: true),
+            .campus(.maxLadder)
+        ]
+
+        #expect(ExerciseLibrary.isDuplicate(.generic(name: "Bench", dataType: .repWeight, sideType: nil), among: existing))
+        #expect(!ExerciseLibrary.isDuplicate(.generic(name: "Bench", dataType: .rep, sideType: nil), among: existing))
+
+        #expect(ExerciseLibrary.isDuplicate(.repeater(tag: "HC", timeOn: 7, timeOff: 3), among: existing))
+        #expect(!ExerciseLibrary.isDuplicate(.repeater(tag: "HC", timeOn: 5, timeOff: 3), among: existing))
+
+        #expect(ExerciseLibrary.isDuplicate(.maxHang(tag: "BM", isSingleArm: true), among: existing))
+        #expect(!ExerciseLibrary.isDuplicate(.maxHang(tag: "BM", isSingleArm: false), among: existing))
+
+        #expect(ExerciseLibrary.isDuplicate(.campus(.maxLadder), among: existing))
+        #expect(!ExerciseLibrary.isDuplicate(.campus(.basicLadder), among: existing))
+    }
+
+    @Test func isDuplicateAgainstEmptySequence() {
+        #expect(!ExerciseLibrary.isDuplicate(.generic(name: "Bench", dataType: .repWeight, sideType: nil), among: [ExerciseIdentity]()))
+    }
 }

@@ -97,6 +97,13 @@ enum ExerciseLibrary {
         }
     }
 
+    /// True when `identity` already has a library entry. Takes identities rather than
+    /// `Exercise` objects so callers can feed it a `@Query` result and so it is testable
+    /// without a ModelContainer.
+    static func isDuplicate(_ identity: ExerciseIdentity, among existing: some Sequence<ExerciseIdentity>) -> Bool {
+        existing.contains(identity)
+    }
+
     static func findOrCreate(for identity: ExerciseIdentity, in context: ModelContext) -> Exercise {
         let all = try? context.fetch(FetchDescriptor<Exercise>())
         if let existing = all?.first(where: { $0.identity == identity }) {
