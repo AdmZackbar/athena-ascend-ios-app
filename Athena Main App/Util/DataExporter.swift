@@ -8,6 +8,10 @@
 import Foundation
 import SwiftData
 
+// Pinned to V2: this is the one-time export path read by the JSON importer, and must
+// keep reading the V2 store regardless of what CurrentSchema points at. Fully
+// qualified throughout rather than pinned via shadow aliases.
+
 /// Exports every persisted model to one JSON file each, written into a
 /// timestamped sub-directory of the app's Documents folder.
 enum DataExporter {
@@ -18,15 +22,15 @@ enum DataExporter {
     static func exportAllModels(context: ModelContext, date: Date = .now) throws -> URL {
         let directory = try makeExportDirectory(date: date)
 
-        try write(context.fetch(FetchDescriptor<Athlete>()).map { AthleteExportDTO($0) },
+        try write(context.fetch(FetchDescriptor<SchemaV2.Athlete>()).map { AthleteExportDTO($0) },
                    filename: "athletes.json", to: directory)
-        try write(context.fetch(FetchDescriptor<Exercise>()).map { ExerciseExportDTO($0) },
+        try write(context.fetch(FetchDescriptor<SchemaV2.Exercise>()).map { ExerciseExportDTO($0) },
                    filename: "exercises.json", to: directory)
-        try write(context.fetch(FetchDescriptor<Routine>()).map { RoutineExportDTO($0) },
+        try write(context.fetch(FetchDescriptor<SchemaV2.Routine>()).map { RoutineExportDTO($0) },
                    filename: "routines.json", to: directory)
-        try write(context.fetch(FetchDescriptor<Session>()).map { SessionExportDTO($0) },
+        try write(context.fetch(FetchDescriptor<SchemaV2.Session>()).map { SessionExportDTO($0) },
                    filename: "sessions.json", to: directory)
-        try write(context.fetch(FetchDescriptor<TeamSession>()).map { TeamSessionExportDTO($0) },
+        try write(context.fetch(FetchDescriptor<SchemaV2.TeamSession>()).map { TeamSessionExportDTO($0) },
                    filename: "teamSessions.json", to: directory)
 
         return directory

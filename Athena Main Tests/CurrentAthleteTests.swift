@@ -13,7 +13,7 @@ import Testing
 struct CurrentAthleteTests {
     @MainActor
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(SchemaV2.models)
+        let schema = Schema(SchemaV3.models)
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         return try ModelContainer(for: schema, configurations: [config])
     }
@@ -24,7 +24,7 @@ struct CurrentAthleteTests {
 
         let resolved = CurrentAthlete.resolve(storedID: "", athletes: [], context: context)
 
-        #expect(resolved.name == Athlete.defaultName)
+        #expect(resolved.name == "Zach Wassynger")
         #expect(try context.fetch(FetchDescriptor<Athlete>()).count == 1)
     }
 
@@ -43,13 +43,27 @@ struct CurrentAthleteTests {
         #expect(try context.fetch(FetchDescriptor<Athlete>()).count == 2)
     }
 
+    /// V3's `Athlete` has no `lastUsedAt` — recency is derived from the latest
+    /// `ExerciseData.session.startTime` across the athlete's own data.
     @Test @MainActor func fallsBackToMostRecentlyUsedForAStaleID() throws {
         let container = try makeContainer()
         let context = container.mainContext
-        let alice = Athlete(name: "Alice", lastUsedAt: .now.addingTimeInterval(-3600))
-        let bob = Athlete(name: "Bob", lastUsedAt: .now)
+        let alice = Athlete(name: "Alice")
+        let bob = Athlete(name: "Bob")
         context.insert(alice)
         context.insert(bob)
+
+        let exercise = Exercise(category: .repeater(tag: "HC", timeOn: 7, timeOff: 3))
+        context.insert(exercise)
+
+        let aliceSession = Session(startTime: .now.addingTimeInterval(-3600))
+        let bobSession = Session(startTime: .now)
+        context.insert(aliceSession)
+        context.insert(bobSession)
+
+        context.insert(ExerciseData(exercise: exercise, session: aliceSession, athlete: alice, position: .init(setIndex: 0)))
+        context.insert(ExerciseData(exercise: exercise, session: bobSession, athlete: bob, position: .init(setIndex: 0)))
+        try context.save()
 
         let resolved = CurrentAthlete.resolve(storedID: UUID().uuidString, athletes: [alice, bob], context: context)
 
@@ -69,6 +83,9 @@ struct CurrentAthleteTests {
         #expect(resolved.uuid == alice.uuid)
     }
 
+    /// V3's `Session` has no direct `.athlete` — a session "belongs to" an athlete
+    /// only indirectly, through the athletes referenced by its `ExerciseData` rows
+    /// (since one V3 session can span several athletes, replacing V2's TeamSession).
     @Test @MainActor func routineSessionsScopeCorrectlyPerAthlete() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -80,14 +97,22 @@ struct CurrentAthleteTests {
         context.insert(alice)
         context.insert(bob)
 
-        let aliceSession = Session(athlete: alice)
-        let bobSession = Session(athlete: bob)
+        let exercise = Exercise(category: .repeater(tag: "HC", timeOn: 7, timeOff: 3))
+        context.insert(exercise)
+
+        let aliceSession = Session(routine: routine)
+        let bobSession = Session(routine: routine)
+        context.insert(aliceSession)
+        context.insert(bobSession)
         routine.sessions.append(aliceSession)
         routine.sessions.append(bobSession)
+
+        context.insert(ExerciseData(exercise: exercise, session: aliceSession, athlete: alice, position: .init(setIndex: 0)))
+        context.insert(ExerciseData(exercise: exercise, session: bobSession, athlete: bob, position: .init(setIndex: 0)))
         try context.save()
 
-        let aliceOnly = routine.sessions.filter { $0.athlete?.uuid == alice.uuid }
-        let bobOnly = routine.sessions.filter { $0.athlete?.uuid == bob.uuid }
+        let aliceOnly = routine.sessions.filter { session in session.data.contains { $0.athlete?.uuid == alice.uuid } }
+        let bobOnly = routine.sessions.filter { session in session.data.contains { $0.athlete?.uuid == bob.uuid } }
 
         #expect(aliceOnly.count == 1)
         #expect(aliceOnly.first?.persistentModelID == aliceSession.persistentModelID)

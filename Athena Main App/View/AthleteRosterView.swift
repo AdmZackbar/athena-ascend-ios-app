@@ -1,5 +1,5 @@
 //
-//  AthleteListView.swift
+//  AthleteRosterView.swift
 //  AthenaAscend
 //
 //  Created by Zach Wassynger on 9/22/26.
@@ -8,14 +8,11 @@
 import SwiftData
 import SwiftUI
 
-struct AthleteListView: View {
+struct AthleteRosterView: View {
     @EnvironmentObject private var navigationStore: NavigationStore
     @Environment(\.modelContext) private var modelContext
     
     @Query(sort: \Athlete.name) private var athletes: [Athlete]
-
-    /// So the roster can mark which entry is currently selected on `MainView`
-    let currentAthleteID: UUID
 
     @State private var deleteTarget: Athlete? = nil
 
@@ -25,7 +22,7 @@ struct AthleteListView: View {
                 Button {
                     navigationStore.push(ViewType.athlete(athlete: athlete))
                 } label: {
-                    row(for: athlete)
+                    entryView(for: athlete)
                         .contentShape(Rectangle())
                 }.buttonStyle(.plain)
                     .contextMenu {
@@ -56,20 +53,18 @@ struct AthleteListView: View {
                 }
             } message: {
                 if let deleteTarget {
-                    let soloCount = deleteTarget.sessions.filter { !$0.isTeamEntry }.count
-                    let teamCount = deleteTarget.sessions.filter(\.isTeamEntry).count
-                    Text("Delete \(deleteTarget.name)? This also deletes their \(soloCount) session(s) and \(teamCount) team-session entry(ies). This can't be undone.")
+                    Text("Delete \(deleteTarget.name)? This also deletes their \(deleteTarget.data.count) exercise data. This can't be undone.")
                 }
             }
     }
 
     @ViewBuilder
-    private func row(for athlete: Athlete) -> some View {
+    private func entryView(for athlete: Athlete) -> some View {
         VStack(alignment: .leading) {
             HStack {
                 Text(athlete.name)
                     .fontWeight(.semibold)
-                if athlete.uuid == currentAthleteID {
+                if athlete == navigationStore.currentAthlete {
                     Text("Current")
                         .font(.caption)
                         .padding(.horizontal, 6)
@@ -83,8 +78,8 @@ struct AthleteListView: View {
                     .font(.subheadline)
                     .italic()
             }
-            if let lastUsedAt = athlete.lastUsedAt {
-                Text("Last used \(lastUsedAt.formatted(date: .abbreviated, time: .omitted))")
+            if let lastUsedAt = athlete.recentDataDate {
+                Text("Recent data at \(lastUsedAt.formatted(date: .abbreviated, time: .omitted))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

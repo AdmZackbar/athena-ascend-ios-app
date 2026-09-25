@@ -23,34 +23,10 @@ extension CampusSet.Side {
     }
 }
 
-extension CampusExercise {
-    var text: String {
-        switch self {
-        case .basicLadder: return "Basic Ladder"
-        case .maxLadder: return "Max Ladder"
-        case .maxFirst: return "Max First"
-        case .bumps: return "Bumps"
-        case .touches: return "Touches"
-        case .doubles: return "Doubles"
-        case .downUps: return "Down-Ups"
-        }
-    }
-    
-    var start: CampusMove {
-        switch self {
-        case .doubles, .downUps:
-            return .init(rung: .full(3), side: .both)
-        default:
-            return .init(rung: .full(1), side: .both)
-        }
-    }
-}
-
 struct CampusBoardView: View {
     typealias Side = CampusSet.Side
     
     let board: CampusBoard
-    let exercise: CampusExercise
     @Binding var moves: [CampusMove]
     
     var body: some View {
@@ -85,7 +61,7 @@ struct CampusBoardView: View {
             Spacer()
         }.onAppear {
             if moves.isEmpty {
-                moves = [exercise.start]
+                moves = [.init(rung: .full(1), side: .both)]
             }
         }
     }
@@ -151,26 +127,14 @@ struct CampusBoardView: View {
     
     private func computeInitialGrip(_ rung: CampusRung) -> Side {
         guard let last = moves.last else { return .both }
-        switch exercise {
-        case .doubles, .downUps:
+        if last.rung == rung {
             return .both
-        case .bumps:
-            switch last.side {
-            case .both, .right:
-                return .right
-            case .left:
-                return .left
-            }
-        default:
-            if last.rung == rung {
-                return .both
-            }
-            switch last.side {
-            case .both, .left:
-                return .right
-            case .right:
-                return .left
-            }
+        }
+        switch last.side {
+        case .both, .left:
+            return .right
+        case .right:
+            return .left
         }
     }
     
@@ -215,14 +179,8 @@ struct CampusBoardView: View {
 }
 
 #Preview {
-    @Previewable @State var exercise: Routine.CampusSets.Exercise = .maxLadder
     @Previewable @State var moves: [CampusMove] = []
     Form {
-        Picker("Campus Type", selection: $exercise) {
-            ForEach(Routine.CampusSets.Exercise.allCases, id: \.text) { exercise in
-                Text(exercise.text).tag(exercise)
-            }
-        }.pickerStyle(.menu)
-        CampusBoardView(board: .largeEdges, exercise: exercise, moves: $moves)
+        CampusBoardView(board: .largeEdges, moves: $moves)
     }
 }

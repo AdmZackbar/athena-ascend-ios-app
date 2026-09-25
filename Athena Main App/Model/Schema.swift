@@ -7,7 +7,7 @@
 
 import SwiftData
 
-typealias CurrentSchema = SchemaV2
+typealias CurrentSchema = SchemaV3
 
 enum SchemaV1: VersionedSchema {
     static var versionIdentifier: Schema.Version {

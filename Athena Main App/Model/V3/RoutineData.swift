@@ -7,6 +7,8 @@
 
 import SwiftData
 
+typealias RoutineData = SchemaV3.RoutineData
+
 extension SchemaV3 {
     @Model
     final class RoutineData {

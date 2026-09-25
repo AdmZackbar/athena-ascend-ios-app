@@ -9,13 +9,13 @@ import Foundation
 
 /// Identifies a specific set of a specific exercise within a session's sets.
 nonisolated struct ExerciseIndices: Codable, Hashable, Equatable {
-    var routineSetIndex: Int
-    var setExerciseIndex: Int
+    var superSetIndex: Int
+    var setIndex: Int
     var exerciseSetIndex: Int
 
-    init(_ routineSetIndex: Int = 0, _ setExerciseIndex: Int = 0, _ exerciseSetIndex: Int = 0) {
-        self.routineSetIndex = routineSetIndex
-        self.setExerciseIndex = setExerciseIndex
+    init(_ superSetIndex: Int = 0, _ setIndex: Int = 0, _ exerciseSetIndex: Int = 0) {
+        self.superSetIndex = superSetIndex
+        self.setIndex = setIndex
         self.exerciseSetIndex = exerciseSetIndex
     }
 }

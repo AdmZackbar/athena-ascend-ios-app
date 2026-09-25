@@ -357,9 +357,9 @@ nonisolated enum LegacyImport {
                 endTime: dto.endTime,
                 superSets: dto.sets.map(V2ToV3Conversion.superSet),
                 notes: dto.notes,
-                bodyWeight: dto.bodyWeight,
                 standoutSong: dto.standoutSong.map { .init(name: $0.name, artist: $0.artist) }
             )
+            v3Session.athletes = [athlete]
             context.insert(v3Session)
             summary.soloSessionsImported += 1
             makeExerciseDataRows(for: dto, session: v3Session, athlete: athlete)
@@ -403,9 +403,20 @@ nonisolated enum LegacyImport {
                 endTime: dto.endTime,
                 superSets: superSets,
                 notes: noteLines.joined(separator: "\n"),
-                bodyWeight: nil,
                 standoutSong: nil
             )
+            // Dedupes against `fallbackOwner` standing in for more than one missing
+            // `athleteID` (a claimed entry whose athlete was deleted after the fact) —
+            // without this, the same fallback athlete could appear twice in `athletes`.
+            var participatingAthletes: [SchemaV3.Athlete] = []
+            var seenAthleteUUIDs: Set<UUID> = []
+            for (athleteID, _) in orderedEntries {
+                let athlete = athleteByUUID[athleteID] ?? fallbackOwner
+                if seenAthleteUUIDs.insert(athlete.uuid).inserted {
+                    participatingAthletes.append(athlete)
+                }
+            }
+            v3Session.athletes = participatingAthletes
             context.insert(v3Session)
             summary.teamSessionsImported += 1
 

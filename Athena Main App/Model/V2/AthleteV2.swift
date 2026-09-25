@@ -8,8 +8,6 @@
 import Foundation
 import SwiftData
 
-typealias Athlete = SchemaV2.Athlete
-
 extension SchemaV2 {
     @Model
     final class Athlete {

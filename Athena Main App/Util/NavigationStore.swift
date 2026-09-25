@@ -11,24 +11,7 @@ internal import Combine
 @MainActor
 final class NavigationStore: ObservableObject {
     @Published var path = NavigationPath()
-    
-    private let decoder = JSONDecoder()
-    private let encoder = JSONEncoder()
-    
-    func encoded() -> Data? {
-        try? path.codable.map(encoder.encode)
-    }
-    
-    func restore(from data: Data) {
-        do {
-            let codable = try decoder.decode(
-                NavigationPath.CodableRepresentation.self, from: data
-            )
-            path = NavigationPath(codable)
-        } catch {
-            path = NavigationPath()
-        }
-    }
+    @Published var currentAthlete: Athlete? = nil
     
     func push(_ value: any Hashable) {
         path.append(value)
@@ -48,44 +31,36 @@ final class NavigationStore: ObservableObject {
     @ViewBuilder
     func handleView(_ view: ViewType) -> some View {
         switch view {
-        case .athleteList(let athlete):
-            AthleteListView(currentAthleteID: athlete.uuid)
+        case .athleteRoster:
+            AthleteRosterView()
         case .athlete(let athlete):
             AthleteView(athlete: athlete)
         case .exercise(let exercise, let athlete):
-            ExerciseView(exercise: exercise, athlete: athlete)
-        case .exerciseList(let athlete):
-            ExerciseListView(athlete: athlete)
+            if let athlete {
+                AthleteExerciseView(exercise: exercise, athlete: athlete)
+            } else {
+                ExerciseView(exercise: exercise)
+            }
+        case .exerciseList:
+            ExerciseListView()
         case .routineAdd:
             RoutineEditView()
         case .routineEdit(let routine):
             RoutineEditView(routine: routine)
-        case .routineView(let routine, let athlete):
-            RoutineView(routine: routine, athlete: athlete)
         case .session(let session):
             SessionView(session: session)
-        case .teamSession(let teamSession):
-            TeamSessionView(teamSession: teamSession)
-        case .repeaters(let athlete):
-            RepeaterOverview(athlete: athlete)
-        case .exerciseLibrary:
-            ExerciseLibraryView()
         }
     }
 }
 
 enum ViewType: Hashable {
-    case athleteList(athlete: Athlete)
     case athlete(athlete: Athlete)
-    case exercise(exercise: Exercise, athlete: Athlete)
-    case exerciseList(athlete: Athlete)
+    case athleteRoster
+    case exercise(exercise: Exercise, athlete: Athlete? = nil)
+    case exerciseList
     case routineAdd
     case routineEdit(routine: Routine)
-    case routineView(routine: Routine, athlete: Athlete? = nil)
     case session(session: Session)
-    case teamSession(session: TeamSession)
-    case repeaters(athlete: Athlete)
-    case exerciseLibrary
 }
 
 extension View {

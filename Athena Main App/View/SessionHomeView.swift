@@ -11,15 +11,12 @@ import SwiftUI
 /// The home page shown when no exercise is in progress: session metadata, notes, and a summary
 /// of every set/exercise with actions to start, resume, edit, or delete them.
 struct SessionHomeView: View {
-    @Query(sort: [
-        SortDescriptor(\Athlete.lastUsedAt, order: .reverse),
-        SortDescriptor(\Athlete.name)
-    ]) private var athletes: [Athlete]
+    @Query(sort: \Athlete.name) private var athletes: [Athlete]
     
     @Bindable var session: Session
     @Binding var sheetType: SessionView.SheetType?
     @Binding var song: Session.Song
-    @Binding var deleteExercise: (Int, Int)?
+    @Binding var deleteExercise: ExerciseData.Position?
     /// Jumps into the given exercise/set, exactly as if its "Start"/"Resume"/"Re-start" button
     /// had been tapped.
     let onSelect: (ExerciseIndices) -> Void
@@ -30,7 +27,7 @@ struct SessionHomeView: View {
 
     /// If true, data has been collected in some form for the session
     private var hasData: Bool {
-        !session.notes.isEmpty || session.sets.contains(where: { $0.exercises.contains(where: \.hasData) })
+        !session.notes.isEmpty || session.data.contains(where: { !$0.actualData.isEmpty })
     }
 
     var body: some View {
@@ -44,19 +41,15 @@ struct SessionHomeView: View {
     private func activeHomePage() -> some View {
         Form {
             Section {
-                Picker("Athlete:", selection: $session.athlete) {
-                    ForEach(athletes) { athlete in
-                        Text(athlete.name).tag(athlete as Athlete?)
-                    }
-                }
+                // TODO athlete selection
+//                Picker("Athlete:", selection: $session.athlete) {
+//                    ForEach(athletes) { athlete in
+//                        Text(athlete.name).tag(athlete as Athlete?)
+//                    }
+//                }
                 DatePicker("Start:", selection: $session.startTime, displayedComponents: [.date, .hourAndMinute])
-                Stepper(value: $session.bodyWeight, in: 0...1000, step: 1) {
-                    HStack {
-                        Text("Body Weight: \(session.bodyWeight.lbsFormat)")
-                    }
-                }
                 TextField("Notes", text: $session.notes, axis: .vertical)
-                    .lineLimit((session.sets.isEmpty ? 9 : 3)...12)
+                    .lineLimit((session.data.isEmpty ? 9 : 3)...12)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.sentences)
                 if hasData {
@@ -67,8 +60,6 @@ struct SessionHomeView: View {
             } header: {
                 if let routine = session.routine {
                     Text(routine.name)
-                } else if let routineName = session.routineName {
-                    Text(routineName)
                 }
             }
             setSummaryView()
@@ -80,11 +71,11 @@ struct SessionHomeView: View {
         Form {
             Section {
                 TextField("Notes", text: $session.notes, axis: .vertical)
-                    .lineLimit((session.sets.isEmpty ? 9 : 3)...12)
+                    .lineLimit((session.data.isEmpty ? 9 : 3)...12)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.sentences)
                 Button {
-                    song = session.standoutSong ?? .init()
+                    song = session.standoutSong ?? .init(name: "", artist: "")
                     sheetType = .song
                 } label: {
                     if let standoutSong = session.standoutSong {
@@ -104,17 +95,16 @@ struct SessionHomeView: View {
                 }.buttonStyle(.plain)
             } header: {
                 VStack(alignment: .leading) {
-                    HStack {
-                        Text(session.athleteDisplayName)
-                        Spacer()
-                        Text(session.bodyWeight.lbsFormat)
-                    }.font(.subheadline)
-                        .italic()
+                    // TODO
+//                    HStack {
+//                        Text(session.athleteDisplayName)
+//                        Spacer()
+//                        Text(session.bodyWeight.lbsFormat)
+//                    }.font(.subheadline)
+//                        .italic()
                     HStack {
                         if let routine = session.routine {
                             Text(routine.name)
-                        } else if let routineName = session.routineName {
-                            Text(routineName)
                         } else {
                             Text(session.startTime.formatted(date: .numeric, time: .shortened))
                         }
@@ -131,95 +121,109 @@ struct SessionHomeView: View {
 
     @ViewBuilder
     private func setSummaryView() -> some View {
-        ForEach($session.sets.enumerated(), id: \.offset) { offset, $set in
-            let setIndex = offset
+        ForEach($session.superSets.enumerated(), id: \.offset) { offset, $superSet in
+            let superSetIndex = offset
             Section {
-                ForEach(set.exercises.enumerated(), id: \.offset) { offset, exercise in
-                    let exerciseIndex = offset
-                    if !session.finished {
-                        Menu {
-                            if exercise.numCompletedSets == exercise.numSets {
-                                Button {
-                                    // Go to exercise (set 1)
-                                    onSelect(.init(setIndex, exerciseIndex))
-                                } label: {
-                                    Label("Re-start Exercise", systemImage: "play")
-                                }
-                            } else if exercise.numCompletedSets > 0 {
-                                Button {
-                                    // Go to exercise (next set)
-                                    onSelect(.init(setIndex, exerciseIndex, exercise.numCompletedSets))
-                                } label: {
-                                    Label("Resume Exercise", systemImage: "play")
-                                }
-                            } else {
-                                Button {
-                                    // Go to exercise (set 1)
-                                    onSelect(.init(setIndex, exerciseIndex))
-                                } label: {
-                                    Label("Start Exercise", systemImage: "play")
-                                }
-                            }
-                            Button {
-                                sheetType = .exercise(setIndex: setIndex, exerciseIndex: exerciseIndex)
-                            } label: {
-                                Label("Edit Exercise", systemImage: "pencil")
-                            }
-                        } label: {
-                            HStack {
-                                SessionExerciseEntryView(exercise: exercise)
-                                Spacer()
-                            }.contentShape(Rectangle())
-                        }.buttonStyle(.plain)
-                            .swipeActions {
-                                Button("Delete", systemImage: "trash") {
-                                    deleteExercise = (setIndex, exerciseIndex)
-                                }.tint(.red)
-                            }
-                    } else {
-                        Button {
-                            sheetType = .exercise(setIndex: setIndex, exerciseIndex: exerciseIndex)
-                        } label: {
-                            HStack {
-                                SessionExerciseEntryView(exercise: exercise)
-                                Spacer()
-                            }.contentShape(Rectangle())
-                        }.buttonStyle(.plain)
-                            .swipeActions {
-                                Button("Delete", systemImage: "trash") {
-                                    deleteExercise = (setIndex, exerciseIndex)
-                                }.tint(.red)
-                            }
-                    }
+                ForEach(session.data
+                    .filter { $0.position.superSetIndex == superSetIndex }
+                    .sorted(by: { $0.position.setIndex < $1.position.setIndex })
+                    .enumerated(), id: \.offset) { offset, data in
+                    dataView(superSetIndex: superSetIndex, setIndex: offset, data: data)
                 }
             } header: {
                 HStack {
                     if session.finished {
-                        Text(set.name)
+                        Text(superSet.name)
                     } else {
-                        TextField("Set Name", text: $set.name)
+                        TextField("Set Name", text: $superSet.name)
                     }
                     Spacer()
-                    if set.restTime > 0 {
-                        Text("\(set.restTime)s Rest")
+                    if superSet.restTime > 0 {
+                        Text("\(superSet.restTime)s Rest")
                     }
-                    ExerciseSetHeaderMenu(
-                        onPickFromLibrary: { sheetType = .exercisePicker(setIndex: setIndex) },
-                        onAddNew: { exercise in
-                            set.exercises.append(exercise)
-                            sheetType = .exercise(setIndex: setIndex, exerciseIndex: set.exercises.count - 1)
-                        },
-                        onDeleteSet: { session.sets.remove(at: setIndex) }
-                    )
+                    // TODO
+//                    ExerciseSetHeaderMenu(
+//                        onPickFromLibrary: { sheetType = .exercisePicker(setIndex: setIndex) },
+//                        onAddNew: { exercise in
+//                            set.exercises.append(exercise)
+//                            sheetType = .exercise(setIndex: setIndex, exerciseIndex: set.exercises.count - 1)
+//                        },
+//                        onDeleteSet: { session.sets.remove(at: setIndex) }
+//                    )
                 }
             }
         }
         if !session.finished {
-            Button {
-                session.sets.append(.init(base: .init()))
+            // TODO
+//            Button {
+//                session.sets.append(.init(base: .init()))
+//            } label: {
+//                Label("Add New Set", systemImage: "plus")
+//            }
+        }
+    }
+    
+    @ViewBuilder
+    private func dataView(superSetIndex: Int, setIndex: Int, data: ExerciseData) -> some View {
+        let exercise = data.exercise
+        if !session.finished {
+            Menu {
+                if !data.expectedData.isEmpty {
+                    if data.actualData.count >= data.expectedData.count {
+                        Button {
+                            // Go to exercise (set 1)
+                            onSelect(.init(superSetIndex, setIndex))
+                        } label: {
+                            Label("Re-start Exercise", systemImage: "play")
+                        }
+                    } else if !data.actualData.isEmpty {
+                        Button {
+                            // Go to exercise (next set)
+                            onSelect(.init(superSetIndex, setIndex, data.actualData.count))
+                        } label: {
+                            Label("Resume Exercise", systemImage: "play")
+                        }
+                    } else {
+                        Button {
+                            // Go to exercise (set 1)
+                            onSelect(.init(superSetIndex, setIndex))
+                        } label: {
+                            Label("Start Exercise", systemImage: "play")
+                        }
+                    }
+                }
+                Button {
+                    sheetType = .exercise(setIndex: superSetIndex, exerciseIndex: setIndex)
+                } label: {
+                    Label("Edit Exercise", systemImage: "pencil")
+                }
             } label: {
-                Label("Add New Set", systemImage: "plus")
-            }
+                HStack {
+                    // TODO
+//                    SessionExerciseEntryView(exercise: exercise)
+                    Spacer()
+                }.contentShape(Rectangle())
+            }.buttonStyle(.plain)
+                .swipeActions {
+                    Button("Delete", systemImage: "trash") {
+                        deleteExercise = data.position
+                    }.tint(.red)
+                }
+        } else {
+            Button {
+                sheetType = .exercise(setIndex: superSetIndex, exerciseIndex: setIndex)
+            } label: {
+                HStack {
+                    // TODO
+//                    SessionExerciseEntryView(exercise: exercise)
+                    Spacer()
+                }.contentShape(Rectangle())
+            }.buttonStyle(.plain)
+                .swipeActions {
+                    Button("Delete", systemImage: "trash") {
+                        deleteExercise = data.position
+                    }.tint(.red)
+                }
         }
     }
 }

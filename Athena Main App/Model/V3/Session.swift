@@ -8,16 +8,20 @@
 import Foundation
 import SwiftData
 
+typealias Session = SchemaV3.Session
+
 extension SchemaV3 {
     @Model
-    final class Session {
+    final class Session: Hashable {
         var routine: Routine? = nil
         var startTime: Date = Date()
         var endTime: Date? = nil
         var superSets: [Routine.SuperSet] = []
         var notes: String = ""
-        var bodyWeight: Double? = nil
         var standoutSong: Song? = nil
+        /// All associated athletes
+        @Relationship(inverse: \Athlete.sessions)
+        var athletes: [Athlete]! = []
         /// No point in keeping data for a deleted session
         @Relationship(deleteRule: .cascade, inverse: \ExerciseData.session)
         var data: [ExerciseData]! = []
@@ -27,14 +31,12 @@ extension SchemaV3 {
              endTime: Date? = nil,
              superSets: [Routine.SuperSet] = [],
              notes: String = "",
-             bodyWeight: Double? = nil,
              standoutSong: Song? = nil) {
             self.routine = routine
             self.startTime = startTime
             self.endTime = endTime
             self.superSets = superSets
             self.notes = notes
-            self.bodyWeight = bodyWeight
             self.standoutSong = standoutSong
         }
 

@@ -7,6 +7,12 @@
 
 import SwiftData
 
+typealias ExerciseData = SchemaV3.ExerciseData
+typealias CampusSet = SchemaV3.ExerciseData.CampusSet
+typealias CampusBoard = CampusSet.Board
+typealias CampusMove = CampusSet.Move
+typealias CampusRung = CampusSet.Rung
+
 extension SchemaV3 {
     @Model
     final class ExerciseData {

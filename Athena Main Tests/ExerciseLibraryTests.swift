@@ -30,6 +30,9 @@
 import Testing
 @testable import Athena
 
+// Pinned to V2: ExerciseIdentity is built on V2's Routine.Exercise payload shape.
+private typealias Routine = SchemaV2.Routine
+
 struct ExerciseLibraryTests {
     @Test func identityEqualityAcrossAllFourKinds() {
         #expect(ExerciseIdentity.generic(name: "Bench", dataType: .repWeight, sideType: nil)

@@ -10,6 +10,17 @@ import SwiftData
 import Testing
 @testable import Athena
 
+// Pinned to V2: this suite exercises the still-live V1->V2 backfill.
+private typealias Routine = SchemaV2.Routine
+private typealias Session = SchemaV2.Session
+private typealias Exercise = SchemaV2.Exercise
+private typealias RepeaterExercise = SchemaV2.RepeaterExercise
+private typealias GenericExercise = SchemaV2.GenericExercise
+private typealias MaxHangExercise = SchemaV2.MaxHangExercise
+private typealias CampusLibraryExercise = SchemaV2.CampusLibraryExercise
+private typealias Athlete = SchemaV2.Athlete
+private typealias TeamSession = SchemaV2.TeamSession
+
 struct SchemaV2MigrationTests {
     /// Builds a V1 store at a fresh temp URL. Two routine sets (so removing one still
     /// leaves a second set whose exercises would shift position under the old

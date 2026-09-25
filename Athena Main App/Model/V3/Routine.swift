@@ -8,9 +8,11 @@
 import Foundation
 import SwiftData
 
+typealias Routine = SchemaV3.Routine
+
 extension SchemaV3 {
     @Model
-    final class Routine {
+    final class Routine: Hashable {
         /// The name of the routine
         var name: String = ""
         /// All super sets details (links to data)

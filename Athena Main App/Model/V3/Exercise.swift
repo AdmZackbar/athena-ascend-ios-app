@@ -8,11 +8,29 @@
 import Foundation
 import SwiftData
 
+typealias Exercise = SchemaV3.Exercise
+
 extension SchemaV3 {
     @Model
-    final class Exercise {
+    final class Exercise: Hashable {
         var createdAt: Date = Date()
-        var category: Category = Category.generic(name: "", dataTypes: [.reps], sideType: .none)
+        /// Backing storage for `category`. Stored as `Data` (manually encoded/decoded
+        /// below) rather than letting SwiftData persist `Category` natively as a
+        /// scalar attribute — SPIKE: testing whether that native path is what crashes
+        /// when a fetch returns `Exercise` rows whose `Category` case differs from row
+        /// to row. See conversation notes; if this holds, forcing the same manual
+        /// Codable path already used by `ExerciseData`'s `[DataSet]` collections
+        /// avoids SwiftData's own enum-attribute reflection entirely.
+        var categoryData: Data = Data()
+        var category: Category {
+            get {
+                (try? JSONDecoder().decode(Category.self, from: categoryData))
+                    ?? .generic(name: "", dataTypes: [.reps], sideType: .none)
+            }
+            set {
+                categoryData = (try? JSONEncoder().encode(newValue)) ?? Data()
+            }
+        }
         var notes: String = ""
         /// No point in keeping exercise data for a deleted exercise
         @Relationship(deleteRule: .cascade, inverse: \ExerciseData.exercise)

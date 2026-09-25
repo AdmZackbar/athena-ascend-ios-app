@@ -13,17 +13,9 @@ import SwiftUI
 struct AthleteView: View {
     @State var athlete: Athlete
 
-    private var soloSessions: [Session] {
-        athlete.sessions.filter { !$0.isTeamEntry }.sorted(by: { $0.startTime > $1.startTime })
-    }
-
-    private var teamEntries: [Session] {
-        athlete.sessions.filter(\.isTeamEntry).sorted(by: { $0.startTime > $1.startTime })
-    }
-
     var body: some View {
         Form {
-            Section("Name") {
+            Section("Info") {
                 TextField("Nickname", text: $athlete.name)
                 TextField("First Name", text: .init(get: {
                     athlete.firstName ?? ""
@@ -35,35 +27,24 @@ struct AthleteView: View {
                 }, set: { newValue in
                     athlete.lastName = newValue.isEmpty ? nil : newValue
                 }))
-            }
-            if soloSessions.isEmpty && teamEntries.isEmpty {
-                Text("No sessions yet")
-                    .foregroundStyle(.secondary)
-            }
-            if !soloSessions.isEmpty {
-                Section("Sessions") {
-                    ForEach(soloSessions) { session in
-                        NavigationLink {
-                            SessionView(session: session)
-                        } label: {
-                            historyRow(date: session.startTime, label: session.routine?.name ?? session.routineName)
+                HStack {
+                    Toggle("Set Birthday", isOn: .init(get: {
+                        athlete.birthDate != nil
+                    }, set: { newValue in
+                        if !newValue {
+                            athlete.birthDate = nil
                         }
+                    }))
+                    if athlete.birthDate != nil {
+                        DatePicker("Birthday", selection: .init(get: {
+                            athlete.birthDate ?? .now
+                        }, set: { newValue in
+                            athlete.birthDate = newValue
+                        }))
                     }
                 }
             }
-            if !teamEntries.isEmpty {
-                Section("Team Sessions") {
-                    ForEach(teamEntries) { entry in
-                        if let teamSession = entry.teamSession {
-                            NavigationLink {
-                                TeamAthleteDetailView(entry: entry)
-                            } label: {
-                                historyRow(date: teamSession.startTime, label: teamSession.routine?.name ?? teamSession.routineName)
-                            }
-                        }
-                    }
-                }
-            }
+            // TODO show sessions and data
         }.navigationTitle(athlete.name)
             .navigationBarTitleDisplayMode(.inline)
     }

@@ -8,6 +8,8 @@
 import Foundation
 import SwiftData
 
+typealias Athlete = SchemaV3.Athlete
+
 extension SchemaV3 {
     @Model
     final class Athlete {
@@ -20,6 +22,8 @@ extension SchemaV3 {
         var birthDate: Date? = nil
         /// Creation date of the athlete
         var createdAt: Date = Date()
+        /// All associated sessions
+        var sessions: [Session]! = []
         /// No point in keeping data for a deleted athlete
         @Relationship(deleteRule: .cascade, inverse: \ExerciseData.athlete)
         var data: [ExerciseData]! = []

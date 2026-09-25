@@ -20,159 +20,169 @@ struct TestDataModifier: PreviewModifier {
     }
     
     static func populateContainer(_ container: ModelContainer) {
-        let sessionStartTime = Date.now.addingTimeInterval(-3600)
-        let routine: Routine = .init(name: "Spring 2026 Monday", sets: [
-            .init(name: "Warmup Set", exercises: [
-                .generic(.init(name: "Pancake Fold", dataType: .time, sets: [
-                    .init(num: 5),
-                ])),
-                .generic(.init(name: "Ninja Kick", dataType: .time, sideType: .independent, sets: [
-                    .init(num: 3),
-                ])),
-                .generic(.init(name: "Cossack Squats", dataType: .rep, sideType: .independent, sets: [
-                    .init(num: 10),
-                    .init(num: 10),
-                    .init(num: 10),
-                ])),
-                .generic(.init(name: "Dumbbell Bench Press", sideType: .dependent, sets: [
-                    .init(num: 10),
-                    .init(num: 8),
-                    .init(num: 6),
-                ])),
-                .generic(.init(name: "Curtsy Squat", sideType: .independent, sets: [
-                    .init(min: 8, max: 12),
-                    .init(min: 8, max: 12),
-                    .init(min: 8, max: 12),
-                ]))
-            ], restTime: 10, order: .dfs),
-            .init(name: "Hangboard Block A", exercises: [
-                .repeater(.init(tag: "10mm HC", sets: [
-                    .init(numReps: 7),
-                    .init(numReps: 5, weight: 20.0),
-                ])),
-                .repeater(.init(tag: "MR S Pocket", sets: [
-                    .init(numReps: 7, weight: -40.0),
-                    .init(numReps: 6, weight: -30.0),
-                    .init(numReps: 5, weight: -20.0),
-                ])),
-                .repeater(.init(tag: "M L Pocket", timeOn: 5, timeOff: 5, sets: [
-                    .init(numReps: 7, weight: -60.0),
-                    .init(numReps: 6, weight: -50.0),
-                    .init(numReps: 5, weight: -40.0),
-                ])),
-            ], restTime: 120, order: .dfs),
-            .init(name: "Max Hang Block B", exercises: [
-                .maxHang(.init(tag: "BM Middle", sets: [
-                    .init(target: 10, targetAlt: 10, weight: 35.0, weightAlt: 40.0),
-                    .init(target: 6, targetAlt: 6, weight: 40.0, weightAlt: 45.0),
-                    .init(target: 6, targetAlt: 6, weight: 40.0, weightAlt: 45.0),
-                ]))
-            ], restTime: 180, order: .dfs),
-            .init(name: "Warmup Campus", exercises: [
-                .campus(.init(type: .basicLadder, sets: [
-                    .init(moves: .defined([
+        let context = container.mainContext
+        let date = Date.now.addingTimeInterval(-7200)
+        // Routine
+        let routine = Routine(name: "Spring 2026 Monday", superSets: [
+            .init(name: "Warmup Set", restTime: 0, order: .bfs),
+            .init(name: "Hangboard Block A", restTime: 120, order: .dfs),
+            .init(name: "Max Hang Block B", restTime: 180, order: .dfs),
+            .init(name: "Warmup Campus", restTime: 100, order: .dfs),
+        ], createdAt: date)
+        routine.data = [
+            .init(exercise: .init(category: .generic(name: "Pancake Fold", dataTypes: [.time], sideType: .none)),
+                  routine: routine,
+                  position: .init(setIndex: 0),
+                  expectedData: [[.time: .discrete(45)]]),
+            .init(exercise: .init(category: .generic(name: "Ninja Kick", dataTypes: [.time], sideType: .independent)),
+                  routine: routine,
+                  position: .init(setIndex: 1),
+                  expectedData: [[.time: .discrete(30)]]),
+            .init(exercise: .init(category: .generic(name: "Cossack Squats", dataTypes: [.reps], sideType: .none)),
+                  routine: routine,
+                  position: .init(setIndex: 2),
+                  expectedData: [
+                    [.reps: .discrete(10)],
+                    [.reps: .discrete(10)],
+                    [.reps: .discrete(10)],
+                  ]),
+            .init(exercise: .init(category: .generic(name: "Dumbbell Bench Press", dataTypes: [.reps, .weight], sideType: .dependent)),
+                  routine: routine,
+                  position: .init(setIndex: 3),
+                  expectedData: [
+                    [.reps: .discrete(10), .weight: .number(35)],
+                    [.reps: .discrete(8), .weight: .number(40)],
+                    [.reps: .discrete(6), .weight: .number(45)],
+                  ]),
+            .init(exercise: .init(category: .generic(name: "Curtsy Squat", dataTypes: [.reps, .weight], sideType: .independent)),
+                  routine: routine,
+                  position: .init(setIndex: 4),
+                  expectedData: [
+                    [.reps: .range(min: 8, max: 12)],
+                    [.reps: .range(min: 8, max: 12)],
+                    [.reps: .range(min: 8, max: 12)],
+                  ]),
+            .init(exercise: .init(category: .repeater(tag: "10mm HC", timeOn: 7, timeOff: 3)),
+                  routine: routine,
+                  position: .init(superSetIndex: 1, setIndex: 0),
+                  expectedData: [
+                    [.reps: .discrete(7), .weight: .number(0)],
+                    [.reps: .discrete(5), .weight: .number(20)],
+                  ]),
+            .init(exercise: .init(category: .repeater(tag: "MR S Pocket", timeOn: 7, timeOff: 3)),
+                  routine: routine,
+                  position: .init(superSetIndex: 1, setIndex: 1),
+                  expectedData: [
+                    [.reps: .discrete(7), .weight: .number(-40)],
+                    [.reps: .discrete(6), .weight: .number(-30)],
+                    [.reps: .discrete(5), .weight: .number(-20)],
+                  ]),
+            .init(exercise: .init(category: .repeater(tag: "M L Pocket", timeOn: 5, timeOff: 5)),
+                  routine: routine,
+                  position: .init(superSetIndex: 1, setIndex: 2),
+                  expectedData: [
+                    [.reps: .discrete(7), .weight: .number(-60)],
+                    [.reps: .discrete(6), .weight: .number(-50)],
+                    [.reps: .discrete(5), .weight: .number(-40)],
+                  ]),
+            .init(exercise: .init(category: .maxHang(tag: "BM Middle", sideType: .independent)),
+                  routine: routine,
+                  position: .init(superSetIndex: 2, setIndex: 0),
+                  expectedData: [
+                    [.time: .discrete(10), .weight: .number(35), .weightAlt: .number(40)],
+                    [.time: .discrete(6), .weight: .number(40), .weightAlt: .number(45)],
+                    [.time: .discrete(6), .weight: .number(45)],
+                  ]),
+            .init(exercise: .init(category: .campus(name: "Basic Ladder", mirrorSets: true)),
+                  routine: routine,
+                  position: .init(superSetIndex: 3, setIndex: 0),
+                  expectedData: [
+                    [.campus: .campus(.init(board: .largeEdges, moves: [
                         .init(rung: .full(1), side: .both),
                         .init(rung: .full(3), side: .right),
                         .init(rung: .full(5), side: .left),
                         .init(rung: .full(7), side: .right),
                         .init(rung: .full(9), side: .left),
                         .init(rung: .full(9), side: .both),
-                    ]))
-                ]))
-            ], restTime: 100, order: .dfs)
-        ], createdAt: sessionStartTime, lastUsedAt: sessionStartTime)
-
-        let zach = Athlete(name: "Zach", firstName: "Zach", lastName: "Wassynger", createdAt: sessionStartTime, lastUsedAt: .now)
-        let session = Session(startTime: sessionStartTime, endTime: .now, sets: routine.sets.map({ .init(base: $0) }), bodyWeight: 155, standoutSong: .init(name: "Permanent", artist: "A Day to Remember"), routineName: routine.name, athlete: zach)
-        fillRandomActuals(session)
-        routine.sessions.append(session)
-
-        // Run the same findOrCreate sweep the app uses at routine-save/session-finish
-        // time, so previews exercise the linked path rather than hand-assigning UUIDs.
-        let context = container.mainContext
-        context.insert(zach)
-        for setIndex in routine.sets.indices {
-            for exIndex in routine.sets[setIndex].exercises.indices {
-                guard let exercise = ExerciseLibrary.findOrCreate(for: routine.sets[setIndex].exercises[exIndex], in: context) else { continue }
-                routine.sets[setIndex].exercises[exIndex].exerciseID = exercise.uuid
-                exercise.lastUsedAt = sessionStartTime
-            }
-        }
-        for setIndex in session.sets.indices {
-            for exIndex in session.sets[setIndex].exercises.indices {
-                guard let exercise = ExerciseLibrary.findOrCreate(for: session.sets[setIndex].exercises[exIndex], in: context) else { continue }
-                session.sets[setIndex].exercises[exIndex].exerciseID = exercise.uuid
-                exercise.lastUsedAt = sessionStartTime
-            }
-        }
-
-        // A finished team session over the same routine, for two athletes who aren't
-        // the store's owner — exercises the multi-person entry/review path.
-        let teamStartTime = Date.now.addingTimeInterval(-1800)
-        let linsay = Athlete(name: "Linsay", createdAt: teamStartTime, lastUsedAt: .now)
-        let allie = Athlete(name: "Allie", createdAt: teamStartTime, lastUsedAt: .now)
-        context.insert(linsay)
-        context.insert(allie)
-
-        let teamSession = TeamSession(routineName: routine.name, startTime: teamStartTime, endTime: .now, sets: routine.sets.map(Session.ExerciseSet.init))
-        routine.teamSessions.append(teamSession)
-        for athlete in [linsay, allie] {
-            let entry = teamSession.addAthlete(athlete, context: context)
-            entry.startTime = teamStartTime
-            entry.endTime = .now
-            fillRandomActuals(entry)
-        }
-        ExerciseLibrary.linkUnlinkedExercises(in: &teamSession.sets, context: context)
-        for entry in teamSession.entries {
-            ExerciseLibrary.linkUnlinkedExercises(in: entry, context: context)
-        }
-
+                    ]))]
+                  ])
+        ]
         context.insert(routine)
-    }
 
-    /// Fills every exercise in a session with plausible randomized results, in place —
-    /// shared by the solo sample session and each team-session entry.
-    private static func fillRandomActuals(_ session: Session) {
-        session.sets.indices.forEach { setIndex in
-            session.sets[setIndex].exercises.indices.forEach { exIndex in
-                session.sets[setIndex].exercises[exIndex] = randomizedActual(for: session.sets[setIndex].exercises[exIndex])
-            }
-        }
+        // Solo session
+        let zach = Athlete(name: "Zach", firstName: "Zach", lastName: "Wassynger", createdAt: date)
+        let session = Session(routine: routine,
+                              startTime: date.addingTimeInterval(3600),
+                              endTime: .now,
+                              superSets: routine.superSets,
+                              standoutSong: .init(name: "Permanent", artist: "A Day to Remember"))
+        session.data = routine.data.map { createActualData(session: session, athlete: zach, routineData: $0) }
+        context.insert(session)
+        
+        // Team session
+        let linsay = Athlete(name: "Linsay", createdAt: date.addingTimeInterval(60))
+        let allie = Athlete(name: "Allie", createdAt: date.addingTimeInterval(120))
+        // TODO
     }
-
-    private static func randomizedActual(for exercise: Session.Exercise) -> Session.Exercise {
-        switch exercise {
-        case .generic(let d):
-            var actual: [Session.GenericDataSet] = []
-            for exSet in d.expected.sets {
-                actual.append(.init(numReps: Int.random(in: exSet.min...exSet.max), weight: Double(Int.random(in: 0...12) * 5)))
+    
+    static func createActualData(session: Session, athlete: Athlete, routineData: RoutineData) -> ExerciseData {
+        .init(exercise: routineData.exercise,
+              session: session,
+              athlete: athlete,
+              position: routineData.position,
+              expectedData: routineData.expectedData,
+              actualData: routineData.expectedData.map { createActualData(exercise: routineData.exercise, expected: $0) }
+        )
+    }
+    
+    static func createActualData(exercise: Exercise, expected: ExerciseData.DataSet) -> ExerciseData.DataSet {
+        var actual: ExerciseData.DataSet = .init()
+        switch exercise.category {
+        case .generic(_, let dataTypes, _):
+            for dataType in dataTypes {
+                switch dataType {
+                case .reps:
+                    actual[.reps] = expected[.reps, default: .discrete(8)] + Int.random(in: -3...3)
+                case .time:
+                    actual[.time] = expected[.time, default: .discrete(30)] + Int.random(in: -10...10)
+                case .weight:
+                    actual[.weight] = expected[.weight, default: .number(40)] + (Int.random(in: -3...3) * 5)
+                case .distance:
+                    actual[.distance] = expected[.distance, default: .discrete(24)]
+                }
+                // TODO use side type to fill in alt sometimes
             }
-            return .generic(.init(expected: d.expected, actual: actual))
-        case .repeater(let d):
-            var actual: [Session.RepeaterSet] = []
-            for exSet in d.expected.sets {
-                actual.append(.init(numReps: Int.random(in: (exSet.numReps - 2)...exSet.numReps), weight: Double(Int.random(in: -8...8) * 5)))
-            }
-            return .repeater(.init(expected: d.expected, actual: actual))
-        case .maxHang(let d):
-            var actual: [Session.MaxHangSet] = []
-            for exSet in d.expected.sets {
-                actual.append(.init(time: Int.random(in: exSet.target - 5...exSet.target), weight: Double(Int.random(in: 0...6) * 5)))
-            }
-            return .maxHang(.init(expected: d.expected, actual: actual))
-        case .campus(let d):
-            var actual: [Session.CampusSetPair] = []
-            for exSet in d.expected.sets {
-                let moves = exSet.moves.moves ?? [d.expected.type.start]
-                let alt = exSet.doMirror && d.expected.type.canMirror ? CampusSet(board: exSet.board, moves: moves.flipped) : nil
-                actual.append(.init(main: .init(board: exSet.board, moves: moves), alt: alt))
-            }
-            return .campus(.init(expected: d.expected, actual: actual))
+        case .repeater(_, _, _):
+            actual[.reps] = expected[.reps, default: .discrete(7)]
+            actual[.weight] = expected[.weight, default: .number(0)]
+        case .maxHang(_, _):
+            actual[.time] = expected[.time, default: .discrete(10)] + Int.random(in: -5...1)
+            actual[.weight] = expected[.weight, default: .number(30)]
+        case .campus(_, _):
+            // TODO add variance
+            actual[.campus] = expected[.campus]
         }
+        return actual
     }
 
     func body(content: Content, context: ModelContainer) -> some View {
         content.modelContainer(context)
+    }
+}
+
+extension ExerciseData.Value {
+    static func + (lhs: ExerciseData.Value, rhs: Int) -> ExerciseData.Value {
+        switch lhs {
+        case .discrete(let v):
+            return .discrete(v + rhs)
+        case .number(let v):
+            return .number(v + Double(rhs))
+        case .range(let min, let max):
+            return .discrete(min + ((max - min) / 2) + rhs)
+        default:
+            // TODO
+            return lhs
+        }
     }
 }
 

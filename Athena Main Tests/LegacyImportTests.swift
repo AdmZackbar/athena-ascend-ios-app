@@ -365,9 +365,9 @@ struct LegacyImportTests {
 
         let sessions = try container.mainContext.fetch(FetchDescriptor<SchemaV3.Session>())
         let soloSession = try #require(sessions.first { $0.notes == "great session" })
-        #expect(soloSession.bodyWeight == 165)
         #expect(soloSession.standoutSong?.name == "Song")
         #expect(soloSession.routine?.name == fixture.routineName)
+        #expect(soloSession.athletes.map(\.uuid) == [fixture.athleteA.uuid])
 
         let allData = try container.mainContext.fetch(FetchDescriptor<SchemaV3.ExerciseData>())
         let sessionData = allData.filter { $0.session === soloSession }
@@ -419,8 +419,10 @@ struct LegacyImportTests {
         let teamSessions = sessions.filter { $0.notes.contains("Team notes") }
         #expect(teamSessions.count == 1)
         let teamSession = try #require(teamSessions.first)
-        #expect(teamSession.bodyWeight == nil)
         #expect(teamSession.notes == "Team notes\n\nAlice: Alice notes")
+        // Only Alice's entry matched (`entryA`) — Bob's orphaned entry becomes its own
+        // standalone session and isn't one of this team session's athletes.
+        #expect(teamSession.athletes.map(\.uuid) == [fixture.athleteA.uuid])
 
         let allData = try container.mainContext.fetch(FetchDescriptor<SchemaV3.ExerciseData>())
         let teamData = allData.filter { $0.session === teamSession }
@@ -437,6 +439,7 @@ struct LegacyImportTests {
         let sessions = try container.mainContext.fetch(FetchDescriptor<SchemaV3.Session>())
         let orphanSessions = sessions.filter { $0.notes == "orphan" }
         #expect(orphanSessions.count == 1)
+        #expect(orphanSessions.first?.athletes.map(\.uuid) == [fixture.athleteB.uuid])
 
         let allData = try container.mainContext.fetch(FetchDescriptor<SchemaV3.ExerciseData>())
         #expect(allData.contains { $0.session === orphanSessions.first && $0.athlete?.uuid == fixture.athleteB.uuid } == false)

@@ -34,10 +34,14 @@ struct V2ToV3ConversionTests {
         #expect(V2ToV3Conversion.sideType(isSingleArm: true) == .independent)
     }
 
-    @Test func campusNameMatchesViewLayerText() {
-        for type in SchemaV2.Routine.CampusSets.Exercise.allCases {
-            #expect(V2ToV3Conversion.campusName(for: type) == type.text)
-        }
+    @Test func campusNameMapping() {
+        #expect(V2ToV3Conversion.campusName(for: .basicLadder) == "Basic Ladder")
+        #expect(V2ToV3Conversion.campusName(for: .maxLadder) == "Max Ladder")
+        #expect(V2ToV3Conversion.campusName(for: .maxFirst) == "Max First")
+        #expect(V2ToV3Conversion.campusName(for: .bumps) == "Bumps")
+        #expect(V2ToV3Conversion.campusName(for: .touches) == "Touches")
+        #expect(V2ToV3Conversion.campusName(for: .doubles) == "Doubles")
+        #expect(V2ToV3Conversion.campusName(for: .downUps) == "Down-Ups")
     }
 
     @Test func categoryFromRoutinePayload() {

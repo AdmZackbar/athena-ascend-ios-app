@@ -7,6 +7,13 @@
 
 import Foundation
 
+// Pinned to V2: these DTOs are the one-time export format read by the JSON importer,
+// and must keep reading V2 shapes regardless of what CurrentSchema points at. Fully
+// qualified throughout (no shadow aliases) rather than pinned via `private typealias`,
+// because these DTOs are `internal` (LegacyImport.swift constructs them from a
+// different file) and Swift forbids an `internal` init/property from exposing a
+// `private` type in its signature.
+
 /// Flat, `Codable` mirror of `Athlete` for JSON export via `DataExporter`.
 struct AthleteExportDTO: Codable {
     var uuid: UUID
@@ -16,7 +23,7 @@ struct AthleteExportDTO: Codable {
     var createdAt: Date
     var lastUsedAt: Date?
 
-    init(_ athlete: Athlete) {
+    init(_ athlete: SchemaV2.Athlete) {
         uuid = athlete.uuid
         name = athlete.name
         firstName = athlete.firstName
@@ -35,20 +42,20 @@ struct ExerciseExportDTO: Codable {
     var lastUsedAt: Date?
     var kind: Kind
 
-    init(_ exercise: Exercise) {
+    init(_ exercise: SchemaV2.Exercise) {
         uuid = exercise.uuid
         name = exercise.name
         createdAt = exercise.createdAt
         lastUsedAt = exercise.lastUsedAt
 
         switch exercise {
-        case let generic as GenericExercise:
+        case let generic as SchemaV2.GenericExercise:
             kind = .generic(dataType: generic.dataType, sideType: generic.sideType)
-        case let repeater as RepeaterExercise:
+        case let repeater as SchemaV2.RepeaterExercise:
             kind = .repeater(timeOn: repeater.timeOn, timeOff: repeater.timeOff)
-        case let maxHang as MaxHangExercise:
+        case let maxHang as SchemaV2.MaxHangExercise:
             kind = .maxHang(isSingleArm: maxHang.isSingleArm)
-        case let campus as CampusLibraryExercise:
+        case let campus as SchemaV2.CampusLibraryExercise:
             kind = .campus(campusType: campus.campusType)
         default:
             kind = .unknown
@@ -56,10 +63,10 @@ struct ExerciseExportDTO: Codable {
     }
 
     enum Kind: Codable {
-        case generic(dataType: Routine.GenericSets.DataType, sideType: Routine.SideType?)
+        case generic(dataType: SchemaV2.Routine.GenericSets.DataType, sideType: SchemaV2.Routine.SideType?)
         case repeater(timeOn: Int, timeOff: Int)
         case maxHang(isSingleArm: Bool)
-        case campus(campusType: Routine.CampusSets.Exercise)
+        case campus(campusType: SchemaV2.Routine.CampusSets.Exercise)
         /// Only possible if a future subclass is added without updating this DTO.
         case unknown
     }
@@ -70,11 +77,11 @@ struct ExerciseExportDTO: Codable {
 /// use `name`, matching the app's own `routineName` snapshot fallback pattern.
 struct RoutineExportDTO: Codable {
     var name: String
-    var sets: [Routine.ExerciseSet]
+    var sets: [SchemaV2.Routine.ExerciseSet]
     var createdAt: Date
     var lastUsedAt: Date?
 
-    init(_ routine: Routine) {
+    init(_ routine: SchemaV2.Routine) {
         name = routine.name
         sets = routine.sets
         createdAt = routine.createdAt
@@ -88,14 +95,14 @@ struct SessionExportDTO: Codable {
     var routineName: String?
     var startTime: Date
     var endTime: Date?
-    var sets: [Session.ExerciseSet]
+    var sets: [SchemaV2.Session.ExerciseSet]
     var notes: String
     var bodyWeight: Double
-    var standoutSong: Session.Song?
+    var standoutSong: SchemaV2.Session.Song?
     /// True if this session is one athlete's slice of a `TeamSession`.
     var isTeamSessionEntry: Bool
 
-    init(_ session: Session) {
+    init(_ session: SchemaV2.Session) {
         athleteID = session.athlete?.uuid
         routineName = session.routine?.name ?? session.routineName
         startTime = session.startTime
@@ -116,10 +123,10 @@ struct TeamSessionExportDTO: Codable {
     var startTime: Date
     var endTime: Date?
     var notes: String
-    var sets: [Session.ExerciseSet]
+    var sets: [SchemaV2.Session.ExerciseSet]
     var entryAthleteIDs: [UUID]
 
-    init(_ teamSession: TeamSession) {
+    init(_ teamSession: SchemaV2.TeamSession) {
         routineName = teamSession.routine?.name ?? teamSession.routineName
         startTime = teamSession.startTime
         endTime = teamSession.endTime

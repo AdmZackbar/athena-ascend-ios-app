@@ -1,24 +1,23 @@
 //
-//  ExerciseListView.swift
+//  AthleteExerciseView.swift
 //  Athena
 //
-//  Created by Zach Wassynger on 9/23/26.
+//  Created by Zach Wassynger on 9/25/26.
 //
 
 import SwiftData
 import SwiftUI
 
-struct ExerciseListView: View {
+struct AthleteExerciseListView: View {
     @EnvironmentObject private var navigationStore: NavigationStore
     
-    @Query private var exercises: [Exercise]
+    let athlete: Athlete
     
     var body: some View {
         List {
-            // TODO section by types of exercise
-            ForEach(exercises) { exercise in
+            ForEach(athlete.data.map { $0.exercise }) { exercise in
                 Button {
-                    navigationStore.push(ViewType.exercise(exercise: exercise))
+                    navigationStore.push(ViewType.exercise(exercise: exercise, athlete: athlete))
                 } label: {
                     HStack {
                         VStack(alignment: .leading) {
@@ -33,11 +32,5 @@ struct ExerciseListView: View {
                 }.buttonStyle(.plain)
             }
         }
-    }
-}
-
-#Preview(traits: .sampleData) {
-    NavigationStack {
-        ExerciseListView()
     }
 }

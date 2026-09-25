@@ -8,9 +8,6 @@
 import Foundation
 import SwiftData
 
-typealias Routine = SchemaV2.Routine
-typealias CampusExercise = Routine.CampusSets.Exercise
-
 extension SchemaV2 {
     @Model
     final class Routine {
@@ -250,18 +247,18 @@ extension SchemaV2 {
             }
             
             struct PlannedSet: Codable, Hashable, Equatable {
-                var board: CampusBoard
+                var board: SchemaV2.CampusSet.Board
                 var moves: Moves
                 var doMirror: Bool
-                
-                init(board: CampusBoard = .largeEdges, moves: Moves, doMirror: Bool = true) {
+
+                init(board: SchemaV2.CampusSet.Board = .largeEdges, moves: Moves, doMirror: Bool = true) {
                     self.board = board
                     self.moves = moves
                     self.doMirror = doMirror
                 }
-                
+
                 enum Moves: Codable, Hashable, Equatable {
-                    case defined(_ moves: [CampusMove])
+                    case defined(_ moves: [SchemaV2.CampusSet.Move])
                     case baseline(_ offsets: [Int])
                     case progressive
                 }

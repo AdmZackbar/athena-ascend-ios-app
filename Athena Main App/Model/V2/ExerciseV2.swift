@@ -8,12 +8,6 @@
 import Foundation
 import SwiftData
 
-typealias Exercise = SchemaV2.Exercise
-typealias GenericExercise = SchemaV2.GenericExercise
-typealias RepeaterExercise = SchemaV2.RepeaterExercise
-typealias MaxHangExercise = SchemaV2.MaxHangExercise
-typealias CampusLibraryExercise = SchemaV2.CampusLibraryExercise
-
 extension SchemaV2 {
     /// A reusable exercise library entry. Never instantiated directly — always one of
     /// the concrete subclasses below, matching `Routine.Exercise`'s four cases.
@@ -42,11 +36,11 @@ extension SchemaV2 {
     @available(iOS 26, *)
     @Model
     final class GenericExercise: Exercise {
-        var dataType: Routine.GenericSets.DataType = Routine.GenericSets.DataType.repWeight
+        var dataType: SchemaV2.Routine.GenericSets.DataType = SchemaV2.Routine.GenericSets.DataType.repWeight
         /// Genuinely optional: nil means "not sided" (e.g. plank, barbell bench press).
-        var sideType: Routine.SideType? = nil
+        var sideType: SchemaV2.Routine.SideType? = nil
 
-        init(name: String = "", dataType: Routine.GenericSets.DataType = .repWeight, sideType: Routine.SideType? = nil, createdAt: Date = .now, lastUsedAt: Date? = nil) {
+        init(name: String = "", dataType: SchemaV2.Routine.GenericSets.DataType = .repWeight, sideType: SchemaV2.Routine.SideType? = nil, createdAt: Date = .now, lastUsedAt: Date? = nil) {
             self.dataType = dataType
             self.sideType = sideType
             super.init(name: name, createdAt: createdAt, lastUsedAt: lastUsedAt)
@@ -92,9 +86,9 @@ extension SchemaV2 {
     @available(iOS 26, *)
     @Model
     final class CampusLibraryExercise: Exercise {
-        var campusType: Routine.CampusSets.Exercise = Routine.CampusSets.Exercise.maxLadder
+        var campusType: SchemaV2.Routine.CampusSets.Exercise = SchemaV2.Routine.CampusSets.Exercise.maxLadder
 
-        init(name: String = "", campusType: Routine.CampusSets.Exercise = .maxLadder, createdAt: Date = .now, lastUsedAt: Date? = nil) {
+        init(name: String = "", campusType: SchemaV2.Routine.CampusSets.Exercise = .maxLadder, createdAt: Date = .now, lastUsedAt: Date? = nil) {
             self.campusType = campusType
             super.init(name: name, createdAt: createdAt, lastUsedAt: lastUsedAt)
         }

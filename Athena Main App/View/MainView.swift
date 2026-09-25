@@ -12,19 +12,8 @@ struct MainView: View {
     @StateObject private var navigationStore = NavigationStore()
     @Environment(\.modelContext) private var modelContext
     
-    @Query(sort: [
-        SortDescriptor(\Athlete.lastUsedAt, order: .reverse),
-        SortDescriptor(\Athlete.name)
-    ]) private var athletes: [Athlete]
+    @Query(sort: \Athlete.name) private var athletes: [Athlete]
     @AppStorage(CurrentAthlete.storageKey) private var currentAthleteID: String = ""
-    /// Derived fresh from `athletes` on every access rather than cached in `@State` —
-    /// caching a SwiftData model reference risks it outliving the query/graph that
-    /// produced it (e.g. across a container swap), which can trip an AttributeGraph
-    /// "different namespace" crash. `.task`/`.onChange` below only handle the seeding
-    /// side effect (inserting a default athlete when the roster is empty).
-    private var currentAthlete: Athlete? {
-        athletes.first(where: { $0.uuid.uuidString == currentAthleteID })
-    }
     
     @State private var viewType: MainViewType = .session
     @State private var exportAlert: ExportAlert?
@@ -39,75 +28,18 @@ struct MainView: View {
                             Label(type.name, systemImage: type.icon)
                         }
                 }
-            }.navigationTitle(currentAthlete?.fullName ?? currentAthlete?.name ?? "Select Athlete")
+            }.navigationTitle(navigationStore.currentAthlete?.fullName ?? navigationStore.currentAthlete?.name ?? "Select Athlete")
                 .navigationBarTitleDisplayMode(.inline)
                 .handleDestinations(navigationStore)
-                .toolbar {
-                    ToolbarTitleMenu {
-                        ForEach(athletes) { athlete in
-                            Button {
-                                currentAthleteID = athlete.uuid.uuidString
-                            } label: {
-                                if athlete.uuid == currentAthlete?.uuid {
-                                    Label(athlete.name, systemImage: "checkmark")
-                                } else {
-                                    Text(athlete.name)
-                                }
-                            }
-                        }
-                    }
-                    ToolbarItemGroup(placement: .topBarLeading) {
-                        Menu {
-                            Button {
-                                navigationStore.push(ViewType.exerciseLibrary)
-                            } label: {
-                                Label("View Exercises", systemImage: "tablecells")
-                            }
-                            Button {
-                                navigationStore.push(ViewType.athleteList(athlete: currentAthlete!))
-                            } label: {
-                                Label("Manage Athletes", systemImage: "person.2")
-                            }.disabled(currentAthlete == nil)
-                            Button {
-                                exportAllData()
-                            } label: {
-                                Label("Export Data", systemImage: "square.and.arrow.up")
-                            }
-                        } label: {
-                            Label("Options", systemImage: "ellipsis")
-                        }
-                    }
-                    ToolbarItemGroup(placement: .topBarTrailing) {
-                        Menu {
-                            Button {
-                                let session = Session(athlete: currentAthlete!)
-                                modelContext.insert(session)
-                                navigationStore.push(ViewType.session(session: session))
-                            } label: {
-                                Label("Start Fresh Session", systemImage: "clock")
-                            }.disabled(currentAthlete == nil)
-                            Button {
-                                let teamSession = TeamSession()
-                                modelContext.insert(teamSession)
-                                navigationStore.push(ViewType.teamSession(session: teamSession))
-                            } label: {
-                                Label("Start Team Session", systemImage: "person.3")
-                            }
-                            Button {
-                                navigationStore.push(ViewType.routineAdd)
-                            } label: {
-                                Label("Create New Routine", systemImage: "map")
-                            }
-                        } label: {
-                            Label("Add", systemImage: "plus")
-                        }
-                    }
-                }
+                .toolbar(content: toolbarContent)
                 .task {
                     resolveCurrentAthlete()
                 }
                 .onChange(of: athletes) { _, _ in
                     resolveCurrentAthlete()
+                }
+                .onChange(of: navigationStore.currentAthlete) { _, newValue in
+                    currentAthleteID = newValue?.uuid.uuidString ?? ""
                 }
                 .alert(item: $exportAlert) { alert in
                     Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
@@ -115,10 +47,69 @@ struct MainView: View {
         }.environmentObject(navigationStore)
     }
     
+    @ToolbarContentBuilder
+    func toolbarContent() -> some ToolbarContent {
+        ToolbarTitleMenu {
+            ForEach(athletes) { athlete in
+                Button {
+                    navigationStore.currentAthlete = athlete
+                } label: {
+                    if athlete.uuid == navigationStore.currentAthlete?.uuid {
+                        Label(athlete.name, systemImage: "checkmark")
+                    } else {
+                        Text(athlete.name)
+                    }
+                }
+            }
+        }
+        ToolbarItemGroup(placement: .topBarLeading) {
+            Menu {
+                Button {
+                    navigationStore.push(ViewType.exerciseList)
+                } label: {
+                    Label("View Exercises", systemImage: "tablecells")
+                }
+                Button {
+                    navigationStore.push(ViewType.athleteRoster)
+                } label: {
+                    Label("Manage Athletes", systemImage: "person.2")
+                }
+                Button {
+                    exportAllData()
+                } label: {
+                    Label("Export Data", systemImage: "square.and.arrow.up")
+                }
+            } label: {
+                Label("Options", systemImage: "ellipsis")
+            }
+        }
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            Menu {
+                Button {
+                    let session = Session()
+                    if let athlete = navigationStore.currentAthlete {
+                        session.athletes.append(athlete)
+                    }
+                    modelContext.insert(session)
+                    navigationStore.push(ViewType.session(session: session))
+                } label: {
+                    Label("Start New Session", systemImage: "clock")
+                }
+                Button {
+                    navigationStore.push(ViewType.routineAdd)
+                } label: {
+                    Label("Create New Routine", systemImage: "map")
+                }
+            } label: {
+                Label("Add", systemImage: "plus")
+            }
+        }
+    }
+    
     private func resolveCurrentAthlete() {
-        guard currentAthlete == nil else { return }
+        guard navigationStore.currentAthlete == nil else { return }
         let resolved = CurrentAthlete.resolve(storedID: currentAthleteID, athletes: athletes, context: modelContext)
-        currentAthleteID = resolved.uuid.uuidString
+        navigationStore.currentAthlete = resolved
     }
 
     private func exportAllData() {
@@ -132,10 +123,10 @@ struct MainView: View {
     
     @ViewBuilder
     private func getView(_ type: MainViewType) -> some View {
-        if let currentAthlete {
+        if let currentAthlete = navigationStore.currentAthlete {
             switch type {
             case .exercise:
-                ExerciseListView(athlete: currentAthlete)
+                AthleteExerciseListView(athlete: currentAthlete)
             case .routine:
                 RoutineListView(athlete: currentAthlete)
             case .session:

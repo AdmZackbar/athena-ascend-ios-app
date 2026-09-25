@@ -1,20 +1,17 @@
 //
-//  ExerciseView.swift
+//  AthleteExerciseView.swift
 //  Athena
 //
-//  Created by Zach Wassynger on 9/23/26.
+//  Created by Zach Wassynger on 9/25/26.
 //
 
-import SwiftData
 import SwiftUI
 
-struct ExerciseView: View {
+struct AthleteExerciseView: View {
     @EnvironmentObject private var navigationStore: NavigationStore
     
-    @Query(sort: \Athlete.name) private var athletes: [Athlete]
-    
-    @State var exercise: Exercise
-    @State private var selectedAthlete: Athlete? = nil
+    let exercise: Exercise
+    let athlete: Athlete
     
     var categoryName: String {
         switch exercise.category {
@@ -39,29 +36,13 @@ struct ExerciseView: View {
                     campusInfoView(name: name, mirrorSets: mirrorSets)
                 }
             }
-            Section {
-                if let selectedAthlete {
-                    let data = selectedAthlete.data.filter { $0.exercise == exercise }
-                    if data.isEmpty {
-                        ContentUnavailableView("No data for athlete", systemImage: "tablecells")
-                    } else {
-                        ForEach(data.sorted(by: { $0.session.startTime > $1.session.startTime })) { d in
-                            ExerciseDataEntryView(exercise: exercise, data: d)
-                        }
-                    }
+            Section("Data") {
+                let data = athlete.data.filter { $0.exercise == exercise }
+                if data.isEmpty {
+                    ContentUnavailableView("No data for athlete", systemImage: "tablecells")
                 } else {
-                    ContentUnavailableView("No athlete selected", systemImage: "person")
-                }
-            } header: {
-                HStack {
-                    Text("Data")
-                    Spacer()
-                    Picker("Athlete:", selection: $selectedAthlete) {
-                        Text("None").tag(nil as Athlete?)
-                        ForEach(athletes) { athlete in
-                            Text(athlete.name)
-                                .tag(athlete as Athlete?)
-                        }
+                    ForEach(data.sorted(by: { $0.session.startTime > $1.session.startTime })) { d in
+                        ExerciseDataEntryView(exercise: exercise, data: d)
                     }
                 }
             }
@@ -163,12 +144,5 @@ struct ExerciseView: View {
             Text(mirrorSets ? "Yes" : "No")
                 .fontWeight(.semibold)
         }
-    }
-}
-
-#Preview(traits: .sampleData) {
-    @Previewable @Query var exercises: [Exercise]
-    NavigationStack {
-        ExerciseView(exercise: exercises.first!)
     }
 }

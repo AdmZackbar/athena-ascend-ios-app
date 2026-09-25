@@ -8,6 +8,11 @@
 import Foundation
 import SwiftData
 
+// Pinned to V2: the global Routine/Session/Exercise/Athlete typealiases now point at
+// SchemaV3, but this stage's didMigrate context is always V2. Fully qualified
+// throughout rather than pinned via shadow aliases, which proved unreliable to combine
+// with other files' identically-named private aliases in this project.
+
 enum AthenaMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
         [SchemaV1.self, SchemaV2.self]
@@ -32,10 +37,10 @@ enum AthenaMigrationPlan: SchemaMigrationPlan {
     )
 
     private static func backfill(_ context: ModelContext) throws {
-        let routines = try context.fetch(FetchDescriptor<Routine>())
-        let sessions = try context.fetch(FetchDescriptor<Session>())
+        let routines = try context.fetch(FetchDescriptor<SchemaV2.Routine>())
+        let sessions = try context.fetch(FetchDescriptor<SchemaV2.Session>())
 
-        var identityMap: [ExerciseIdentity: Exercise] = [:]
+        var identityMap: [ExerciseIdentity: SchemaV2.Exercise] = [:]
         var firstSeen: [ExerciseIdentity: Date] = [:]
         var lastSeen: [ExerciseIdentity: Date] = [:]
 
@@ -52,7 +57,7 @@ enum AthenaMigrationPlan: SchemaMigrationPlan {
             }
         }
 
-        func exercise(for identity: ExerciseIdentity) -> Exercise {
+        func exercise(for identity: ExerciseIdentity) -> SchemaV2.Exercise {
             if let existing = identityMap[identity] {
                 return existing
             }
@@ -69,8 +74,8 @@ enum AthenaMigrationPlan: SchemaMigrationPlan {
         // Every pre-V2 session belongs to the store's sole owner. Skip creation when
         // there are no sessions — a first-launch seed (CurrentAthlete.resolve) covers
         // that store with the identical name, so there's nothing to backfill here.
-        let owner: Athlete? = sessions.isEmpty ? nil : Athlete(
-            name: Athlete.defaultName,
+        let owner: SchemaV2.Athlete? = sessions.isEmpty ? nil : SchemaV2.Athlete(
+            name: SchemaV2.Athlete.defaultName,
             createdAt: sessions.map(\.startTime).min() ?? .now,
             lastUsedAt: sessions.map(\.startTime).max()
         )
