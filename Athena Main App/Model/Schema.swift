@@ -30,3 +30,13 @@ enum SchemaV2: VersionedSchema {
          TeamSession.self, Athlete.self]
     }
 }
+
+enum SchemaV3: VersionedSchema {
+    static var versionIdentifier: Schema.Version {
+        .init(3, 0, 0)
+    }
+
+    static var models: [any PersistentModel.Type] {
+        [Athlete.self, Routine.self, RoutineData.self, Session.self, Exercise.self, ExerciseData.self]
+    }
+}
