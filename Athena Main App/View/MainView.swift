@@ -46,11 +46,11 @@ struct MainView: View {
                     Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
                 }
                 .confirmationDialog(
-                    "Import all athletes, exercises, routines, and sessions from the previous app version into this store? This can only be done once, against a fresh store.",
+                    "This will delete all athletes, exercises, routines, and sessions currently in this app, and replace them with the data from the previous app version. This cannot be undone.",
                     isPresented: $showImportConfirmation,
                     titleVisibility: .visible
                 ) {
-                    Button("Import") {
+                    Button("Delete Everything and Import", role: .destructive) {
                         importLegacyData()
                     }
                     Button("Cancel", role: .cancel) {}
@@ -150,8 +150,6 @@ struct MainView: View {
                 title: "Import Complete",
                 message: "Imported \(summary.athletesImported) athletes, \(summary.exercisesImported) exercises, \(summary.routinesImported) routines, and \(summary.soloSessionsImported + summary.teamSessionsImported) sessions."
             )
-        } catch LegacyImport.ImportError.storeNotEmpty {
-            legacyDataAlert = LegacyDataAlert(title: "Import Skipped", message: "This store already has data — import only runs once, against a fresh store.")
         } catch {
             legacyDataAlert = LegacyDataAlert(title: "Import Failed", message: error.localizedDescription)
         }

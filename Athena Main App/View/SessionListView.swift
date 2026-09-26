@@ -18,13 +18,13 @@ struct SessionListView: View {
     
     var body: some View {
         List {
-            let activeRows = sessions.filter({ $0.endTime == nil }).sorted(by: { $0.startTime > $1.startTime })
+            let activeRows = athlete.sessions.filter({ $0.endTime == nil }).sorted(by: { $0.startTime > $1.startTime })
             if !activeRows.isEmpty {
                 Section("Active Sessions") {
                     sessionsView(activeRows)
                 }
             }
-            let oldRows = sessions.filter({ $0.endTime != nil }).sorted(by: { $0.startTime > $1.startTime })
+            let oldRows = athlete.sessions.filter({ $0.endTime != nil }).sorted(by: { $0.startTime > $1.startTime })
             if !oldRows.isEmpty {
                 Section("Previous Sessions") {
                     sessionsView(oldRows)

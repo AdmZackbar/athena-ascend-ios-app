@@ -280,15 +280,34 @@ struct LegacyImportTests {
     // MARK: - Import (container)
 
     @MainActor
-    @Test func refusesImportIntoNonEmptyStore() throws {
+    @Test func importOverwritesExistingData() throws {
         let container = try makeV3Container()
-        container.mainContext.insert(SchemaV3.Athlete(name: "Existing"))
-        try container.mainContext.save()
+        let context = container.mainContext
+        let existingAthlete = SchemaV3.Athlete(name: "Existing")
+        let existingExercise = SchemaV3.Exercise(category: .generic(name: "Old Exercise", dataTypes: [.reps], sideType: .none))
+        let existingRoutine = SchemaV3.Routine(name: "Old Routine")
+        let existingSession = SchemaV3.Session()
+        context.insert(existingAthlete)
+        context.insert(existingExercise)
+        context.insert(existingRoutine)
+        context.insert(existingSession)
+        context.insert(SchemaV3.RoutineData(exercise: existingExercise, routine: existingRoutine, position: .init(setIndex: 0)))
+        context.insert(SchemaV3.ExerciseData(exercise: existingExercise, session: existingSession, athlete: existingAthlete, position: .init(setIndex: 0)))
+        try context.save()
 
         let fixture = try makeFixture()
-        #expect(throws: LegacyImport.ImportError.storeNotEmpty) {
-            try LegacyImport.apply(fixture.archive, into: container.mainContext)
-        }
+        try LegacyImport.apply(fixture.archive, into: context)
+
+        // None of the pre-existing rows survive the import, in any table.
+        #expect(try context.fetch(FetchDescriptor<SchemaV3.Athlete>()).contains { $0.name == "Existing" } == false)
+        #expect(try context.fetch(FetchDescriptor<SchemaV3.Exercise>()).contains { $0.name == "Old Exercise" } == false)
+        #expect(try context.fetch(FetchDescriptor<SchemaV3.Routine>()).contains { $0.name == "Old Routine" } == false)
+        #expect(try context.fetch(FetchDescriptor<SchemaV3.Session>()).contains { $0.persistentModelID == existingSession.persistentModelID } == false)
+        #expect(try context.fetch(FetchDescriptor<SchemaV3.RoutineData>()).contains { $0.routine?.name == "Old Routine" } == false)
+        #expect(try context.fetch(FetchDescriptor<SchemaV3.ExerciseData>()).contains { $0.exercise?.name == "Old Exercise" } == false)
+
+        // The fixture's own data imported normally alongside the wipe.
+        #expect(try context.fetch(FetchDescriptor<SchemaV3.Routine>()).contains { $0.name == fixture.routineName })
     }
 
     @MainActor

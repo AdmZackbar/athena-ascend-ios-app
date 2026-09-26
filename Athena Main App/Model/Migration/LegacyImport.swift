@@ -18,6 +18,11 @@ import SwiftData
 /// (`ExerciseLibraryTests.swift`) — `ExerciseExportDTO.Kind` is already flattened per
 /// subclass.
 ///
+/// `apply` always starts from empty: any existing V3 data in the destination context
+/// is deleted before the archive is imported (see `clearExistingData`). There is no
+/// merge/dedupe logic against pre-existing V3 rows — running this twice reimports from
+/// scratch rather than layering on top of a prior import.
+///
 /// The V2 store itself is never touched by this type — it is only ever read via its
 /// exported JSON — so re-exporting from a reinstalled V2 build remains possible for as
 /// long as that JSON might be wrong or incomplete.
@@ -31,12 +36,6 @@ nonisolated enum LegacyImport {
         var routines: [RoutineExportDTO]
         var sessions: [SessionExportDTO]
         var teamSessions: [TeamSessionExportDTO]
-    }
-
-    enum ImportError: Error {
-        /// The destination store already has data. Import is only meant to run once,
-        /// against a freshly created V3 store — there is no merge/dedupe logic here.
-        case storeNotEmpty
     }
 
     /// Decodes the five files `DataExporter.exportAllModels` writes. A missing file
@@ -190,7 +189,7 @@ nonisolated enum LegacyImport {
     @discardableResult
     @MainActor
     static func apply(_ archive: Archive, into context: ModelContext) throws -> Summary {
-        try guardEmpty(context)
+        try clearExistingData(context)
 
         var summary = Summary()
 
@@ -431,16 +430,18 @@ nonisolated enum LegacyImport {
         return summary
     }
 
+    /// Wipes every existing V3 row before importing, so the import always leaves the
+    /// store containing exactly the archive's data — never a merge of old and new.
+    /// Deletes children before parents rather than relying on cascade delete rules to
+    /// do it implicitly, so this stays correct even if a delete rule changes later.
     @MainActor
-    private static func guardEmpty(_ context: ModelContext) throws {
-        let counts = try [
-            context.fetchCount(FetchDescriptor<SchemaV3.Athlete>()),
-            context.fetchCount(FetchDescriptor<SchemaV3.Exercise>()),
-            context.fetchCount(FetchDescriptor<SchemaV3.Routine>()),
-            context.fetchCount(FetchDescriptor<SchemaV3.Session>()),
-        ]
-        guard counts.allSatisfy({ $0 == 0 }) else {
-            throw ImportError.storeNotEmpty
-        }
+    private static func clearExistingData(_ context: ModelContext) throws {
+        try context.delete(model: SchemaV3.ExerciseData.self)
+        try context.delete(model: SchemaV3.RoutineData.self)
+        try context.delete(model: SchemaV3.Session.self)
+        try context.delete(model: SchemaV3.Routine.self)
+        try context.delete(model: SchemaV3.Exercise.self)
+        try context.delete(model: SchemaV3.Athlete.self)
+        try context.save()
     }
 }

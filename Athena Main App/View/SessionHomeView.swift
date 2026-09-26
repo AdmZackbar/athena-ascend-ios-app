@@ -97,35 +97,33 @@ struct SessionHomeView: View {
                     .lineLimit((session.data.isEmpty ? 9 : 3)...12)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.sentences)
-                Button {
-                    song = session.standoutSong ?? .init(name: "", artist: "")
-                    sheetType = .song
-                } label: {
-                    if let standoutSong = session.standoutSong {
-                        VStack(alignment: .leading) {
-                            Text("Standout Song")
-                                .bold()
-                            Text(standoutSong.artist)
-                                .font(.subheadline)
-                                .italic()
-                            Text(standoutSong.name)
-                                .font(.headline)
-                                .bold()
+                // Only show song for single athlete sessioons
+                if athletes.count == 1 {
+                    Button {
+                        song = session.standoutSong ?? .init(name: "", artist: "")
+                        sheetType = .song
+                    } label: {
+                        if let standoutSong = session.standoutSong {
+                            VStack(alignment: .leading) {
+                                Text("Standout Song")
+                                    .bold()
+                                Text(standoutSong.artist)
+                                    .font(.subheadline)
+                                    .italic()
+                                Text(standoutSong.name)
+                                    .font(.headline)
+                                    .bold()
+                            }
+                        } else {
+                            Label("Choose Standout Song...", systemImage: "music.note")
                         }
-                    } else {
-                        Label("Choose Standout Song...", systemImage: "music.note")
-                    }
-                }.buttonStyle(.plain)
+                    }.buttonStyle(.plain)
+                }
             } header: {
                 VStack(alignment: .leading) {
                     if session.athletes.count > 1 {
-                        ScrollView([.horizontal]) {
-                            HStack {
-                                ForEach(session.athletes.sorted(by: { $0.name < $1.name })) { athlete in
-                                    Text(athlete.fullName ?? athlete.name)
-                                }
-                            }
-                        }.font(.subheadline)
+                        Text(session.athletes.map { $0.name }.sorted().joined(separator: ", "))
+                            .font(.subheadline)
                             .italic()
                     } else if let athlete = session.athletes.first {
                         Text(athlete.fullName ?? athlete.name)
@@ -149,7 +147,7 @@ struct SessionHomeView: View {
     func dataView() -> some View {
         if session.athletes.count > 1 {
             multiAthleteDataView()
-        } else if let athlete = session.athletes.first {
+        } else if !session.athletes.isEmpty {
             singleAthleteDataView()
         } else {
             Section("Data") {
@@ -160,37 +158,34 @@ struct SessionHomeView: View {
     
     @ViewBuilder
     func multiAthleteDataView() -> some View {
-        if session.routine == nil {
-            // No need to structure exercises
-            let groupedData: [ExerciseData.Position: [ExerciseData]] = .init(grouping: session.data, by: { $0.position })
-            ForEach(groupedData.sorted(by: { ($0.key.superSetIndex, $0.key.setIndex) < ($1.key.superSetIndex, $1.key.setIndex) }),
-                id: \.key.hashValue) { key, athleteData in
-                    Section {
-                        ForEach(athleteData.sorted(by: { $0.athlete.name < $1.athlete.name })) { d in
-                            dataView(d, headerType: .athleteName)
-                        }
-                    } header: {
-                        HStack {
-                            Text(athleteData.first!.exercise.name)
-                            Spacer()
-                            Button(role: .destructive) {
-                                deleteExercise = key
-                            } label: {
-                                Image(systemName: "trash")
-                            }
+        // TODO handle routines - need to keep structure
+        // No need to structure exercises
+        let groupedData: [ExerciseData.Position: [ExerciseData]] = .init(grouping: session.data, by: { $0.position })
+        ForEach(groupedData.sorted(by: { ($0.key.superSetIndex, $0.key.setIndex) < ($1.key.superSetIndex, $1.key.setIndex) }),
+            id: \.key.hashValue) { key, athleteData in
+                Section {
+                    ForEach(athleteData.sorted(by: { $0.athlete.name < $1.athlete.name })) { d in
+                        dataView(d, headerType: .athleteName)
+                    }
+                } header: {
+                    HStack {
+                        Text(athleteData.first!.exercise.name)
+                        Spacer()
+                        Button(role: .destructive) {
+                            deleteExercise = key
+                        } label: {
+                            Image(systemName: "trash")
                         }
                     }
-            }
+                }
+        }
+        if !session.finished {
             Button {
                 // Adding all exercises to default main set
                 sheetType = .addExercise(superSetIndex: 0)
             } label: {
                 Label("Add/Remove Exercises...", systemImage: "pencil")
             }
-        } else {
-            // Need to keep exercises structured
-            // TODO
-            Text("TODO")
         }
     }
     
@@ -209,10 +204,12 @@ struct SessionHomeView: View {
                                 }.tint(.red)
                             }
                 }
-                Button {
-                    sheetType = .addExercise(superSetIndex: superSetIndex)
-                } label: {
-                    Label("Add/Remove Exercises...", systemImage: "pencil")
+                if !session.finished {
+                    Button {
+                        sheetType = .addExercise(superSetIndex: superSetIndex)
+                    } label: {
+                        Label("Add/Remove Exercises...", systemImage: "pencil")
+                    }
                 }
             } header: {
                 HStack {

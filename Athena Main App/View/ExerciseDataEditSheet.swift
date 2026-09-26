@@ -57,6 +57,16 @@ struct ExerciseDataEditSheet: View {
                 ForEach(0..<numSets, id: \.self) { setIndex in
                     Section {
                         editor(setIndex: setIndex)
+                        TextField("Notes", text: .init(get: {
+                            getString(setIndex, field: .notes)
+                        }, set: { newValue in
+                            if newValue.isEmpty {
+                                athleteData[selectedAthlete, default: [.init()]][setIndex].removeValue(forKey: .notes)
+                            } else {
+                                athleteData[selectedAthlete, default: [.init()]][setIndex][.notes] = .text(newValue)
+                            }
+                        })).textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
                     } header: {
                         HStack {
                             Text("Set \(setIndex + 1)")
@@ -122,7 +132,7 @@ struct ExerciseDataEditSheet: View {
             }
             Button {
                 athleteData.forEach { athlete, dataSets in
-                    var exerciseData = session.data.filter { $0.athlete == athlete && $0.position == position }.first!
+                    let exerciseData = session.data.filter { $0.athlete == athlete && $0.position == position }.first!
                     exerciseData.actualData = dataSets.map { dataSet in
                         if canMirror && !showAlt {
                             // Strip out all alt values
@@ -226,6 +236,13 @@ struct ExerciseDataEditSheet: View {
         switch athleteData[selectedAthlete]?[setIndex][field] {
         case .number(let v): return v
         default: return nil
+        }
+    }
+    
+    private func getString(_ setIndex: Int, field: ExerciseData.Field) -> String {
+        switch athleteData[selectedAthlete]?[setIndex][field] {
+        case .text(let str): return str
+        default: return ""
         }
     }
     

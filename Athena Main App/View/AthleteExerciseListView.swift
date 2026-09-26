@@ -15,7 +15,7 @@ struct AthleteExerciseListView: View {
     
     var body: some View {
         List {
-            ForEach(athlete.data.map { $0.exercise }) { exercise in
+            ForEach(Set(athlete.data.map { $0.exercise }).sorted(by: { $0.name < $1.name })) { exercise in
                 Button {
                     navigationStore.push(ViewType.exercise(exercise: exercise, athlete: athlete))
                 } label: {
@@ -23,7 +23,7 @@ struct AthleteExerciseListView: View {
                         VStack(alignment: .leading) {
                             Text(exercise.name)
                                 .font(.headline)
-                            Text("\(exercise.data.count) data sets")
+                            Text("\(exercise.data.filter({ $0.athlete == athlete }).count) data sets")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
