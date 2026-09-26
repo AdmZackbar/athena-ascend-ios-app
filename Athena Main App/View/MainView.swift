@@ -16,7 +16,8 @@ struct MainView: View {
     @AppStorage(CurrentAthlete.storageKey) private var currentAthleteID: String = ""
     
     @State private var viewType: MainViewType = .session
-    @State private var exportAlert: ExportAlert?
+    @State private var legacyDataAlert: LegacyDataAlert?
+    @State private var showImportConfirmation = false
 
     var body: some View {
         NavigationStack(path: $navigationStore.path) {
@@ -41,8 +42,18 @@ struct MainView: View {
                 .onChange(of: navigationStore.currentAthlete) { _, newValue in
                     currentAthleteID = newValue?.uuid.uuidString ?? ""
                 }
-                .alert(item: $exportAlert) { alert in
+                .alert(item: $legacyDataAlert) { alert in
                     Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
+                }
+                .confirmationDialog(
+                    "Import all athletes, exercises, routines, and sessions from the previous app version into this store? This can only be done once, against a fresh store.",
+                    isPresented: $showImportConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button("Import") {
+                        importLegacyData()
+                    }
+                    Button("Cancel", role: .cancel) {}
                 }
         }.environmentObject(navigationStore)
     }
@@ -79,6 +90,11 @@ struct MainView: View {
                 } label: {
                     Label("Export Data", systemImage: "square.and.arrow.up")
                 }
+                Button {
+                    showImportConfirmation = true
+                } label: {
+                    Label("Import Legacy Data", systemImage: "tray.and.arrow.down")
+                }
             } label: {
                 Label("Options", systemImage: "ellipsis")
             }
@@ -114,10 +130,30 @@ struct MainView: View {
 
     private func exportAllData() {
         do {
-            let directory = try DataExporter.exportAllModels(context: modelContext)
-            exportAlert = ExportAlert(title: "Export Complete", message: "Data exported to:\n\(directory.lastPathComponent)")
+            // The legacy store, not the live `modelContext` — `DataExporter` fetches
+            // `SchemaV2` model types, which aren't registered in the current V3 store.
+            let legacyContainer = try ModelStore.makeLegacyV2Container()
+            let directory = try DataExporter.exportAllModels(context: legacyContainer.mainContext)
+            legacyDataAlert = LegacyDataAlert(title: "Export Complete", message: "Data exported to:\n\(directory.lastPathComponent)")
         } catch {
-            exportAlert = ExportAlert(title: "Export Failed", message: error.localizedDescription)
+            legacyDataAlert = LegacyDataAlert(title: "Export Failed", message: error.localizedDescription)
+        }
+    }
+
+    private func importLegacyData() {
+        do {
+            let legacyContainer = try ModelStore.makeLegacyV2Container()
+            let directory = try DataExporter.exportAllModels(context: legacyContainer.mainContext)
+            let archive = try LegacyImport.readArchive(from: directory)
+            let summary = try LegacyImport.apply(archive, into: modelContext)
+            legacyDataAlert = LegacyDataAlert(
+                title: "Import Complete",
+                message: "Imported \(summary.athletesImported) athletes, \(summary.exercisesImported) exercises, \(summary.routinesImported) routines, and \(summary.soloSessionsImported + summary.teamSessionsImported) sessions."
+            )
+        } catch LegacyImport.ImportError.storeNotEmpty {
+            legacyDataAlert = LegacyDataAlert(title: "Import Skipped", message: "This store already has data — import only runs once, against a fresh store.")
+        } catch {
+            legacyDataAlert = LegacyDataAlert(title: "Import Failed", message: error.localizedDescription)
         }
     }
     
@@ -163,7 +199,7 @@ struct MainView: View {
         }
     }
 
-    private struct ExportAlert: Identifiable {
+    private struct LegacyDataAlert: Identifiable {
         let id = UUID()
         let title: String
         let message: String
