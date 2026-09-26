@@ -93,9 +93,10 @@ extension SchemaV3 {
             }
             
             /// This struct's nested `Rung`/`Move`/`Side` must always be used here — never
-            /// the global `Campus*` typealiases, which point at `SchemaV2` today and will
-            /// point at a different version later. Mixing them silently persists the wrong
-            /// version's type.
+            /// the global `Campus*` typealiases (lines 11-14). They point at these same
+            /// `SchemaV3` types today, but a future schema version could repoint them —
+            /// using the nested spelling here is what keeps this struct's own persisted
+            /// shape from silently changing out from under it if that happens.
             struct Board: Codable, Hashable {
                 /// The name of the holds/board setup
                 /// e.g. large edges, sloper rungs, sloper balls, small edges

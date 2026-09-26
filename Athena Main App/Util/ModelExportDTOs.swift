@@ -6,13 +6,67 @@
 //
 
 import Foundation
+import SwiftData
 
-// Pinned to V2: these DTOs are the one-time export format read by the JSON importer,
-// and must keep reading V2 shapes regardless of what CurrentSchema points at. Fully
-// qualified throughout (no shadow aliases) rather than pinned via `private typealias`,
-// because these DTOs are `internal` (LegacyImport.swift constructs them from a
-// different file) and Swift forbids an `internal` init/property from exposing a
-// `private` type in its signature.
+/// A single value inside a `DataSet`, re-keyed for JSON export. Mirrors
+/// `ExerciseData.Value` case-for-case, but with explicit parameter labels so it encodes
+/// as `{"discrete":{"value":8}}` rather than the unlabeled `{"_0":8}` that `Value`'s own
+/// underscore-labeled cases would produce.
+enum ValueExportDTO: Codable {
+    case number(value: Double)
+    case discrete(value: Int)
+    case range(min: Int, max: Int)
+    case text(value: String)
+    /// `text` is a rendered rung/move sequence (e.g. "Large Edges: B1-R3-L5"), derived
+    /// from `set` via the model's own `CampusSet.Move.text`/`Board.name` — included so
+    /// the JSON is legible without decoding `set` first. `set` is the lossless value.
+    case campus(text: String, set: SchemaV3.ExerciseData.CampusSet)
+
+    init(_ value: SchemaV3.ExerciseData.Value) {
+        switch value {
+        case .number(let v): self = .number(value: v)
+        case .discrete(let v): self = .discrete(value: v)
+        case .range(let min, let max): self = .range(min: min, max: max)
+        case .text(let v): self = .text(value: v)
+        case .campus(let set):
+            let text = "\(set.board.name): \(set.moves.map(\.text).joined(separator: "-"))"
+            self = .campus(text: text, set: set)
+        }
+    }
+}
+
+/// Re-keys a `DataSet` (`[ExerciseData.Field: ExerciseData.Value]`) to a
+/// `[String: ValueExportDTO]` for export.
+///
+/// `ExerciseData.Field` has no raw value, so `Dictionary`'s `Encodable` conformance
+/// falls back to an unkeyed `[key, value, key, value, ...]` JSON *array* rather than an
+/// object whenever `Key` isn't `String`/`Int`/`CodingKeyRepresentable` — and that
+/// array's element order follows dictionary iteration order, which is nondeterministic
+/// per process. Re-keying to `String` up front avoids both problems.
+///
+/// `Field` is deliberately NOT retroactively conformed to `CodingKeyRepresentable` to
+/// fix this at the source: that conformance is global and would change how every
+/// already-persisted `expectedData`/`actualData` blob decodes, silently breaking the
+/// production data this app just finished migrating into V3.
+func exportDataSet(_ dataSet: SchemaV3.ExerciseData.DataSet) -> [String: ValueExportDTO] {
+    Dictionary(uniqueKeysWithValues: dataSet.map { (exportKey(for: $0.key), ValueExportDTO($0.value)) })
+}
+
+private func exportKey(for field: SchemaV3.ExerciseData.Field) -> String {
+    switch field {
+    case .reps: "reps"
+    case .repsAlt: "repsAlt"
+    case .time: "time"
+    case .timeAlt: "timeAlt"
+    case .weight: "weight"
+    case .weightAlt: "weightAlt"
+    case .distance: "distance"
+    case .distanceAlt: "distanceAlt"
+    case .campus: "campus"
+    case .campusAlt: "campusAlt"
+    case .notes: "notes"
+    }
+}
 
 /// Flat, `Codable` mirror of `Athlete` for JSON export via `DataExporter`.
 struct AthleteExportDTO: Codable {
@@ -20,118 +74,113 @@ struct AthleteExportDTO: Codable {
     var name: String
     var firstName: String?
     var lastName: String?
+    var birthDate: Date?
     var createdAt: Date
-    var lastUsedAt: Date?
 
-    init(_ athlete: SchemaV2.Athlete) {
+    init(_ athlete: SchemaV3.Athlete) {
         uuid = athlete.uuid
         name = athlete.name
         firstName = athlete.firstName
         lastName = athlete.lastName
+        birthDate = athlete.birthDate
         createdAt = athlete.createdAt
-        lastUsedAt = athlete.lastUsedAt
     }
 }
 
-/// Flat, `Codable` mirror of `Exercise` (and its four concrete subclasses) for JSON
-/// export via `DataExporter`. `kind` carries whichever subclass's fields apply.
+/// Flat, `Codable` mirror of a library `Exercise` for JSON export. `index` is this
+/// exercise's position in `exercises.json` — `RoutineDataExportDTO`/
+/// `ExerciseDataExportDTO` reference it by `exerciseIndex` rather than duplicating this
+/// DTO inline, so which routine/session slots share the same library exercise (V3's
+/// whole reason for having a shared library instead of copies) survives the export
+/// instead of being flattened away.
 struct ExerciseExportDTO: Codable {
-    var uuid: UUID
     var name: String
+    var category: SchemaV3.Exercise.Category
+    var notes: String
     var createdAt: Date
-    var lastUsedAt: Date?
-    var kind: Kind
 
-    init(_ exercise: SchemaV2.Exercise) {
-        uuid = exercise.uuid
+    init(_ exercise: SchemaV3.Exercise) {
         name = exercise.name
+        category = exercise.category
+        notes = exercise.notes
         createdAt = exercise.createdAt
-        lastUsedAt = exercise.lastUsedAt
-
-        switch exercise {
-        case let generic as SchemaV2.GenericExercise:
-            kind = .generic(dataType: generic.dataType, sideType: generic.sideType)
-        case let repeater as SchemaV2.RepeaterExercise:
-            kind = .repeater(timeOn: repeater.timeOn, timeOff: repeater.timeOff)
-        case let maxHang as SchemaV2.MaxHangExercise:
-            kind = .maxHang(isSingleArm: maxHang.isSingleArm)
-        case let campus as SchemaV2.CampusLibraryExercise:
-            kind = .campus(campusType: campus.campusType)
-        default:
-            kind = .unknown
-        }
-    }
-
-    enum Kind: Codable {
-        case generic(dataType: SchemaV2.Routine.GenericSets.DataType, sideType: SchemaV2.Routine.SideType?)
-        case repeater(timeOn: Int, timeOff: Int)
-        case maxHang(isSingleArm: Bool)
-        case campus(campusType: SchemaV2.Routine.CampusSets.Exercise)
-        /// Only possible if a future subclass is added without updating this DTO.
-        case unknown
     }
 }
 
-/// Flat, `Codable` mirror of `Routine` for JSON export via `DataExporter`. `Routine`
-/// has no stable ID field, so cross-references from `Session`/`TeamSession` exports
-/// use `name`, matching the app's own `routineName` snapshot fallback pattern.
+/// Flat, `Codable` mirror of one `RoutineData` row (one exercise slot within a
+/// routine's super sets).
+struct RoutineDataExportDTO: Codable {
+    var position: SchemaV3.ExerciseData.Position
+    var exerciseIndex: Int?
+    var expectedData: [[String: ValueExportDTO]]
+
+    init(_ routineData: SchemaV3.RoutineData, exerciseIndices: [PersistentIdentifier: Int]) {
+        position = routineData.position
+        exerciseIndex = routineData.exercise.flatMap { exerciseIndices[$0.persistentModelID] }
+        expectedData = routineData.expectedData.map(exportDataSet)
+    }
+}
+
+/// Flat, `Codable` mirror of `Routine` for JSON export.
 struct RoutineExportDTO: Codable {
     var name: String
-    var sets: [SchemaV2.Routine.ExerciseSet]
+    var superSets: [SchemaV3.Routine.SuperSet]
+    var data: [RoutineDataExportDTO]
     var createdAt: Date
-    var lastUsedAt: Date?
 
-    init(_ routine: SchemaV2.Routine) {
+    init(_ routine: SchemaV3.Routine, exerciseIndices: [PersistentIdentifier: Int]) {
         name = routine.name
-        sets = routine.sets
+        superSets = routine.superSets
+        data = (routine.data ?? [])
+            .sorted { ($0.position.superSetIndex, $0.position.setIndex) < ($1.position.superSetIndex, $1.position.setIndex) }
+            .map { RoutineDataExportDTO($0, exerciseIndices: exerciseIndices) }
         createdAt = routine.createdAt
-        lastUsedAt = routine.lastUsedAt
     }
 }
 
-/// Flat, `Codable` mirror of `Session` for JSON export via `DataExporter`.
+/// Flat, `Codable` mirror of one `ExerciseData` row (one exercise slot's recorded data
+/// within a session, scoped to one athlete).
+struct ExerciseDataExportDTO: Codable {
+    var athleteUUID: UUID?
+    var position: SchemaV3.ExerciseData.Position
+    var exerciseIndex: Int?
+    var expectedData: [[String: ValueExportDTO]]
+    var actualData: [[String: ValueExportDTO]]
+    var notes: String
+
+    init(_ data: SchemaV3.ExerciseData, exerciseIndices: [PersistentIdentifier: Int]) {
+        athleteUUID = data.athlete?.uuid
+        position = data.position
+        exerciseIndex = data.exercise.flatMap { exerciseIndices[$0.persistentModelID] }
+        expectedData = data.expectedData.map(exportDataSet)
+        actualData = data.actualData.map(exportDataSet)
+        notes = data.notes
+    }
+}
+
+/// Flat, `Codable` mirror of `Session` for JSON export. `routineName` is a snapshot,
+/// not a link — matches the app's own fallback-to-name pattern for when a routine has
+/// been deleted out from under a session (`Routine.sessions`'s `.nullify` delete rule).
 struct SessionExportDTO: Codable {
-    var athleteID: UUID?
     var routineName: String?
     var startTime: Date
     var endTime: Date?
-    var sets: [SchemaV2.Session.ExerciseSet]
+    var superSets: [SchemaV3.Routine.SuperSet]
     var notes: String
-    var bodyWeight: Double
-    var standoutSong: SchemaV2.Session.Song?
-    /// True if this session is one athlete's slice of a `TeamSession`.
-    var isTeamSessionEntry: Bool
+    var standoutSong: SchemaV3.Session.Song?
+    var athleteUUIDs: [UUID]
+    var data: [ExerciseDataExportDTO]
 
-    init(_ session: SchemaV2.Session) {
-        athleteID = session.athlete?.uuid
-        routineName = session.routine?.name ?? session.routineName
+    init(_ session: SchemaV3.Session, exerciseIndices: [PersistentIdentifier: Int]) {
+        routineName = session.routine?.name
         startTime = session.startTime
         endTime = session.endTime
-        sets = session.sets
+        superSets = session.superSets
         notes = session.notes
-        bodyWeight = session.bodyWeight
         standoutSong = session.standoutSong
-        isTeamSessionEntry = session.teamSession != nil
-    }
-}
-
-/// Flat, `Codable` mirror of `TeamSession` for JSON export via `DataExporter`.
-/// `entryAthleteIDs` cross-references the `athleteID` field of each corresponding
-/// `SessionExportDTO`.
-struct TeamSessionExportDTO: Codable {
-    var routineName: String?
-    var startTime: Date
-    var endTime: Date?
-    var notes: String
-    var sets: [SchemaV2.Session.ExerciseSet]
-    var entryAthleteIDs: [UUID]
-
-    init(_ teamSession: SchemaV2.TeamSession) {
-        routineName = teamSession.routine?.name ?? teamSession.routineName
-        startTime = teamSession.startTime
-        endTime = teamSession.endTime
-        notes = teamSession.notes
-        sets = teamSession.sets
-        entryAthleteIDs = teamSession.entries.compactMap { $0.athlete?.uuid }
+        athleteUUIDs = (session.athletes ?? []).map(\.uuid)
+        data = (session.data ?? [])
+            .sorted { ($0.position.superSetIndex, $0.position.setIndex) < ($1.position.superSetIndex, $1.position.setIndex) }
+            .map { ExerciseDataExportDTO($0, exerciseIndices: exerciseIndices) }
     }
 }

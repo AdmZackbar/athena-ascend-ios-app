@@ -9,28 +9,6 @@ import SwiftData
 
 typealias CurrentSchema = SchemaV3
 
-enum SchemaV1: VersionedSchema {
-    static var versionIdentifier: Schema.Version {
-        .init(1, 0, 0)
-    }
-
-    static var models: [any PersistentModel.Type] {
-        [Routine.self]
-    }
-}
-
-enum SchemaV2: VersionedSchema {
-    static var versionIdentifier: Schema.Version {
-        .init(2, 0, 0)
-    }
-
-    static var models: [any PersistentModel.Type] {
-        [Routine.self, Session.self, Exercise.self,
-         GenericExercise.self, RepeaterExercise.self, MaxHangExercise.self, CampusLibraryExercise.self,
-         TeamSession.self, Athlete.self]
-    }
-}
-
 enum SchemaV3: VersionedSchema {
     static var versionIdentifier: Schema.Version {
         .init(3, 0, 0)

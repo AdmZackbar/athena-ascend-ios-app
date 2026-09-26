@@ -8,39 +8,40 @@
 import Foundation
 import SwiftData
 
-// Pinned to V2: this is the one-time export path read by the JSON importer, and must
-// keep reading the V2 store regardless of what CurrentSchema points at. Fully
-// qualified throughout rather than pinned via shadow aliases.
-
 /// Exports every persisted model to one JSON file each, written into a
-/// timestamped sub-directory of the app's Documents folder.
+/// timestamped sub-directory of `parent`.
 enum DataExporter {
-    /// Writes `athletes.json`, `exercises.json`, `routines.json`, `sessions.json`,
-    /// and `teamSessions.json` into a new `Export yyyy-MM-dd HH-mm-ss` directory
-    /// inside Documents, returning that directory's URL.
+    /// Writes `athletes.json`, `exercises.json`, `routines.json`, and `sessions.json`
+    /// into a new `Export yyyy-MM-dd HH-mm-ss` directory inside `parent`, returning
+    /// that directory's URL. `parent` defaults to the app's real Documents folder but
+    /// is overridable so tests can export into a scratch directory instead.
     @discardableResult
-    static func exportAllModels(context: ModelContext, date: Date = .now) throws -> URL {
-        let directory = try makeExportDirectory(date: date)
+    @MainActor
+    static func exportAllModels(context: ModelContext, date: Date = .now, in parent: URL = .documentsDirectory) throws -> URL {
+        let directory = try makeExportDirectory(date: date, in: parent)
 
-        try write(context.fetch(FetchDescriptor<SchemaV2.Athlete>()).map { AthleteExportDTO($0) },
+        let exercises = try context.fetch(FetchDescriptor<SchemaV3.Exercise>(sortBy: [SortDescriptor(\.createdAt)]))
+        let exerciseIndices = Dictionary(uniqueKeysWithValues: exercises.enumerated().map { ($1.persistentModelID, $0) })
+
+        try write(context.fetch(FetchDescriptor<SchemaV3.Athlete>(sortBy: [SortDescriptor(\.createdAt)])).map(AthleteExportDTO.init),
                    filename: "athletes.json", to: directory)
-        try write(context.fetch(FetchDescriptor<SchemaV2.Exercise>()).map { ExerciseExportDTO($0) },
+        try write(exercises.map(ExerciseExportDTO.init),
                    filename: "exercises.json", to: directory)
-        try write(context.fetch(FetchDescriptor<SchemaV2.Routine>()).map { RoutineExportDTO($0) },
+        try write(context.fetch(FetchDescriptor<SchemaV3.Routine>(sortBy: [SortDescriptor(\.createdAt)]))
+                    .map { RoutineExportDTO($0, exerciseIndices: exerciseIndices) },
                    filename: "routines.json", to: directory)
-        try write(context.fetch(FetchDescriptor<SchemaV2.Session>()).map { SessionExportDTO($0) },
+        try write(context.fetch(FetchDescriptor<SchemaV3.Session>(sortBy: [SortDescriptor(\.startTime)]))
+                    .map { SessionExportDTO($0, exerciseIndices: exerciseIndices) },
                    filename: "sessions.json", to: directory)
-        try write(context.fetch(FetchDescriptor<SchemaV2.TeamSession>()).map { TeamSessionExportDTO($0) },
-                   filename: "teamSessions.json", to: directory)
 
         return directory
     }
 
-    private static func makeExportDirectory(date: Date) throws -> URL {
+    private static func makeExportDirectory(date: Date, in parent: URL) throws -> URL {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH-mm-ss"
         formatter.timeZone = .current
-        let directory = URL.documentsDirectory.appending(path: "Export \(formatter.string(from: date))")
+        let directory = parent.appending(path: "Export \(formatter.string(from: date))")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
