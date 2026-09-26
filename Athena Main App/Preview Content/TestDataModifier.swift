@@ -116,13 +116,19 @@ struct TestDataModifier: PreviewModifier {
                               endTime: .now,
                               superSets: routine.superSets,
                               standoutSong: .init(name: "Permanent", artist: "A Day to Remember"))
+        session.athletes.append(zach)
         session.data = routine.data.map { createActualData(session: session, athlete: zach, routineData: $0) }
         context.insert(session)
         
         // Team session
         let linsay = Athlete(name: "Linsay", createdAt: date.addingTimeInterval(60))
         let allie = Athlete(name: "Allie", createdAt: date.addingTimeInterval(120))
-        // TODO
+        let inde = Athlete(name: "Inde", createdAt: date.addingTimeInterval(150))
+        let jace = Athlete(name: "Jace", createdAt: date.addingTimeInterval(180))
+        let jack = Athlete(name: "Jack", createdAt: date.addingTimeInterval(210))
+        let freshSession = Session()
+        freshSession.athletes += [linsay, allie, inde, jace, jack]
+        context.insert(freshSession)
     }
     
     static func createActualData(session: Session, athlete: Athlete, routineData: RoutineData) -> ExerciseData {

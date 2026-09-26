@@ -816,7 +816,7 @@ extension ExerciseData.DataSet {
         case .text(let str): return str
         case .discrete(let v): return "\(v.formatted())\(dataType.getUnit(v))"
         case .number(let v): return "\(v.formatted(.number.precision(.fractionLength(0...2))))\(dataType.getUnit(Int(v)))"
-        case .range(let min, let max): return "[\(min)\(dataType.getUnit(min))-\(max)\(dataType.getUnit(max))]"
+        case .range(let min, let max): return "\(min)-\(max)\(dataType.getUnit(max))"
         case .campus(let set): return "TODO"
         case .none: return nil
         }
@@ -831,6 +831,18 @@ extension Exercise.DataType {
         case .weight: value == 1 ? " lb" : " lbs"
         case .distance: "in"
         }
+    }
+}
+
+extension ExerciseData.DataSet {
+    static func ^ (lhs: ExerciseData.DataSet, rhs: ExerciseData.DataSet) -> ExerciseData.DataSet {
+        var result: ExerciseData.DataSet = lhs
+        rhs.forEach { field, rightVal in
+            if let leftVal = lhs[field], leftVal == rightVal {
+                result.removeValue(forKey: field)
+            }
+        }
+        return result
     }
 }
 

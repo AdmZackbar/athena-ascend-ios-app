@@ -35,19 +35,44 @@ struct SessionHomeView: View {
             closedHomePage()
         } else {
             activeHomePage()
+                .onAppear {
+                    if session.superSets.isEmpty {
+                        session.superSets.append(.init(name: "Main Set"))
+                    }
+                }
         }
     }
 
     private func activeHomePage() -> some View {
         Form {
             Section {
-                // TODO athlete selection
-//                Picker("Athlete:", selection: $session.athlete) {
-//                    ForEach(athletes) { athlete in
-//                        Text(athlete.name).tag(athlete as Athlete?)
-//                    }
-//                }
-                DatePicker("Start:", selection: $session.startTime, displayedComponents: [.date, .hourAndMinute])
+                Button {
+                    sheetType = .athlete
+                } label: {
+                    HStack {
+                        Image(systemName: "pencil.circle")
+                            .font(.title3)
+                        if session.athletes.count > 1 {
+                            VStack(alignment: .leading) {
+                                Text("Athletes")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Text(session.athletes.map(\.name).sorted().joined(separator: ", "))
+                            }
+                        } else if let athlete = session.athletes.first {
+                            VStack(alignment: .leading) {
+                                Text("Athlete")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Text(athlete.fullName ?? athlete.name)
+                            }
+                        } else {
+                            Text("No Athletes")
+                                .italic()
+                        }
+                        Spacer()
+                    }
+                }.buttonStyle(.plain)
                 TextField("Notes", text: $session.notes, axis: .vertical)
                     .lineLimit((session.data.isEmpty ? 9 : 3)...12)
                     .autocorrectionDisabled()
@@ -58,11 +83,9 @@ struct SessionHomeView: View {
                     }
                 }
             } header: {
-                if let routine = session.routine {
-                    Text(routine.name)
-                }
+                DatePicker("Start", selection: $session.startTime, displayedComponents: [.date, .hourAndMinute])
             }
-            setSummaryView()
+            dataView()
         }
     }
 
@@ -95,19 +118,22 @@ struct SessionHomeView: View {
                 }.buttonStyle(.plain)
             } header: {
                 VStack(alignment: .leading) {
-                    // TODO
-//                    HStack {
-//                        Text(session.athleteDisplayName)
-//                        Spacer()
-//                        Text(session.bodyWeight.lbsFormat)
-//                    }.font(.subheadline)
-//                        .italic()
+                    if session.athletes.count > 1 {
+                        ScrollView([.horizontal]) {
+                            HStack {
+                                ForEach(session.athletes.sorted(by: { $0.name < $1.name })) { athlete in
+                                    Text(athlete.fullName ?? athlete.name)
+                                }
+                            }
+                        }.font(.subheadline)
+                            .italic()
+                    } else if let athlete = session.athletes.first {
+                        Text(athlete.fullName ?? athlete.name)
+                            .font(.subheadline)
+                            .italic()
+                    }
                     HStack {
-                        if let routine = session.routine {
-                            Text(routine.name)
-                        } else {
-                            Text(session.startTime.formatted(date: .numeric, time: .shortened))
-                        }
+                        Text(session.startTime.formatted(date: .numeric, time: .shortened))
                         Spacer()
                         if let endTime = session.endTime {
                             Text(Duration.seconds(endTime.timeIntervalSince(session.startTime)).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
@@ -115,20 +141,65 @@ struct SessionHomeView: View {
                     }
                 }
             }
-            setSummaryView()
+            dataView()
         }
     }
-
+    
     @ViewBuilder
-    private func setSummaryView() -> some View {
+    func dataView() -> some View {
+        if session.athletes.count > 1 {
+            multiAthleteDataView()
+        } else if let athlete = session.athletes.first {
+            singleAthleteDataView()
+        } else {
+            Section("Data") {
+                ContentUnavailableView("Add athletes to view and set data", systemImage: "person")
+            }
+        }
+    }
+    
+    @ViewBuilder
+    func multiAthleteDataView() -> some View {
+        if session.routine == nil {
+            // No need to structure exercises
+            let groupedData: [ExerciseData.Position: [ExerciseData]] = .init(grouping: session.data, by: { $0.position })
+            ForEach(groupedData
+                .sorted(by: { $0.key.setIndex < $1.key.setIndex })
+                .sorted(by: { $0.key.superSetIndex < $1.key.superSetIndex }), id: \.key.hashValue) { key, athleteData in
+                    Section {
+                        ForEach(athleteData) { d in
+                            dataView(d, headerType: .athleteName)
+                        }
+                    } header: {
+                        Text(athleteData.first!.exercise.name)
+                    }
+            }
+            Button {
+                // Adding all exercises to default main set
+                sheetType = .addExercise(superSetIndex: 0)
+            } label: {
+                Label("Add/Remove Exercises...", systemImage: "pencil")
+            }
+        } else {
+            // Need to keep exercises structured
+            // TODO
+        }
+    }
+    
+    @ViewBuilder
+    func singleAthleteDataView() -> some View {
         ForEach($session.superSets.enumerated(), id: \.offset) { offset, $superSet in
             let superSetIndex = offset
             Section {
-                ForEach(session.data
-                    .filter { $0.position.superSetIndex == superSetIndex }
+                ForEach(session.data.filter { $0.position.superSetIndex == superSetIndex }
                     .sorted(by: { $0.position.setIndex < $1.position.setIndex })
                     .enumerated(), id: \.offset) { offset, data in
-                    dataView(superSetIndex: superSetIndex, setIndex: offset, data: data)
+                        dataView(data, headerType: .exerciseName)
+                }
+                Button {
+                    sheetType = .addExercise(superSetIndex: superSetIndex)
+                } label: {
+                    Label("Add/Remove Exercises...", systemImage: "pencil")
                 }
             } header: {
                 HStack {
@@ -141,81 +212,62 @@ struct SessionHomeView: View {
                     if superSet.restTime > 0 {
                         Text("\(superSet.restTime)s Rest")
                     }
-                    // TODO
-//                    ExerciseSetHeaderMenu(
-//                        onPickFromLibrary: { sheetType = .exercisePicker(setIndex: setIndex) },
-//                        onAddNew: { exercise in
-//                            set.exercises.append(exercise)
-//                            sheetType = .exercise(setIndex: setIndex, exerciseIndex: set.exercises.count - 1)
-//                        },
-//                        onDeleteSet: { session.sets.remove(at: setIndex) }
-//                    )
                 }
             }
-        }
-        if !session.finished {
-            // TODO
-//            Button {
-//                session.sets.append(.init(base: .init()))
-//            } label: {
-//                Label("Add New Set", systemImage: "plus")
-//            }
         }
     }
     
     @ViewBuilder
-    private func dataView(superSetIndex: Int, setIndex: Int, data: ExerciseData) -> some View {
-        let exercise = data.exercise
+    private func dataView(_ data: ExerciseData, headerType: ExerciseDataEntryView.HeaderType) -> some View {
         if !session.finished {
             Menu {
-                if !data.expectedData.isEmpty {
+                if data.expectedData.isEmpty {
                     if data.actualData.count >= data.expectedData.count {
                         Button {
                             // Go to exercise (set 1)
-                            onSelect(.init(superSetIndex, setIndex))
+                            onSelect(data.position.exerciseIndices)
                         } label: {
                             Label("Re-start Exercise", systemImage: "play")
                         }
                     } else if !data.actualData.isEmpty {
                         Button {
                             // Go to exercise (next set)
-                            onSelect(.init(superSetIndex, setIndex, data.actualData.count))
+                            onSelect(.init(data.position.superSetIndex, data.position.setIndex, data.actualData.count))
                         } label: {
                             Label("Resume Exercise", systemImage: "play")
                         }
                     } else {
                         Button {
                             // Go to exercise (set 1)
-                            onSelect(.init(superSetIndex, setIndex))
+                            onSelect(data.position.exerciseIndices)
                         } label: {
                             Label("Start Exercise", systemImage: "play")
                         }
                     }
                 }
                 Button {
-                    sheetType = .exercise(setIndex: superSetIndex, exerciseIndex: setIndex)
+                    sheetType = .exercise(data.position)
                 } label: {
                     Label("Edit Exercise", systemImage: "pencil")
                 }
             } label: {
                 HStack {
-                    // TODO
-//                    SessionExerciseEntryView(exercise: exercise)
+                    ExerciseDataEntryView(data: data, headerType: headerType)
                     Spacer()
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
-                .swipeActions {
-                    Button("Delete", systemImage: "trash") {
-                        deleteExercise = data.position
-                    }.tint(.red)
-                }
+            // TODO change to context menu
+//                .swipeActions {
+//                    Button("Delete", systemImage: "trash") {
+//                        deleteExercise = data.first!.position
+//                    }.tint(.red)
+//                }
         } else {
             Button {
-                sheetType = .exercise(setIndex: superSetIndex, exerciseIndex: setIndex)
+                sheetType = .exercise(data.position)
             } label: {
                 HStack {
-                    // TODO
-//                    SessionExerciseEntryView(exercise: exercise)
+                    ExerciseDataEntryView(data: data, headerType: headerType)
                     Spacer()
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
@@ -225,5 +277,11 @@ struct SessionHomeView: View {
                     }.tint(.red)
                 }
         }
+    }
+}
+
+extension ExerciseData.Position {
+    var exerciseIndices: ExerciseIndices {
+        .init(self.superSetIndex, self.setIndex)
     }
 }

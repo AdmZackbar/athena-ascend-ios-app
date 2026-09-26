@@ -8,34 +8,113 @@
 import SwiftUI
 
 struct ExerciseDataEntryView: View {
-    let exercise: Exercise
     let data: ExerciseData
+    let headerType: HeaderType
+    
+    var header: String {
+        switch headerType {
+        case .date:
+            data.session.startTime.formatted(date: .abbreviated, time: .omitted)
+        case .exerciseName:
+            data.exercise.name
+        case .athleteName:
+            data.athlete.name
+        }
+    }
+    var header2: String? {
+        switch headerType {
+        case .date:
+            data.session.startTime.formatted(date: .omitted, time: .shortened)
+        case .exerciseName, .athleteName:
+            nil
+        }
+    }
+    
+    init(data: ExerciseData, headerType: HeaderType = .date) {
+        self.data = data
+        self.headerType = headerType
+    }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(data.session.startTime.formatted(date: .abbreviated, time: .shortened))
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(header)
+                Spacer()
+                if let header2 {
+                    Text(header2)
+                }
+            }.bold()
                 .foregroundStyle(.secondary)
             if !data.notes.isEmpty {
                 Text(data.notes)
                     .font(.subheadline)
                     .italic()
             }
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-                ForEach(data.actualData.enumerated(), id: \.offset) { offset, d in
-                    GridRow(alignment: .top) {
-                        Text("Set \(offset + 1)")
-                            .fontWeight(.semibold)
-                        dataSetView(d)
+            if !data.actualData.isEmpty || !data.expectedData.isEmpty {
+                let numRows: Int = max(data.actualData.count, data.expectedData.count)
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+                    ForEach(0..<numRows, id: \.self) { index in
+                        GridRow(alignment: .top) {
+                            Text("Set \(index + 1)")
+                                .fontWeight(.semibold)
+                            let expected: ExerciseData.DataSet? = index < data.expectedData.count ? data.expectedData[index] : nil
+                            let actual: ExerciseData.DataSet? = index < data.actualData.count ? data.actualData[index] : nil
+                            if let expected, let actual {
+                                actualView(actual)
+                                // Remove shared values from expected
+                                let diff = expected ^ actual
+                                // Only show if needed
+                                if !diff.isEmpty {
+                                    expectedView(diff)
+                                }
+                            } else if let expected {
+                                expectedView(expected)
+                            } else if let actual {
+                                actualView(actual)
+                            }
+                        }
                     }
                 }
+            } else {
+                Text("No Data")
+                    .italic()
             }
         }
     }
     
     @ViewBuilder
-    func dataSetView(_ dataSet: ExerciseData.DataSet) -> some View {
+    func expectedView(_ dataSet: ExerciseData.DataSet) -> some View {
         VStack(alignment: .leading) {
-            switch exercise.category {
+            switch data.exercise.category {
+            case .generic(_, let dataTypes, let sideType):
+                if sideType == .independent && !dataTypes.allSatisfy({ getText(dataSet: dataSet, dataType: $0, useAlt: false) == getText(dataSet: dataSet, dataType: $0, useAlt: true) }) {
+                    Text("[L: \(dataTypes.compactMap { dataSet.getText($0, useAlt: false) }.joined(separator: ", "))]")
+                    Text("[R: \(dataTypes.compactMap { dataSet.getText($0, useAlt: true) }.joined(separator: ", "))]")
+                } else {
+                    Text("[\(dataTypes.compactMap { dataSet.getText($0, useAlt: false) }.joined(separator: ", "))]")
+                }
+            case .repeater(_, _, _):
+                let dataTypes: [Exercise.DataType] = [.reps, .weight]
+                Text("[\(dataTypes.compactMap { dataSet.getText($0, useAlt: false) }.joined(separator: " @ "))]")
+            case .maxHang(_, _):
+                let dataTypes: [Exercise.DataType] = [.time, .weight]
+                Text("[\(dataTypes.compactMap { dataSet.getText($0, useAlt: false) }.joined(separator: " @ "))]")
+            case .campus(_, let mirrorSets):
+                // TODO handle mirroring properly
+                if mirrorSets {
+                    Text(dataSet[.campus]?.text ?? "N/A")
+                    Text(dataSet[.campusAlt]?.text ?? "N/A")
+                } else {
+                    Text(dataSet[.campus]?.text ?? "N/A")
+                }
+            }
+        }.italic()
+    }
+    
+    @ViewBuilder
+    func actualView(_ dataSet: ExerciseData.DataSet) -> some View {
+        VStack(alignment: .leading) {
+            switch data.exercise.category {
             case .generic(_, let dataTypes, let sideType):
                 if sideType == .independent && !dataTypes.allSatisfy({ getText(dataSet: dataSet, dataType: $0, useAlt: false) == getText(dataSet: dataSet, dataType: $0, useAlt: true) }) {
                     Text("L: \(dataTypes.map { getText(dataSet: dataSet, dataType: $0, useAlt: false) }.joined(separator: ", "))")
@@ -67,5 +146,11 @@ struct ExerciseDataEntryView: View {
     
     private func getText(dataSet: ExerciseData.DataSet, dataType: Exercise.DataType, useAlt: Bool) -> String {
         return dataSet.getText(dataType, useAlt: useAlt) ?? "N/A"
+    }
+    
+    enum HeaderType {
+        case date
+        case exerciseName
+        case athleteName
     }
 }

@@ -17,6 +17,8 @@ struct SessionView: View {
     var title: String {
         if let indices {
             return session.superSets[indices.superSetIndex].name
+        } else if let routine = session.routine {
+            return routine.name
         } else {
             return session.startTime.formatted(date: .numeric, time: .shortened)
         }
@@ -242,6 +244,42 @@ struct SessionView: View {
     @ViewBuilder
     func sheetView(_ t: SheetType) -> some View {
         switch t {
+        case .addExercise(let superSetIndex):
+            let initialSelection = Set(session.data
+                .filter { $0.position.superSetIndex == superSetIndex }
+                .compactMap { $0.exercise })
+                .sorted(by: { $0.name < $1.name })
+            SelectExercisesSheet(initialSelection: initialSelection) { newSelection in
+                let newExercises = newSelection.filter { !initialSelection.contains($0) }
+                let removedExercises = initialSelection.filter { !newSelection.contains($0) }
+                // Remove all data for the removed exercises
+                session.data.removeAll(where: { removedExercises.contains($0.exercise) })
+                // Add athlete placeholder data
+                let nextSetIndex: Int = session.data
+                    .filter { $0.position.superSetIndex == superSetIndex }
+                    .map { $0.position.setIndex }
+                    .max() ?? 0
+                for athlete in session.athletes {
+                    session.data += newExercises.enumerated().map { offset, exercise in
+                        ExerciseData(exercise: exercise, session: session, athlete: athlete, position: .init(superSetIndex: superSetIndex, setIndex: nextSetIndex + offset))
+                    }
+                }
+            }
+        case .athlete:
+            SelectAthletesSheet(initialSelection: session.athletes) { newSelection in
+                let newAthletes = newSelection.filter { !session.athletes.contains($0) }
+                let removedAthletes = session.athletes.filter { !newSelection.contains($0) }
+                // Remove athletes and associated data from session
+                session.athletes.removeAll(where: { removedAthletes.contains($0) })
+                session.data.removeAll(where: { removedAthletes.contains($0.athlete) })
+                // Add athletes and placeholder data to session
+                session.athletes += newAthletes
+                if let routine = session.routine {
+                    for athlete in newAthletes {
+                        session.data += routine.data.map { ExerciseData(exercise: $0.exercise, session: session, athlete: athlete, position: $0.position, expectedData: $0.expectedData) }
+                    }
+                }
+            }
         case .notes:
             Form {
                 TextField("Notes", text: .init(get: {
@@ -352,11 +390,6 @@ struct SessionView: View {
                             sheetType = .date
                         } label: {
                             Label("Edit Start/End Date", systemImage: "calendar")
-                        }
-                        Button {
-                            sheetType = .weight
-                        } label: {
-                            Label("Edit Weight", systemImage: "scalemass")
                         }
                         Button {
                             song = session.standoutSong ?? .init(name: "", artist: "")
@@ -1161,12 +1194,14 @@ struct SessionView: View {
     enum SheetType: Identifiable, Codable, Hashable, Equatable {
         var id: String {
             switch self {
+            case .addExercise(let superSetIndex):
+                "add-exercise-\(superSetIndex)"
+            case .athlete:
+                "athlete"
             case .date:
                 "date"
-            case .weight:
-                "weight"
-            case .exercise(let setIndex, let exerciseIndex):
-                "ex-\(setIndex)-\(exerciseIndex)"
+            case .exercise(let position):
+                "ex-\(position.superSetIndex)-\(position.setIndex)"
             case .notes:
                 "notes"
             case .song:
@@ -1178,9 +1213,10 @@ struct SessionView: View {
             }
         }
 
+        case addExercise(superSetIndex: Int)
+        case athlete
         case date
-        case weight
-        case exercise(setIndex: Int, exerciseIndex: Int)
+        case exercise(_ position: ExerciseData.Position)
         case notes
         case song
         case campusMoves(alt: Bool)
@@ -1190,21 +1226,13 @@ struct SessionView: View {
 }
 
 #Preview(traits: .sampleData) {
-    @Previewable @Query var athletes: [Athlete]
-    @Previewable @Query var routines: [Routine]
+    @Previewable @Query(sort: \Session.startTime) var sessions: [Session]
     NavigationStack {
-        let routine = routines.first!
-        let athlete = athletes.first!
-        let session: Session = {
-            let session: Session = .init(routine: routine, startTime: .now.addingTimeInterval(-700), superSets: routine.superSets)
-            session.data = routine.data.map { ExerciseData(exercise: $0.exercise, session: session, athlete: athlete, position: $0.position, expectedData: $0.expectedData) }
-            return session
-        }()
-        SessionView(session: session)
+        SessionView(session: sessions.first!)
     }
 }
 
-#Preview("Fresh") {
+#Preview("Fresh", traits: .sampleData) {
     NavigationStack {
         SessionView(session: Session())
     }
