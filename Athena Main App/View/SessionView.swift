@@ -212,8 +212,11 @@ struct SessionView: View {
             })) {
                 Button(role: .destructive) {
                     if let deleteExercise {
-                        // TODO
-//                        session.sets[deleteExercise.0].exercises.remove(at: deleteExercise.1)
+                        session.data.removeAll(where: { $0.position == deleteExercise })
+                        // Update positions of all later exercises to reflect the shift down
+                        session.data
+                            .filter { $0.position.superSetIndex == deleteExercise.superSetIndex && $0.position.setIndex > deleteExercise.setIndex }
+                            .forEach { $0.position = .init(superSetIndex: $0.position.superSetIndex, setIndex: $0.position.setIndex - 1) }
                     }
                 } label: {
                     Label("Delete", systemImage: "trash")
@@ -280,6 +283,8 @@ struct SessionView: View {
                     }
                 }
             }
+        case .exercise(let position, let athlete):
+            ExerciseDataEditSheet(session: session, position: position, initialAthlete: athlete)
         case .notes:
             Form {
                 TextField("Notes", text: .init(get: {
@@ -1191,7 +1196,7 @@ struct SessionView: View {
         runner.timerDuration(at: indices, phase: exerciseState)
     }
     
-    enum SheetType: Identifiable, Codable, Hashable, Equatable {
+    enum SheetType: Identifiable, Hashable {
         var id: String {
             switch self {
             case .addExercise(let superSetIndex):
@@ -1200,8 +1205,8 @@ struct SessionView: View {
                 "athlete"
             case .date:
                 "date"
-            case .exercise(let position):
-                "ex-\(position.superSetIndex)-\(position.setIndex)"
+            case .exercise(let position, let athlete):
+                "ex-\(position.superSetIndex)-\(position.setIndex)-\(athlete?.uuid.uuidString ?? "")"
             case .notes:
                 "notes"
             case .song:
@@ -1216,7 +1221,7 @@ struct SessionView: View {
         case addExercise(superSetIndex: Int)
         case athlete
         case date
-        case exercise(_ position: ExerciseData.Position)
+        case exercise(_ position: ExerciseData.Position, athlete: Athlete? = nil)
         case notes
         case song
         case campusMoves(alt: Bool)

@@ -163,15 +163,22 @@ struct SessionHomeView: View {
         if session.routine == nil {
             // No need to structure exercises
             let groupedData: [ExerciseData.Position: [ExerciseData]] = .init(grouping: session.data, by: { $0.position })
-            ForEach(groupedData
-                .sorted(by: { $0.key.setIndex < $1.key.setIndex })
-                .sorted(by: { $0.key.superSetIndex < $1.key.superSetIndex }), id: \.key.hashValue) { key, athleteData in
+            ForEach(groupedData.sorted(by: { ($0.key.superSetIndex, $0.key.setIndex) < ($1.key.superSetIndex, $1.key.setIndex) }),
+                id: \.key.hashValue) { key, athleteData in
                     Section {
-                        ForEach(athleteData) { d in
+                        ForEach(athleteData.sorted(by: { $0.athlete.name < $1.athlete.name })) { d in
                             dataView(d, headerType: .athleteName)
                         }
                     } header: {
-                        Text(athleteData.first!.exercise.name)
+                        HStack {
+                            Text(athleteData.first!.exercise.name)
+                            Spacer()
+                            Button(role: .destructive) {
+                                deleteExercise = key
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                        }
                     }
             }
             Button {
@@ -183,6 +190,7 @@ struct SessionHomeView: View {
         } else {
             // Need to keep exercises structured
             // TODO
+            Text("TODO")
         }
     }
     
@@ -195,6 +203,11 @@ struct SessionHomeView: View {
                     .sorted(by: { $0.position.setIndex < $1.position.setIndex })
                     .enumerated(), id: \.offset) { offset, data in
                         dataView(data, headerType: .exerciseName)
+                            .swipeActions {
+                                Button("Delete", systemImage: "trash") {
+                                    deleteExercise = data.position
+                                }.tint(.red)
+                            }
                 }
                 Button {
                     sheetType = .addExercise(superSetIndex: superSetIndex)
@@ -246,7 +259,7 @@ struct SessionHomeView: View {
                     }
                 }
                 Button {
-                    sheetType = .exercise(data.position)
+                    sheetType = .exercise(data.position, athlete: data.athlete)
                 } label: {
                     Label("Edit Exercise", systemImage: "pencil")
                 }
@@ -256,12 +269,6 @@ struct SessionHomeView: View {
                     Spacer()
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
-            // TODO change to context menu
-//                .swipeActions {
-//                    Button("Delete", systemImage: "trash") {
-//                        deleteExercise = data.first!.position
-//                    }.tint(.red)
-//                }
         } else {
             Button {
                 sheetType = .exercise(data.position)
@@ -271,11 +278,6 @@ struct SessionHomeView: View {
                     Spacer()
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
-                .swipeActions {
-                    Button("Delete", systemImage: "trash") {
-                        deleteExercise = data.position
-                    }.tint(.red)
-                }
         }
     }
 }

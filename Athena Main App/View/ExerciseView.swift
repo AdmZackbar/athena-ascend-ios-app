@@ -16,29 +16,9 @@ struct ExerciseView: View {
     @State var exercise: Exercise
     @State private var selectedAthlete: Athlete? = nil
     
-    var categoryName: String {
-        switch exercise.category {
-        case .generic(_, _, _): return "Exercise"
-        case .repeater(_, _, _): return "Repeaters"
-        case .maxHang(_, _): return "Max Hangs"
-        case .campus(_, _): return "Campus Sets"
-        }
-    }
-    
     var body: some View {
         Form {
-            Section(categoryName) {
-                switch exercise.category {
-                case .generic(let name, let dataTypes, let sideType):
-                    genericInfoView(name: name, dataTypes: dataTypes, sideType: sideType)
-                case .repeater(let tag, let timeOn, let timeOff):
-                    repeaterInfoView(tag: tag, timeOn: timeOn, timeOff: timeOff)
-                case .maxHang(let tag, let sideType):
-                    maxHangInfoView(tag: tag, sideType: sideType)
-                case .campus(let name, let mirrorSets):
-                    campusInfoView(name: name, mirrorSets: mirrorSets)
-                }
-            }
+            ExerciseInfoSection(exercise: exercise)
             Section {
                 if let selectedAthlete {
                     let data = selectedAthlete.data.filter { $0.exercise == exercise }
@@ -58,7 +38,7 @@ struct ExerciseView: View {
                     Spacer()
                     Picker("Athlete:", selection: $selectedAthlete) {
                         Text("None").tag(nil as Athlete?)
-                        ForEach(athletes) { athlete in
+                        ForEach(athletes, id: \.uuid) { athlete in
                             Text(athlete.name)
                                 .tag(athlete as Athlete?)
                         }
@@ -67,6 +47,34 @@ struct ExerciseView: View {
             }
         }.navigationTitle(exercise.name)
             .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct ExerciseInfoSection: View {
+    let exercise: Exercise
+    
+    var categoryName: String {
+        switch exercise.category {
+        case .generic(_, _, _): return "Exercise"
+        case .repeater(_, _, _): return "Repeaters"
+        case .maxHang(_, _): return "Max Hangs"
+        case .campus(_, _): return "Campus Sets"
+        }
+    }
+    
+    var body: some View {
+        Section(categoryName) {
+            switch exercise.category {
+            case .generic(let name, let dataTypes, let sideType):
+                genericInfoView(name: name, dataTypes: dataTypes, sideType: sideType)
+            case .repeater(let tag, let timeOn, let timeOff):
+                repeaterInfoView(tag: tag, timeOn: timeOn, timeOff: timeOff)
+            case .maxHang(let tag, let sideType):
+                maxHangInfoView(tag: tag, sideType: sideType)
+            case .campus(let name, let mirrorSets):
+                campusInfoView(name: name, mirrorSets: mirrorSets)
+            }
+        }
     }
     
     @ViewBuilder

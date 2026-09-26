@@ -12,7 +12,7 @@ typealias Athlete = SchemaV3.Athlete
 
 extension SchemaV3 {
     @Model
-    final class Athlete {
+    final class Athlete: Hashable {
         /// Unique ID that is used when persisting a data reference outside the DB
         var uuid: UUID = UUID()
         /// The main display name (i.e. nickname)
@@ -40,6 +40,19 @@ extension SchemaV3 {
             self.lastName = lastName
             self.birthDate = birthDate
             self.createdAt = createdAt
+        }
+        
+        // Override hash and equals to make it more stable
+        // The persistent ID can change after insertion, which makes it
+        // very unreliable as a hash key source
+        // UUIDs should be unique, so only it needs to be used
+        
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(uuid)
+        }
+        
+        static func == (lhs: Athlete, rhs: Athlete) -> Bool {
+            lhs.uuid == rhs.uuid
         }
     }
 }

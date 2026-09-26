@@ -789,15 +789,11 @@ extension SchemaV2.Session.CampusSetPair {
 }
 
 extension ExerciseData.DataSet {
+    var hasAlt: Bool {
+        self.keys.contains(where: \.isAlt)
+    }
+    
     func getText(_ dataType: Exercise.DataType, useAlt: Bool = false) -> String? {
-        let field: ExerciseData.Field = {
-            switch dataType {
-            case .reps: return .reps
-            case .time: return .time
-            case .weight: return .weight
-            case .distance: return .distance
-            }
-        }()
         let value: ExerciseData.Value? = {
             if useAlt {
                 let altField: ExerciseData.Field = {
@@ -808,9 +804,9 @@ extension ExerciseData.DataSet {
                     case .distance: return .distanceAlt
                     }
                 }()
-                return self[altField] ?? self[field]
+                return self[altField] ?? self[dataType.field]
             }
-            return self[field]
+            return self[dataType.field]
         }()
         switch value {
         case .text(let str): return str
@@ -823,7 +819,31 @@ extension ExerciseData.DataSet {
     }
 }
 
+extension [ExerciseData.DataSet] {
+    var hasAlt: Bool {
+        self.contains(where: { $0.hasAlt })
+    }
+}
+
 extension Exercise.DataType {
+    var field: ExerciseData.Field {
+        switch self {
+        case .reps: return .reps
+        case .time: return .time
+        case .weight: return .weight
+        case .distance: return .distance
+        }
+    }
+    
+    var altField: ExerciseData.Field {
+        switch self {
+        case .reps: return .repsAlt
+        case .time: return .timeAlt
+        case .weight: return .weightAlt
+        case .distance: return .distanceAlt
+        }
+    }
+    
     func getUnit(_ value: Int) -> String {
         switch self {
         case .reps: value == 1 ? " rep" : " reps"
@@ -831,6 +851,10 @@ extension Exercise.DataType {
         case .weight: value == 1 ? " lb" : " lbs"
         case .distance: "in"
         }
+    }
+    
+    func getField(alt: Bool) -> ExerciseData.Field {
+        return alt ? altField : field
     }
 }
 
@@ -843,6 +867,35 @@ extension ExerciseData.DataSet {
             }
         }
         return result
+    }
+    
+    func dedupe() -> ExerciseData.DataSet {
+        var result = self
+        for altField in ExerciseData.Field.altFields {
+            if let mainField = altField.mainField, self[mainField] == self[altField] {
+                result.removeValue(forKey: altField)
+            }
+        }
+        return result
+    }
+}
+
+extension ExerciseData.Field {
+    static let altFields: [ExerciseData.Field] = [.repsAlt, .timeAlt, .distanceAlt, .weightAlt, .campusAlt]
+    
+    var isAlt: Bool {
+        Self.altFields.contains(self)
+    }
+    
+    var mainField: ExerciseData.Field? {
+        switch self {
+        case .repsAlt: .reps
+        case .timeAlt: .time
+        case .distanceAlt: .distance
+        case .weightAlt: .weight
+        case .campusAlt: .campus
+        default: nil
+        }
     }
 }
 
