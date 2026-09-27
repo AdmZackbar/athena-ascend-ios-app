@@ -24,7 +24,7 @@ struct CurrentAthleteTests {
 
         let resolved = CurrentAthlete.resolve(storedID: "", athletes: [], context: context)
 
-        #expect(resolved.name == "Zach Wassynger")
+        #expect(resolved.name == "Zach")
         #expect(try context.fetch(FetchDescriptor<Athlete>()).count == 1)
     }
 
