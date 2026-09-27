@@ -24,46 +24,84 @@ extension CampusSet.Side {
 }
 
 struct CampusBoardView: View {
+    @Environment(\.dismiss) var dismiss
+    
     typealias Side = CampusSet.Side
     
-    let board: CampusBoard
-    @Binding var moves: [CampusMove]
+    let onComplete: (CampusSet) -> Void
+    @State var board: CampusBoard
+    @State var moves: [CampusMove]
+    
+    init(set: CampusSet, onComplete: @escaping (CampusSet) -> Void) {
+        self.onComplete = onComplete
+        self.board = set.board
+        self.moves = set.moves
+    }
     
     var body: some View {
-        VStack {
-            if !moves.isEmpty {
-                movesView()
-            } else {
-                Button {
-                    // Do nothing
-                } label: {
-                    Text("No Moves Set")
-                        .font(.title2)
-                        .bold()
-                        .italic()
-                }.buttonStyle(.bordered)
-                    .tint(.primary)
-            }
-            HStack {
+        Form {
+            Section {
                 VStack {
-                    ForEach(((board.startRung.num + (board.startRung.isHalf ? 1 : 0))...board.endRung.num).reversed().map({ CampusRung.full($0) }), id: \.text) { rung in
-                        rungButton(rung)
+                    if !moves.isEmpty {
+                        movesView()
+                    } else {
+                        Button {
+                            // Do nothing
+                        } label: {
+                            Text("No Moves Set")
+                                .bold()
+                                .italic()
+                        }.buttonStyle(.bordered)
+                            .tint(.primary)
                     }
-                }
-                if board.hasHalf {
-                    VStack {
-                        ForEach((board.startRung.num...(board.endRung.num - (board.endRung.isHalf ? 0 : 1))).reversed().map({ CampusRung.half($0) }), id: \.text) { rung in
-                            rungButton(rung)
+                    HStack {
+                        VStack {
+                            ForEach(((board.startRung.num + (board.startRung.isHalf ? 1 : 0))...board.endRung.num).reversed().map({ CampusRung.full($0) }), id: \.text) { rung in
+                                rungButton(rung)
+                            }
+                        }
+                        if board.hasHalf {
+                            VStack {
+                                ForEach((board.startRung.num...(board.endRung.num - (board.endRung.isHalf ? 0 : 1))).reversed().map({ CampusRung.half($0) }), id: \.text) { rung in
+                                    rungButton(rung)
+                                }
+                            }
                         }
                     }
+                    Spacer()
+                }.onAppear {
+                    if moves.isEmpty {
+                        moves = [.init(rung: .full(1), side: .both)]
+                    }
+                }
+            } header: {
+                Picker("Campus Board", selection: $board) {
+                    ForEach(CampusBoard.allCases, id: \.name) { b in
+                        Text(b.name).tag(b)
+                    }
+                }
+            } footer: {
+                Text(moves.text)
+                    .font(.subheadline)
+                    .fontWeight(.heavy)
+            }
+        }.navigationTitle("Edit Moves")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button {
+                        moves.removeAll()
+                    } label: {
+                        Label("Clear", systemImage: "clear")
+                    }
+                    Button {
+                        onComplete(.init(board: board, moves: moves))
+                        dismiss()
+                    } label: {
+                        Label("Save", systemImage: "checkmark")
+                    }.disabled(moves.isEmpty)
                 }
             }
-            Spacer()
-        }.onAppear {
-            if moves.isEmpty {
-                moves = [.init(rung: .full(1), side: .both)]
-            }
-        }
     }
     
     @ViewBuilder
@@ -103,13 +141,12 @@ struct CampusBoardView: View {
                         }.tint(.red)
                     } label: {
                         Text(move.text)
-                            .font(.title2)
                             .bold()
                     }.buttonStyle(.bordered)
                         .tint(move.side.color)
                 }
             }
-        }.scrollTargetBehavior(.viewAligned)
+        }
     }
     
     @ViewBuilder
@@ -179,8 +216,9 @@ struct CampusBoardView: View {
 }
 
 #Preview {
-    @Previewable @State var moves: [CampusMove] = []
-    Form {
-        CampusBoardView(board: .largeEdges, moves: $moves)
+    NavigationStack {
+        CampusBoardView(set: .init(board: .largeEdges, moves: [.init(rung: .full(1), side: .both)])) { moves in
+            // TODO
+        }
     }
 }

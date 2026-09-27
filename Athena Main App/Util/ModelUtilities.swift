@@ -94,45 +94,27 @@ extension Session {
 // EXERCISES //
 // ********* //
 
-extension CampusBoard {
-    static let largeEdges = CampusBoard(name: "Large Edges")
-    static let mediumEdges = CampusBoard(name: "Medium Edges")
-    static let smallEdges = CampusBoard(name: "Small Edges")
-    static let sloperRungs = CampusBoard(name: "Sloper Rungs", endRung: .full(8), hasHalf: false)
-
-    static let allCases = [largeEdges, mediumEdges, smallEdges, sloperRungs]
-}
-
 extension ExerciseData.DataSet {
     var hasAlt: Bool {
         self.keys.contains(where: \.isAlt)
     }
     
     func getSummary(useAlt: Bool = false) -> String? {
-        Exercise.DataType.allCases.compactMap { getText($0, useAlt: useAlt) }.joined(separator: ", ")
+        var values = Exercise.DataType.allCases.compactMap { getText($0, useAlt: useAlt) }
+        if let value = self[useAlt ? .campusAlt : .campus] {
+            values.append(value.text)
+        }
+        return values.joined(separator: ", ")
     }
 
     func getText(_ dataType: Exercise.DataType, useAlt: Bool = false) -> String? {
-        let value: ExerciseData.Value? = {
-            if useAlt {
-                let altField: ExerciseData.Field = {
-                    switch dataType {
-                    case .reps: return .repsAlt
-                    case .time: return .timeAlt
-                    case .weight: return .weightAlt
-                    case .distance: return .distanceAlt
-                    }
-                }()
-                return self[altField] ?? self[dataType.field]
-            }
-            return self[dataType.field]
-        }()
+        let value: ExerciseData.Value? = self[dataType.getField(alt: useAlt)]
         switch value {
         case .text(let str): return str
         case .discrete(let v): return "\(v.formatted())\(dataType.getUnit(v))"
         case .number(let v): return "\(v.formatted(.number.precision(.fractionLength(0...2))))\(dataType.getUnit(Int(v)))"
         case .range(let min, let max): return "\(min)-\(max)\(dataType.getUnit(max))"
-        case .campus(let set): return "TODO"
+        case .campus(let set): return value?.text
         case .none: return nil
         }
     }
@@ -150,10 +132,14 @@ extension ExerciseData.DataSet {
     func dedupe() -> ExerciseData.DataSet {
         var result = self
         for altField in ExerciseData.Field.altFields {
+            if altField == .campusAlt {
+                continue
+            }
             if let mainField = altField.mainField, self[mainField] == self[altField] {
                 result.removeValue(forKey: altField)
             }
         }
+        // TODO dedupe flipped version of main for campus
         return result
     }
 }
@@ -223,7 +209,37 @@ extension ExerciseData.Value {
         case .discrete(let v): v.formatted()
         case .number(let v): v.formatted(.number.precision(.fractionLength(0...2)))
         case .range(let min, let max): "[\(min)-\(max)]"
-        case .campus(let set): "TODO"
+        case .campus(let set): "(\(set.board.abbreviation)) \(set.moves.text)"
         }
+    }
+    
+    var alt: ExerciseData.Value {
+        switch self {
+        case .campus(let set): return .campus(set.flipped())
+        default: return self
+        }
+    }
+}
+
+extension CampusBoard {
+    static let largeEdges = CampusBoard(name: "Large Edges", abbreviation: "L")
+    static let mediumEdges = CampusBoard(name: "Medium Edges", abbreviation: "M")
+    static let smallEdges = CampusBoard(name: "Small Edges", abbreviation: "S")
+    static let sloperRungs = CampusBoard(name: "Sloper Rungs", abbreviation: "SLP", endRung: .full(8), hasHalf: false)
+
+    static let allCases = [largeEdges, mediumEdges, smallEdges, sloperRungs]
+}
+
+extension CampusSet {
+    func flipped() -> CampusSet {
+        var result = self
+        result.moves = self.moves.map { .init(rung: $0.rung, side: $0.side.flipped) }
+        return result
+    }
+}
+
+extension [CampusMove] {
+    var text: String {
+        self.map(\.text).joined(separator: "-")
     }
 }

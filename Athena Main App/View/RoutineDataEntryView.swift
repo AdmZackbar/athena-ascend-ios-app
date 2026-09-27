@@ -38,7 +38,7 @@ struct RoutineDataEntryView: View {
                         GridRow(alignment: .top) {
                             Text("Set \(index + 1)")
                                 .fontWeight(.semibold)
-                            expectedView(data.expectedData[index])
+                            ExpectedDataSetView(data: data, dataSet: data.expectedData[index])
                         }
                     }
                 }
@@ -49,12 +49,20 @@ struct RoutineDataEntryView: View {
         }
     }
     
-    @ViewBuilder
-    func expectedView(_ dataSet: ExerciseData.DataSet) -> some View {
+    private func getText(dataSet: ExerciseData.DataSet, dataType: Exercise.DataType, useAlt: Bool) -> String {
+        return dataSet.getText(dataType, useAlt: useAlt) ?? "N/A"
+    }
+}
+
+struct ExpectedDataSetView: View {
+    let data: RoutineData
+    let dataSet: ExerciseData.DataSet
+    
+    var body: some View {
         VStack(alignment: .leading) {
             switch data.exercise.category {
             case .generic(_, let dataTypes, let sideType):
-                if sideType == .independent && !dataTypes.allSatisfy({ getText(dataSet: dataSet, dataType: $0, useAlt: false) == getText(dataSet: dataSet, dataType: $0, useAlt: true) }) {
+                if sideType == .independent && dataSet.hasAlt {
                     Text("[L: \(dataTypes.compactMap { dataSet.getText($0, useAlt: false) }.joined(separator: ", "))]")
                     Text("[R: \(dataTypes.compactMap { dataSet.getText($0, useAlt: true) }.joined(separator: ", "))]")
                 } else {
@@ -67,19 +75,14 @@ struct RoutineDataEntryView: View {
                 let dataTypes: [Exercise.DataType] = [.time, .weight]
                 Text("[\(dataTypes.compactMap { dataSet.getText($0, useAlt: false) }.joined(separator: " @ "))]")
             case .campus(_, let mirrorSets):
-                // TODO handle mirroring properly
                 if mirrorSets {
                     Text(dataSet[.campus]?.text ?? "N/A")
-                    Text(dataSet[.campusAlt]?.text ?? "N/A")
+                    Text(dataSet[.campusAlt]?.text ?? dataSet[.campus]?.alt.text ?? "N/A")
                 } else {
                     Text(dataSet[.campus]?.text ?? "N/A")
                 }
             }
         }.italic()
-    }
-    
-    private func getText(dataSet: ExerciseData.DataSet, dataType: Exercise.DataType, useAlt: Bool) -> String {
-        return dataSet.getText(dataType, useAlt: useAlt) ?? "N/A"
     }
 }
 

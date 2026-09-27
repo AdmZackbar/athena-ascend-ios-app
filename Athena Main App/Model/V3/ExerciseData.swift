@@ -69,9 +69,6 @@ extension SchemaV3 {
         enum Value: Codable, Hashable {
             case number(_ v: Double)
             case discrete(_ v: Int)
-            /// An inclusive rep/time range, e.g. an expected "8-12" prescription.
-            /// `min == max` is represented as `.discrete` instead; this case is only
-            /// used when the bounds actually differ.
             case range(min: Int, max: Int)
             case text(_ str: String)
             case campus(_ set: CampusSet)
@@ -92,15 +89,12 @@ extension SchemaV3 {
                 self.tempo = tempo
             }
             
-            /// This struct's nested `Rung`/`Move`/`Side` must always be used here — never
-            /// the global `Campus*` typealiases (lines 11-14). They point at these same
-            /// `SchemaV3` types today, but a future schema version could repoint them —
-            /// using the nested spelling here is what keeps this struct's own persisted
-            /// shape from silently changing out from under it if that happens.
             struct Board: Codable, Hashable {
                 /// The name of the holds/board setup
                 /// e.g. large edges, sloper rungs, sloper balls, small edges
                 var name: String
+                /// A shortened version of the name
+                var abbreviation: String
                 /// The lowest rung of the board
                 var startRung: Rung
                 /// The highest rung of the board
@@ -108,8 +102,13 @@ extension SchemaV3 {
                 /// If the board has 'half' rungs
                 var hasHalf: Bool
                 
-                init(name: String, startRung: Rung = .full(1), endRung: Rung = .full(10), hasHalf: Bool = true) {
+                init(name: String,
+                     abbreviation: String,
+                     startRung: Rung = .full(1),
+                     endRung: Rung = .full(10),
+                     hasHalf: Bool = true) {
                     self.name = name
+                    self.abbreviation = abbreviation
                     self.startRung = startRung
                     self.endRung = endRung
                     self.hasHalf = hasHalf

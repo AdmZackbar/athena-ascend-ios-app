@@ -94,9 +94,12 @@ struct RoutineDataEditSheet: View {
                     return []
                 }
             }()
-            // TODO handle campus
             // Only need main field, don't care about alt
             dataTypes.map { ($0.field, entry[$0.field]?.editType) }.forEach { dict[$0.0] = $0.1 }
+            // Have to handle campus directly (no link in data types)
+            if let editType = entry[.campus]?.editType {
+                dict[.campus] = editType
+            }
             return (entry, dict)
         }
     }
@@ -221,17 +224,7 @@ struct RoutineDataEditSheet: View {
                             GridRow(alignment: .top) {
                                 Text("Set \(offset + 1)")
                                     .fontWeight(.semibold)
-                                if set.0.hasAlt {
-                                    VStack(alignment: .leading) {
-                                        Text("L: \(set.0.getSummary() ?? "N/A")")
-                                        Text("R: \(set.0.getSummary(useAlt: true) ?? "N/A")")
-                                    }
-                                } else if let summary = set.0.getSummary() {
-                                    Text(summary)
-                                } else {
-                                    Text("N/A")
-                                        .italic()
-                                }
+                                ExpectedDataSetView(data: data, dataSet: set.0)
                             }
                         }
                     }
@@ -257,7 +250,7 @@ struct RoutineDataEditSheet: View {
             editorGroup(dataType: .time)
             editorGroup(dataType: .weight)
         case .campus(_, _):
-            Text("TODO")
+            campusEditorGroup()
         }
     }
     
@@ -380,6 +373,73 @@ struct RoutineDataEditSheet: View {
         }
     }
     
+    @ViewBuilder
+    func campusEditorGroup() -> some View {
+        Section {
+            campusEditor()
+            if showAlt {
+                campusEditor(alt: true)
+            }
+        } header: {
+            HStack {
+                Text("Campus")
+                Spacer()
+                Picker("Type", selection: .init(get: {
+                    sets[editSetIndex].1[.campus]
+                }, set: { newValue in
+                    sets[editSetIndex].1[.campus] = newValue
+                    // Special cases: need to reset data
+                    switch newValue {
+                    case .text, .none:
+                        sets[editSetIndex].0.removeValue(forKey: .campus)
+                        sets[editSetIndex].0.removeValue(forKey: .campusAlt)
+                    default:
+                        break
+                    }
+                })) {
+                    ForEach([FieldEditType.campus, FieldEditType.text], id: \.text) { t in
+                        Text(t.text).tag(t as FieldEditType?)
+                    }
+                }.pickerStyle(.segmented)
+                    .frame(width: 200)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    func campusEditor(alt: Bool = false) -> some View {
+        switch sets[editSetIndex].1[.campus] {
+        case .campus:
+            var current: CampusSet = {
+                if alt {
+                    return getCampusSet(field: .campusAlt) ?? getCampusSet(field: .campus)?.flipped() ?? .init(board: .largeEdges, moves: [])
+                } else {
+                    return getCampusSet(field: .campus) ?? .init(board: .largeEdges, moves: [])
+                }
+            }()
+            NavigationLink {
+                CampusBoardView(set: current) { newSet in
+                    sets[editSetIndex].0[alt ? .campusAlt : .campus] = .campus(newSet)
+                }
+            } label: {
+                Text(current.moves.text)
+            }
+        case .text:
+            let field: ExerciseData.Field = alt ? .campusAlt : .campus
+            TextField("Custom", text: .init(get: {
+                getString(field: field)
+            }, set: { newValue in
+                if !newValue.isEmpty {
+                    sets[editSetIndex].0[field] = .text(newValue)
+                } else {
+                    sets[editSetIndex].0.removeValue(forKey: field)
+                }
+            }))
+        default:
+            EmptyView()
+        }
+    }
+    
     private func getInt(field: ExerciseData.Field) -> Int? {
         switch sets[editSetIndex].0[field] {
         case .discrete(let v): return v
@@ -423,6 +483,13 @@ struct RoutineDataEditSheet: View {
         // Fallback methods
         case .number(let v): return Int(v)
         case .discrete(let v): return v
+        default: return nil
+        }
+    }
+    
+    private func getCampusSet(field: ExerciseData.Field) -> CampusSet? {
+        switch sets[editSetIndex].0[field] {
+        case .campus(let set): return set
         default: return nil
         }
     }
