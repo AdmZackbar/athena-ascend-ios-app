@@ -107,6 +107,10 @@ extension ExerciseData.DataSet {
     var hasAlt: Bool {
         self.keys.contains(where: \.isAlt)
     }
+    
+    func getSummary(useAlt: Bool = false) -> String? {
+        Exercise.DataType.allCases.compactMap { getText($0, useAlt: useAlt) }.joined(separator: ", ")
+    }
 
     func getText(_ dataType: Exercise.DataType, useAlt: Bool = false) -> String? {
         let value: ExerciseData.Value? = {
@@ -131,6 +135,26 @@ extension ExerciseData.DataSet {
         case .campus(let set): return "TODO"
         case .none: return nil
         }
+    }
+    
+    static func ^ (lhs: ExerciseData.DataSet, rhs: ExerciseData.DataSet) -> ExerciseData.DataSet {
+        var result: ExerciseData.DataSet = lhs
+        rhs.forEach { field, rightVal in
+            if let leftVal = lhs[field], leftVal == rightVal {
+                result.removeValue(forKey: field)
+            }
+        }
+        return result
+    }
+
+    func dedupe() -> ExerciseData.DataSet {
+        var result = self
+        for altField in ExerciseData.Field.altFields {
+            if let mainField = altField.mainField, self[mainField] == self[altField] {
+                result.removeValue(forKey: altField)
+            }
+        }
+        return result
     }
 }
 
@@ -170,28 +194,6 @@ extension Exercise.DataType {
 
     func getField(alt: Bool) -> ExerciseData.Field {
         return alt ? altField : field
-    }
-}
-
-extension ExerciseData.DataSet {
-    static func ^ (lhs: ExerciseData.DataSet, rhs: ExerciseData.DataSet) -> ExerciseData.DataSet {
-        var result: ExerciseData.DataSet = lhs
-        rhs.forEach { field, rightVal in
-            if let leftVal = lhs[field], leftVal == rightVal {
-                result.removeValue(forKey: field)
-            }
-        }
-        return result
-    }
-
-    func dedupe() -> ExerciseData.DataSet {
-        var result = self
-        for altField in ExerciseData.Field.altFields {
-            if let mainField = altField.mainField, self[mainField] == self[altField] {
-                result.removeValue(forKey: altField)
-            }
-        }
-        return result
     }
 }
 
