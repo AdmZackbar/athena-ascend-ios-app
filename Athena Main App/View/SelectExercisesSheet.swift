@@ -16,7 +16,7 @@ struct SelectExercisesSheet: View {
     let initialSelection: [Exercise]
     let onComplete: ([Exercise]) -> Void
     @State var selection: [Exercise]
-    @State private var selectedType: ExerciseType? = nil
+    @State private var selectedType: ExerciseType = .generic
     @State private var filter: String = ""
     
     init(initialSelection: [Exercise] = [], onComplete: @escaping ([Exercise]) -> Void) {
@@ -43,7 +43,7 @@ struct SelectExercisesSheet: View {
                     }
                 }
                 let notSelected = exercises.filter { !selection.contains($0) }
-                    .filter { selectedType == nil || selectedType!.hasType($0) }
+                    .filter { selectedType.hasType($0) }
                     .filter { filter.isEmpty || $0.name.localizedCaseInsensitiveContains(filter) }
                     .sorted(by: { $0.name < $1.name })
                 Section {
@@ -63,18 +63,12 @@ struct SelectExercisesSheet: View {
                         ContentUnavailableView("No remaining exercises match filters", systemImage: "line.3.horizontal.decrease")
                     }
                 } header: {
-                    HStack {
-                        Text("Exercises")
-                        Spacer()
-                        Picker("Exercise Type", selection: $selectedType) {
-                            Text("All").tag(nil as ExerciseType?)
-                            ForEach(ExerciseType.allCases, id: \.text) { t in
-                                Text(t.text).tag(t as ExerciseType?)
-                            }
+                    Picker("Exercise Type", selection: $selectedType) {
+                        ForEach(ExerciseType.allCases, id: \.text) { t in
+                            Text(t.text).tag(t)
                         }
-                    }
+                    }.padding([.leading, .trailing], -16)
                 }
-                
             }.navigationTitle("Select Exercise(s)")
                 .navigationBarTitleDisplayMode(.inline)
                 .searchable(text: $filter)

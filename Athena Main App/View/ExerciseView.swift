@@ -47,6 +47,15 @@ struct ExerciseView: View {
             }
         }.navigationTitle(exercise.name)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        navigationStore.push(ViewType.exerciseEdit(exercise: exercise))
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                }
+            }
     }
 }
 
@@ -73,6 +82,15 @@ struct ExerciseInfoSection: View {
                 maxHangInfoView(tag: tag, sideType: sideType)
             case .campus(let name, let mirrorSets):
                 campusInfoView(name: name, mirrorSets: mirrorSets)
+            }
+            if !exercise.notes.isEmpty {
+                VStack(alignment: .leading) {
+                    Text("Notes")
+                        .font(.subheadline)
+                        .italic()
+                    Text(exercise.notes)
+                        .fontWeight(.semibold)
+                }
             }
         }
     }

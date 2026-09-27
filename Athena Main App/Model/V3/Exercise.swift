@@ -15,12 +15,7 @@ extension SchemaV3 {
     final class Exercise: Hashable {
         var createdAt: Date = Date()
         /// Backing storage for `category`. Stored as `Data` (manually encoded/decoded
-        /// below) rather than letting SwiftData persist `Category` natively as a
-        /// scalar attribute — SPIKE: testing whether that native path is what crashes
-        /// when a fetch returns `Exercise` rows whose `Category` case differs from row
-        /// to row. See conversation notes; if this holds, forcing the same manual
-        /// Codable path already used by `ExerciseData`'s `[DataSet]` collections
-        /// avoids SwiftData's own enum-attribute reflection entirely.
+        /// below) rather than letting SwiftData persist `Category` natively as a scalar attribute
         var categoryData: Data = Data()
         var category: Category {
             get {

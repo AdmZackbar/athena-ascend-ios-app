@@ -41,6 +41,10 @@ final class NavigationStore: ObservableObject {
             } else {
                 ExerciseView(exercise: exercise)
             }
+        case .exerciseAdd:
+            ExerciseEditView()
+        case .exerciseEdit(let exercise):
+            ExerciseEditView(exercise: exercise)
         case .exerciseList:
             ExerciseListView()
         case .routineAdd:
@@ -57,6 +61,8 @@ enum ViewType: Hashable {
     case athlete(athlete: Athlete)
     case athleteRoster
     case exercise(exercise: Exercise, athlete: Athlete? = nil)
+    case exerciseAdd
+    case exerciseEdit(exercise: Exercise)
     case exerciseList
     case routineAdd
     case routineEdit(routine: Routine)

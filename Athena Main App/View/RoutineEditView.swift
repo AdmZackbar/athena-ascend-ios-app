@@ -11,6 +11,7 @@ import SwiftUI
 struct RoutineEditView: View {
     @State private var routine: Routine
     @State private var isNew: Bool
+    @State private var editData: RoutineData? = nil
     
     init(routine: Routine? = nil) {
         self.routine = routine ?? .init(superSets: [.init(name: "")])
@@ -28,13 +29,10 @@ struct RoutineEditView: View {
                         .filter { $0.position.superSetIndex == offset }
                         .sorted(by: { $0.position.setIndex < $1.position.setIndex })) { data in
                         Button {
-                            // TODO edit data
+                            editData = data
                         } label: {
                             HStack {
-                                VStack(alignment: .leading) {
-                                    Text(data.exercise.name)
-                                    // TODO
-                                }
+                                RoutineDataEntryView(data: data)
                                 Spacer()
                             }.contentShape(Rectangle())
                         }.buttonStyle(.plain)
@@ -52,7 +50,7 @@ struct RoutineEditView: View {
                             ForEach(Routine.SuperSet.Order.allCases, id: \.name) { order in
                                 Text(order.name).tag(order)
                             }
-                        }
+                        }.pickerStyle(.segmented)
                     }
                 } footer: {
                     Stepper(superSet.restTime > 0 ? "Rest: \(superSet.restTime)s" : "No Rest", value: $superSet.restTime)
@@ -62,7 +60,19 @@ struct RoutineEditView: View {
             Button("Add New Super Set") {
                 routine.superSets.append(.init(name: ""))
             }
-        }
+        }.navigationTitle("Edit Routine")
+            .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: .init(get: {
+                editData != nil
+            }, set: { newValue in
+                if !newValue {
+                    editData = nil
+                }
+            })) {
+                if let editData {
+                    RoutineDataEditSheet(data: editData)
+                }
+            }
     }
 }
 

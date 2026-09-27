@@ -100,6 +100,11 @@ struct MainView: View {
                 } label: {
                     Label("Create New Routine", systemImage: "map")
                 }
+                Button {
+                    navigationStore.push(ViewType.exerciseAdd)
+                } label: {
+                    Label("Create New Exercise", systemImage: "scalemass")
+                }
             } label: {
                 Label("Add", systemImage: "plus")
             }
