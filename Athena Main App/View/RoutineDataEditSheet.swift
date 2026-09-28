@@ -224,7 +224,7 @@ struct RoutineDataEditSheet: View {
                             GridRow(alignment: .top) {
                                 Text("Set \(offset + 1)")
                                     .fontWeight(.semibold)
-                                ExpectedDataSetView(data: data, dataSet: set.0)
+                                ExpectedDataSetView(exercise: data.exercise, dataSet: set.0)
                             }
                         }
                     }

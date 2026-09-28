@@ -65,10 +65,10 @@ struct ExerciseDataEntryView: View {
                                 let diff = expected ^ actual
                                 // Only show if needed
                                 if !diff.isEmpty {
-                                    expectedView(diff)
+                                    ExpectedDataSetView(exercise: data.exercise, dataSet: diff)
                                 }
                             } else if let expected {
-                                expectedView(expected)
+                                ExpectedDataSetView(exercise: data.exercise, dataSet: expected)
                             } else if let actual {
                                 actualView(actual)
                             }
@@ -83,40 +83,11 @@ struct ExerciseDataEntryView: View {
     }
     
     @ViewBuilder
-    func expectedView(_ dataSet: ExerciseData.DataSet) -> some View {
-        VStack(alignment: .leading) {
-            switch data.exercise.category {
-            case .generic(_, let dataTypes, let sideType):
-                if sideType == .independent && !dataTypes.allSatisfy({ getText(dataSet: dataSet, dataType: $0, useAlt: false) == getText(dataSet: dataSet, dataType: $0, useAlt: true) }) {
-                    Text("[L: \(dataTypes.compactMap { dataSet.getText($0, useAlt: false) }.joined(separator: ", "))]")
-                    Text("[R: \(dataTypes.compactMap { dataSet.getText($0, useAlt: true) }.joined(separator: ", "))]")
-                } else {
-                    Text("[\(dataTypes.compactMap { dataSet.getText($0, useAlt: false) }.joined(separator: ", "))]")
-                }
-            case .repeater(_, _, _):
-                let dataTypes: [Exercise.DataType] = [.reps, .weight]
-                Text("[\(dataTypes.compactMap { dataSet.getText($0, useAlt: false) }.joined(separator: " @ "))]")
-            case .maxHang(_, _):
-                let dataTypes: [Exercise.DataType] = [.time, .weight]
-                Text("[\(dataTypes.compactMap { dataSet.getText($0, useAlt: false) }.joined(separator: " @ "))]")
-            case .campus(_, let mirrorSets):
-                // TODO handle mirroring properly
-                if mirrorSets {
-                    Text(dataSet[.campus]?.text ?? "N/A")
-                    Text(dataSet[.campusAlt]?.text ?? "N/A")
-                } else {
-                    Text(dataSet[.campus]?.text ?? "N/A")
-                }
-            }
-        }.italic()
-    }
-    
-    @ViewBuilder
     func actualView(_ dataSet: ExerciseData.DataSet) -> some View {
         VStack(alignment: .leading) {
             switch data.exercise.category {
             case .generic(_, let dataTypes, let sideType):
-                if sideType == .independent && !dataTypes.allSatisfy({ getText(dataSet: dataSet, dataType: $0, useAlt: false) == getText(dataSet: dataSet, dataType: $0, useAlt: true) }) {
+                if sideType == .independent && dataSet.hasAlt {
                     Text("L: \(dataTypes.map { getText(dataSet: dataSet, dataType: $0, useAlt: false) }.joined(separator: ", "))")
                     Text("R: \(dataTypes.map { getText(dataSet: dataSet, dataType: $0, useAlt: true) }.joined(separator: ", "))")
                 } else {
@@ -129,10 +100,9 @@ struct ExerciseDataEntryView: View {
                 let dataTypes: [Exercise.DataType] = [.time, .weight]
                 Text(dataTypes.map { getText(dataSet: dataSet, dataType: $0, useAlt: false) }.joined(separator: " @ "))
             case .campus(_, let mirrorSets):
-                // TODO handle mirroring properly
                 if mirrorSets {
                     Text(dataSet[.campus]?.text ?? "N/A")
-                    Text(dataSet[.campusAlt]?.text ?? "N/A")
+                    Text(dataSet[.campusAlt]?.text ?? dataSet[.campus]?.alt.text ?? "N/A")
                 } else {
                     Text(dataSet[.campus]?.text ?? "N/A")
                 }

@@ -38,7 +38,7 @@ struct RoutineDataEntryView: View {
                         GridRow(alignment: .top) {
                             Text("Set \(index + 1)")
                                 .fontWeight(.semibold)
-                            ExpectedDataSetView(data: data, dataSet: data.expectedData[index])
+                            ExpectedDataSetView(exercise: data.exercise, dataSet: data.expectedData[index])
                         }
                     }
                 }
@@ -55,12 +55,12 @@ struct RoutineDataEntryView: View {
 }
 
 struct ExpectedDataSetView: View {
-    let data: RoutineData
+    let exercise: Exercise
     let dataSet: ExerciseData.DataSet
     
     var body: some View {
         VStack(alignment: .leading) {
-            switch data.exercise.category {
+            switch exercise.category {
             case .generic(_, let dataTypes, let sideType):
                 if sideType == .independent && dataSet.hasAlt {
                     Text("[L: \(dataTypes.compactMap { dataSet.getText($0, useAlt: false) }.joined(separator: ", "))]")
