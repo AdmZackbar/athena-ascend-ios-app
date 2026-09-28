@@ -57,24 +57,33 @@ struct RoutineEditView: View {
                     HStack {
                         TextField("Name", text: $superSet.name, prompt: Text("Set \(offset + 1)"))
                         Spacer()
-                        Picker("Order", selection: $superSet.order) {
-                            ForEach(Routine.SuperSet.Order.allCases, id: \.name) { order in
-                                Text(order.name).tag(order)
+                        Text(superSet.order.name)
+                        Menu {
+                            Menu {
+                                ForEach(Routine.SuperSet.Order.allCases, id: \.name) { order in
+                                    Button(order.name) {
+                                        superSet.order = order
+                                    }.disabled(superSet.order == order)
+                                }
+                            } label: {
+                                Label("Order", systemImage: "arrow.left.arrow.right.circle")
                             }
-                        }
-                        Button(role: .destructive) {
-                            deleteSuperIndex = offset
+                            Button(role: .destructive) {
+                                deleteSuperIndex = offset
+                            } label: {
+                                Label("Delete Super Set", systemImage: "trash")
+                            }
                         } label: {
-                            Label("Delete Super Set", systemImage: "trash")
-                                .labelStyle(.iconOnly)
-                        }.buttonStyle(.glassProminent)
+                            Image(systemName: "ellipsis.circle")
+                        }.buttonStyle(.glass)
                     }
                 } footer: {
-                    Stepper(superSet.restTime > 0 ? "Rest: \(superSet.restTime)s" : "No Rest", value: $superSet.restTime)
+                    Stepper(superSet.restTime > 0 ? "Rest: \(superSet.restTime)s" : "No Rest", value: $superSet.restTime, in: 0...900, step: 5)
                 }
             }
         }.navigationTitle("Edit Routine")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar(content: toolbarContent)
             .alert("Delete Super Set?", isPresented: .init(get: {
                 deleteSuperIndex != nil
             }, set: { newValue in
