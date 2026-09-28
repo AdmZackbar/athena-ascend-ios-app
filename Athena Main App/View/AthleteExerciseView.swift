@@ -22,6 +22,8 @@ struct AthleteExerciseView: View {
         }
     }
     
+    @State private var editData: ExerciseData? = nil
+
     var body: some View {
         Form {
             ExerciseInfoSection(exercise: exercise)
@@ -31,7 +33,12 @@ struct AthleteExerciseView: View {
                     ContentUnavailableView("No data for athlete", systemImage: "tablecells")
                 } else {
                     ForEach(data.sorted(by: { $0.session.startTime > $1.session.startTime })) { d in
-                        ExerciseDataEntryView(data: d)
+                        Button {
+                            editData = d
+                        } label: {
+                            ExerciseDataEntryView(data: d)
+                                .contentShape(Rectangle())
+                        }.buttonStyle(.plain)
                     }
                 }
             }
@@ -44,6 +51,17 @@ struct AthleteExerciseView: View {
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
+                }
+            }
+            .sheet(isPresented: .init(get: {
+                editData != nil
+            }, set: { newValue in
+                if !newValue {
+                    editData = nil
+                }
+            })) {
+                if let editData {
+                    ExerciseDataEditSheet(session: editData.session, position: editData.position, initialAthlete: athlete)
                 }
             }
     }
