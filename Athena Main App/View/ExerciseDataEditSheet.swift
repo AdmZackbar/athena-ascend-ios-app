@@ -168,7 +168,10 @@ struct ExerciseDataEditSheet: View {
             stepperGroup(setIndex, dataType: .time)
             stepperGroup(setIndex, dataType: .weight)
         case .campus(_, _):
-            Text("TODO")
+            campusEditor(setIndex)
+            if showAlt {
+                campusEditor(setIndex, alt: true)
+            }
         }
     }
     
@@ -225,6 +228,24 @@ struct ExerciseDataEditSheet: View {
         }
     }
     
+    @ViewBuilder
+    func campusEditor(_ setIndex: Int, alt: Bool = false) -> some View {
+        var current: CampusSet = {
+            if alt {
+                return getCampusSet(setIndex, field: .campusAlt) ?? getCampusSet(setIndex, field: .campus)?.flipped() ?? .init(board: .largeEdges, moves: [])
+            } else {
+                return getCampusSet(setIndex, field: .campus) ?? .init(board: .largeEdges, moves: [])
+            }
+        }()
+        NavigationLink {
+            CampusBoardView(set: current) { newSet in
+                athleteData[selectedAthlete]?[setIndex][alt ? .campusAlt : .campus] = .campus(newSet)
+            }
+        } label: {
+            Text(current.moves.text)
+        }
+    }
+    
     private func getInt(_ setIndex: Int, field: ExerciseData.Field) -> Int? {
         switch athleteData[selectedAthlete]?[setIndex][field] {
         case .discrete(let v): return v
@@ -246,12 +267,15 @@ struct ExerciseDataEditSheet: View {
         }
     }
     
-    private func setValue(_ setIndex: Int, dataType: Exercise.DataType, alt: Bool, value: ExerciseData.Value) {
-        if alt {
-            athleteData[selectedAthlete, default: [.init()]][setIndex][dataType.altField] = value
-        } else {
-            athleteData[selectedAthlete, default: [.init()]][setIndex][dataType.field] = value
+    private func getCampusSet(_ setIndex: Int, field: ExerciseData.Field) -> CampusSet? {
+        switch athleteData[selectedAthlete]?[setIndex][field] {
+        case .campus(let set): return set
+        default: return nil
         }
+    }
+    
+    private func setValue(_ setIndex: Int, dataType: Exercise.DataType, alt: Bool, value: ExerciseData.Value) {
+        athleteData[selectedAthlete, default: [.init()]][setIndex][dataType.getField(alt: alt)] = value
     }
 }
 

@@ -81,7 +81,7 @@ struct CampusBoardView: View {
                     }
                 }
             } footer: {
-                Text(moves.text)
+                Text("(\(board.abbreviation)) \(moves.text)")
                     .font(.subheadline)
                     .fontWeight(.heavy)
             }
