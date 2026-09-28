@@ -174,7 +174,7 @@ extension Exercise.DataType {
         case .reps: value == 1 ? " rep" : " reps"
         case .time: "s"
         case .weight: value == 1 ? " lb" : " lbs"
-        case .distance: "in"
+        case .distance: "\""
         }
     }
 

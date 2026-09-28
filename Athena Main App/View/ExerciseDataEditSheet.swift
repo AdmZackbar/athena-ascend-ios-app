@@ -109,8 +109,8 @@ struct ExerciseDataEditSheet: View {
                 Menu("Unit Step Size") {
                     ForEach([1, 5, 10], id: \.self) { step in
                         Button("\(step.formatted()) units") {
-                            numberStep = step
-                        }.disabled(numberStep == step)
+                            discreteStep = Int(step)
+                        }.disabled(discreteStep == step)
                     }
                 }
                 Menu("Weight Step Size") {
@@ -230,7 +230,7 @@ struct ExerciseDataEditSheet: View {
     
     @ViewBuilder
     func campusEditor(_ setIndex: Int, alt: Bool = false) -> some View {
-        var current: CampusSet = {
+        let current: CampusSet = {
             if alt {
                 return getCampusSet(setIndex, field: .campusAlt) ?? getCampusSet(setIndex, field: .campus)?.flipped() ?? .init(board: .largeEdges, moves: [])
             } else {

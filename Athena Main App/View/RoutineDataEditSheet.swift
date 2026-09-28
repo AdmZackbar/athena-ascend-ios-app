@@ -170,8 +170,8 @@ struct RoutineDataEditSheet: View {
                 Menu("Unit Step Size") {
                     ForEach([1, 5, 10], id: \.self) { step in
                         Button("\(step.formatted()) units") {
-                            numberStep = step
-                        }.disabled(numberStep == step)
+                            discreteStep = Int(step)
+                        }.disabled(discreteStep == step)
                     }
                 }
                 Menu("Weight Step Size") {
@@ -410,7 +410,7 @@ struct RoutineDataEditSheet: View {
     func campusEditor(alt: Bool = false) -> some View {
         switch sets[editSetIndex].1[.campus] {
         case .campus:
-            var current: CampusSet = {
+            let current: CampusSet = {
                 if alt {
                     return getCampusSet(field: .campusAlt) ?? getCampusSet(field: .campus)?.flipped() ?? .init(board: .largeEdges, moves: [])
                 } else {
