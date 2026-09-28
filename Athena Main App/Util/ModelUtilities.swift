@@ -109,8 +109,8 @@ extension ExerciseData.DataSet {
     }
     
     func getSummary(useAlt: Bool = false) -> String? {
-        var values = Exercise.DataType.allCases.compactMap { getText($0, useAlt: useAlt) }
-        if let value = self[useAlt ? .campusAlt : .campus] {
+        var values = Exercise.DataType.allCases.compactMap { useAlt ? getText($0, useAlt: true) ?? getText($0) : getText($0) }
+        if let value = useAlt ? self[.campusAlt] ?? self[.campus] : self[.campus] {
             values.append(value.text)
         }
         return values.joined(separator: ", ")
@@ -219,6 +219,15 @@ extension ExerciseData.Value {
         case .number(let v): v.formatted(.number.precision(.fractionLength(0...2)))
         case .range(let min, let max): "[\(min)-\(max)]"
         case .campus(let set): "(\(set.board.abbreviation)) \(set.moves.text)"
+        }
+    }
+    
+    var num: Int? {
+        switch self {
+        case .discrete(let v): return v
+        case .number(let v): return Int(v)
+        case .range(let min, let max): return min + ((max - min) / 2)
+        default: return nil
         }
     }
     
