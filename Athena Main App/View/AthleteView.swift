@@ -12,6 +12,12 @@ import SwiftUI
 /// took part in, newest first.
 struct AthleteView: View {
     @State var athlete: Athlete
+    @State var editBirthday: Bool
+    
+    init(athlete: Athlete) {
+        self.athlete = athlete
+        self.editBirthday = athlete.birthDate != nil
+    }
 
     var body: some View {
         Form {
@@ -28,25 +34,24 @@ struct AthleteView: View {
                     athlete.lastName = newValue.isEmpty ? nil : newValue
                 }))
                 HStack {
-                    Toggle("Set Birthday", isOn: .init(get: {
-                        athlete.birthDate != nil
-                    }, set: { newValue in
-                        if !newValue {
-                            athlete.birthDate = nil
-                        }
-                    }))
-                    if athlete.birthDate != nil {
-                        DatePicker("Birthday", selection: .init(get: {
+                    Toggle("Birthday", isOn: $editBirthday)
+                    if editBirthday {
+                        DatePicker("", selection: .init(get: {
                             athlete.birthDate ?? .now
                         }, set: { newValue in
                             athlete.birthDate = newValue
-                        }))
+                        }), displayedComponents: .date)
                     }
                 }
             }
             // TODO show sessions and data
         }.navigationTitle(athlete.name)
             .navigationBarTitleDisplayMode(.inline)
+            .onChange(of: editBirthday) { oldValue, newValue in
+                if !newValue {
+                    athlete.birthDate = nil
+                }
+            }
     }
 
     @ViewBuilder
