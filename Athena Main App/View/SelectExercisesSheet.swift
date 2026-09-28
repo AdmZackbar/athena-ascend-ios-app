@@ -80,7 +80,12 @@ struct SelectExercisesSheet: View {
                             Label("Back", systemImage: "chevron.left")
                         }
                     }
-                    ToolbarItem(placement: .primaryAction) {
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        NavigationLink {
+                            ExerciseEditView()
+                        } label: {
+                            Label("Add New Exercise", systemImage: "plus")
+                        }
                         Button {
                             onComplete(selection)
                             dismiss()
