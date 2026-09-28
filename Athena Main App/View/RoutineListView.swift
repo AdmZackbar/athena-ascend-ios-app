@@ -37,15 +37,6 @@ struct RoutineListView: View {
                 Label("Start Session", systemImage: "plus")
             }
             Button {
-                // TODO
-//                let teamSession = TeamSession(routineName: routine.name, sets: routine.sets.map(Session.ExerciseSet.init))
-//                routine.teamSessions.append(teamSession)
-//                routine.lastUsedAt = .now
-//                navigationStore.push(ViewType.teamSession(session: teamSession))
-            } label: {
-                Label("Start Team Session", systemImage: "person.3")
-            }
-            Button {
                 navigationStore.push(ViewType.routineEdit(routine: routine))
             } label: {
                 Label("Edit", systemImage: "pencil")
