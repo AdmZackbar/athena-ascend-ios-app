@@ -94,6 +94,15 @@ extension Session {
 // EXERCISES //
 // ********* //
 
+extension ExerciseData.Position: Comparable {
+    static func < (lhs: ExerciseData.Position, rhs: ExerciseData.Position) -> Bool {
+        if lhs.superSetIndex == rhs.superSetIndex {
+            return lhs.setIndex < rhs.setIndex
+        }
+        return lhs.superSetIndex < rhs.superSetIndex
+    }
+}
+
 extension ExerciseData.DataSet {
     var hasAlt: Bool {
         self.keys.contains(where: \.isAlt)

@@ -33,7 +33,7 @@ struct SelectExercisesSheet: View {
                         Text("No Selection")
                             .italic()
                     } else {
-                        ForEach(selection.sorted(by: { $0.name < $1.name }).enumerated(), id: \.offset) { offset, exercise in
+                        ForEach(selection.enumerated(), id: \.offset) { offset, exercise in
                             Button {
                                 selection.remove(at: offset)
                             } label: {
