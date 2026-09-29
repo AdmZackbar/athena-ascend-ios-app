@@ -9,6 +9,12 @@ import SwiftData
 import SwiftUI
 internal import Combine
 
+extension View {
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+}
+
 /// Allows the user to progress a `Session` through each super set, exercise, and set.
 struct SessionLiveView: View {
     @Environment(\.dismiss) var dismiss
@@ -37,6 +43,8 @@ struct SessionLiveView: View {
     @State private var cancellable: Cancellable?
     /// If false, disallows the timer from advancing state after the record/rest period ends
     @State private var timerNextOverride: Bool = false
+    /// The in-progress edits for the current set's actual data, shown during the record phase
+    @State private var draftSet: ExerciseData.DataSet = [:]
     /// If true, the timer is allowed to modify the state when it finishes
     var allowTimerNext: Bool {
         switch state {
@@ -218,14 +226,34 @@ struct SessionLiveView: View {
     
     @ViewBuilder
     func setView(_ s: SetState) -> some View {
-        VStack {
+        VStack(spacing: 4) {
             headerView(s)
+            if s.exerciseState == .record {
+                recordEntryView(s)
+            }
             Spacer()
             if timerDuration > .zero {
                 timerView(s)
             }
             controlView()
         }.padding([.leading, .trailing])
+            .ignoresSafeArea(.keyboard)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                hideKeyboard()
+            }
+    }
+
+    @ViewBuilder
+    func recordEntryView(_ s: SetState) -> some View {
+        Group {
+            VStack(spacing: 8) {
+                DataSetEditor(exercise: s.data.exercise, dataSet: $draftSet, sides: sides(for: s))
+            }.padding()
+        }.glassEffect(in: RoundedRectangle(cornerRadius: 16))
+            .font(.title3)
+            .fontWeight(.semibold)
+            .padding(.top, 4)
     }
     
     @ViewBuilder
@@ -347,6 +375,11 @@ struct SessionLiveView: View {
     /// current exercise, or to the next applicable exercise.
     /// If no exercises remain, this view is exited
     func next(skip: Bool = false) {
+        // Persist any data entered during the record phase before advancing,
+        // even if this press doesn't advance the state yet (see guard below)
+        if !skip, let s = recordSetState {
+            commitDraft(for: s)
+        }
         guard allowTimerNext || elapsedSeconds >= timerDuration else {
             timerNextOverride = true
             return
@@ -375,6 +408,66 @@ struct SessionLiveView: View {
         // Advance to next state, reset flags
         state = newState
         timerNextOverride = false
+        // Seed the data entry draft whenever we land on a record phase
+        if case .inSet(let s) = newState, s.exerciseState == .record {
+            seedDraft(for: s)
+        }
+    }
+
+    // ****************** //
+    // DATA ENTRY HELPERS //
+    // ****************** //
+
+    /// The current `SetState`, if we are in the record phase of an exercise.
+    private var recordSetState: SetState? {
+        if case .inSet(let s) = state, s.exerciseState == .record {
+            return s
+        }
+        return nil
+    }
+
+    /// Determines which side(s) of a (potentially) mirrored exercise should be
+    /// exposed for editing during this record phase, based on the current rep state.
+    private func sides(for s: SetState) -> DataSetEditor.Sides {
+        guard s.data.exercise.canMirror else { return .single }
+        switch s.repState {
+        case .binary(let first):
+            return first ? .right : .left
+        default:
+            // No side-specific rep state means both sides are recorded in this pass
+            return .split
+        }
+    }
+
+    /// Populates `draftSet` from any data already recorded for this set,
+    /// falling back to the most recently recorded set and the expected/planned data.
+    private func seedDraft(for s: SetState) {
+        let data = s.data
+        let setIndex = s.setIndex
+        if setIndex < data.actualData.count {
+            // Already (at least partially) recorded - e.g. returning to the same
+            // set for the other side of a mirrored exercise
+            draftSet = data.actualData[setIndex]
+        } else {
+            var seed = data.actualData.last ?? [:]
+            if setIndex < data.expectedData.count {
+                seed.override(data.expectedData[setIndex].expectedToActual())
+            }
+            draftSet = seed
+        }
+    }
+
+    /// Writes `draftSet` back to the underlying `ExerciseData`.
+    private func commitDraft(for s: SetState) {
+        let data = s.data
+        let setIndex = s.setIndex
+        var actual = data.actualData
+        while actual.count <= setIndex {
+            actual.append([:])
+        }
+        let showAlt = sides(for: s) != .single
+        actual[setIndex] = draftSet.normalized(canMirror: data.exercise.canMirror, showAlt: showAlt)
+        data.actualData = actual
     }
     
     private var prevState: ViewState? {

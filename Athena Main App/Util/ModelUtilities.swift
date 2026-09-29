@@ -181,11 +181,37 @@ extension ExerciseData.DataSet {
     mutating func override(_ rhs: ExerciseData.DataSet) {
         self.merge(rhs, uniquingKeysWith: { $1 })
     }
+    
+    /// Prepares this data set for persistence as an `actualData` entry, given
+    /// whether the exercise can mirror left/right sides and whether the alt
+    /// side is currently being tracked.
+    func normalized(canMirror: Bool, showAlt: Bool) -> ExerciseData.DataSet {
+        if canMirror && !showAlt {
+            // Strip out all alt values
+            return self.filter { !$0.key.isAlt }
+        } else if showAlt {
+            // Remove all dupe alt values
+            return self.dedupe()
+        }
+        return self
+    }
 }
 
 extension [ExerciseData.DataSet] {
     var hasAlt: Bool {
         self.contains(where: { $0.hasAlt })
+    }
+}
+
+extension Exercise {
+    /// Whether this exercise's actual data can differ between left/right sides.
+    var canMirror: Bool {
+        switch category {
+        case .generic(_, _, let sideType): return sideType == .independent
+        case .repeater(_, _, _): return false
+        case .maxHang(_, let sideType): return sideType == .independent
+        case .campus(_, let mirrorSets): return mirrorSets
+        }
     }
 }
 
