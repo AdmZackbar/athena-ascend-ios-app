@@ -292,7 +292,7 @@ struct SessionView: View {
                 if !session.finished && !data.expectedData.isEmpty {
                     Button {
                         // Go to exercise (set 1)
-                        navigationStore.push(ViewType.sessionLive(sessionData: data))
+                        navigationStore.push(ViewType.sessionLive(session: data.session))
                     } label: {
                         Label("Start Exercise", systemImage: "play")
                     }
@@ -421,9 +421,9 @@ struct SessionView: View {
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
-            if !session.finished, let sessionData = session.data.filter({ !$0.expectedData.isEmpty }).first {
+            if !session.finished && session.data.contains(where: { !$0.expectedData.isEmpty }) {
                 Button {
-                    navigationStore.push(ViewType.sessionLive(sessionData: sessionData))
+                    navigationStore.push(ViewType.sessionLive(session: session))
                 } label: {
                     Label("Start", systemImage: "play")
                 }

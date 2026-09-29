@@ -36,7 +36,7 @@ struct AthleteExerciseView: View {
                         Button {
                             editData = d
                         } label: {
-                            ExerciseDataEntryView(data: d)
+                            ExerciseDataEntryView(data: d, headerType: .date)
                                 .contentShape(Rectangle())
                         }.buttonStyle(.plain)
                     }

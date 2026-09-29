@@ -9,9 +9,9 @@ import SwiftUI
 
 struct ExerciseDataEntryView: View {
     let data: ExerciseData
-    let headerType: HeaderType
+    let headerType: HeaderType?
     
-    var header: String {
+    var header: String? {
         switch headerType {
         case .date:
             data.session.startTime.formatted(date: .abbreviated, time: .omitted)
@@ -19,32 +19,42 @@ struct ExerciseDataEntryView: View {
             data.exercise.name
         case .athleteName:
             data.athlete.name
+        case .none:
+            nil
         }
     }
     var header2: String? {
         switch headerType {
         case .date:
             data.session.startTime.formatted(date: .omitted, time: .shortened)
-        case .exerciseName, .athleteName:
+        case .exerciseName, .athleteName, .none:
             nil
         }
     }
     
-    init(data: ExerciseData, headerType: HeaderType = .date) {
+    init(data: ExerciseData, headerType: HeaderType? = nil) {
         self.data = data
         self.headerType = headerType
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(header)
-                Spacer()
-                if let header2 {
+            if let header, let header2 {
+                HStack {
+                    Text(header)
+                    Spacer()
                     Text(header2)
-                }
-            }.bold()
-                .foregroundStyle(.secondary)
+                }.bold()
+                    .foregroundStyle(.secondary)
+            } else if let header {
+                Text(header)
+                    .bold()
+                    .foregroundStyle(.secondary)
+            } else if let header2 {
+                Text(header2)
+                    .bold()
+                    .foregroundStyle(.secondary)
+            }
             if !data.notes.isEmpty {
                 Text(data.notes)
                     .font(.subheadline)
