@@ -61,12 +61,7 @@ struct SessionLiveView: View {
     }
     
     var title: String {
-        switch state {
-        case .preSet(let index), .postSet(let index):
-            return session.superSets[index].name
-        case .inSet(let s):
-            return session.superSets[s.superSetIndex].name
-        }
+        return session.superSets[state.superSetIndex].name
     }
     
     /// The background color of the view
@@ -125,11 +120,13 @@ struct SessionLiveView: View {
                 Label("Back", systemImage: "arrow.turn.left.up")
             }
         }
-        ToolbarItem(placement: .primaryAction) {
-            Button {
-                next(skip: true)
-            } label: {
-                Label("Skip", systemImage: "forward.fill")
+        if state.isInSet {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    next(skip: true)
+                } label: {
+                    Label("Skip", systemImage: "forward.fill")
+                }
             }
         }
     }
@@ -224,26 +221,40 @@ struct SessionLiveView: View {
         VStack {
             headerView(s)
             Spacer()
-            timerView(s)
+            if timerDuration > .zero {
+                timerView(s)
+            }
             controlView()
         }.padding([.leading, .trailing])
     }
     
     @ViewBuilder
     func headerView(_ s: SetState) -> some View {
-        let data = s.dataSet
         let numSets = s.data.expectedData.count
         let repText = s.repState?.text
-        let exerciseSummary = data.getSummary(useAlt: s.repState?.hasNext ?? false)
+        let useAlt = s.repState?.hasNext ?? false
         switch s.data.exercise.category {
-        case .generic(let name, _, let sideType):
-            ExerciseStateView(titleLeading: name, titleTrailing: sideType == .independent ? "[L/R]" : nil, subheadline: exerciseSummary, setIndex: s.setIndex, numSets: numSets, repText: repText)
+        case .generic(let name, _, _):
+            ExerciseStateView(titleLeading: name, subheadline: s.dataSet.getSummary(useAlt: useAlt), setIndex: s.setIndex, numSets: numSets, repText: repText)
         case .repeater(let tag, let timeOn, let timeOff):
-            ExerciseStateView(titleLeading: tag, titleTrailing: "\(timeOn)s/\(timeOff)s", subheadline: exerciseSummary, setIndex: s.setIndex, numSets: numSets, repText: repText)
-        case .maxHang(let tag, let sideType):
-            ExerciseStateView(titleLeading: tag, titleTrailing: sideType == .independent ? "[L/R]" : nil, subheadline: exerciseSummary, setIndex: s.setIndex, numSets: numSets, repText: repText)
-        case .campus(let name, let mirrorSets):
-            ExerciseStateView(titleLeading: name, titleTrailing: mirrorSets ? "[L/R]" : nil, subheadline: exerciseSummary, setIndex: s.setIndex, numSets: numSets, repText: repText)
+            let subheadline: String = {
+                if let reps = s.dataSet.getText(.reps), let weight = s.dataSet.getText(.weight) {
+                    return "\(reps) @ \(weight)"
+                }
+                return s.dataSet.getSummary() ?? "N/A"
+            }()
+            ExerciseStateView(titleLeading: tag, titleTrailing: "\(timeOn)s/\(timeOff)s", subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: repText)
+        case .maxHang(let tag, _):
+            let subheadline: String = {
+                if let time = s.dataSet.getText(.time), let weight = s.dataSet.getText(.weight) {
+                    return "\(weight) for \(time)"
+                }
+                return s.dataSet.getSummary() ?? "N/A"
+            }()
+            ExerciseStateView(titleLeading: tag, subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: repText)
+        case .campus(let name, _):
+            // TODO check alt
+            ExerciseStateView(titleLeading: name, subheadline: s.dataSet[.campus]?.text ?? "N/A", setIndex: s.setIndex, numSets: numSets, repText: repText)
         }
     }
     
@@ -545,6 +556,13 @@ struct SessionLiveView: View {
         case inSet(_ state: SetState)
         case postSet(_ index: Int)
         
+        var isInSet: Bool {
+            switch self {
+            case .inSet(_): return true
+            default: return false
+            }
+        }
+        
         var prev: ViewState? {
             switch self {
             case .inSet(let s):
@@ -626,7 +644,9 @@ struct SessionLiveView: View {
         }
         
         var setRestTime: Int {
-            data.session.superSets[superSetIndex].restTime
+            // TODO investigate why I need this guard
+            guard superSetIndex < data.session.superSets.count else { return 0 }
+            return data.session.superSets[superSetIndex].restTime
         }
         
         var maxTimeSeconds: Int {
@@ -694,7 +714,7 @@ struct SessionLiveView: View {
                 return sideType == .independent ? .binary(first: true) : nil
             case .repeater(_, _, _):
                 guard let max = dataSet[.reps]?.num else { return nil }
-                return .multi(current: 0, max: max)
+                return .multi(current: 1, max: max)
             case .maxHang(_, let sideType):
                 return sideType == .independent ? .binary(first: true) : nil
             case .campus(_, let mirrorSides):
@@ -821,6 +841,17 @@ struct ExerciseStateView: View {
         self.repText = repText
     }
     
+    var headerSize: CGFloat {
+        let textLength = (titleLeading.count + (titleTrailing?.count ?? 0))
+        if textLength < 16 {
+            return 40
+        } else if textLength < 22 {
+            return 32
+        } else {
+            return 24
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading) {
             HStack {
@@ -829,22 +860,21 @@ struct ExerciseStateView: View {
                 if let titleTrailing {
                     Text(titleTrailing)
                 }
-            }.font(.title)
-                .bold()
-            if let subheadline {
-                Text(subheadline)
-                    .font(.title2)
-                    .fontWeight(.semibold)
-            }
+            }.font(.system(size: headerSize))
+                .lineLimit(1)
             HStack {
                 Text("Set \(setIndex + 1)/\(numSets)")
                 Spacer()
                 if let repText {
                     Text(repText)
                 }
-            }.font(.title3)
-                .fontWeight(.semibold)
-        }.lineLimit(1)
+            }.font(.system(size: 32))
+            if let subheadline {
+                Text(subheadline)
+                    .font(.title)
+                    .lineLimit(1...2)
+            }
+        }.fontWeight(.heavy)
     }
 }
 
@@ -857,6 +887,8 @@ struct ExerciseStateView: View {
 
 #Preview("State View") {
     Form {
-        ExerciseStateView(titleLeading: "20mm HC", titleTrailing: "7/3s", subheadline: "7 reps @ 20 lbs", setIndex: 1, numSets: 5, repText: "Rep 1/5")
+        ExerciseStateView(titleLeading: "20mm HC", titleTrailing: "7s/3s", subheadline: "7 reps @ 20 lbs", setIndex: 1, numSets: 5, repText: "Rep 1/5")
+        ExerciseStateView(titleLeading: "Basic Ladder", subheadline: "B1-R3-L5-R7-L9-B9", setIndex: 3, numSets: 4, repText: "Rep 1/2")
+        ExerciseStateView(titleLeading: "Ninja kick with pancakes", subheadline: "30s, 40 lbs, 30\"", setIndex: 1, numSets: 12, repText: "Left")
     }
 }

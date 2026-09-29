@@ -16,6 +16,23 @@ struct GroupSessionListView: View {
     
     var body: some View {
         List {
+            Section("Unoccupied Sessions") {
+                ForEach(sessions.filter({ $0.athletes.isEmpty }), id: \.self) { session in
+                    Button {
+                        navigationStore.push(ViewType.session(session: session))
+                    } label: {
+                        sessionView(session)
+                            .contentShape(Rectangle())
+                    }.buttonStyle(.plain)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                modelContext.delete(session)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                }
+            }
             Section("Group Sessions") {
                 ForEach(sessions.filter({ $0.athletes.count > 1 }), id: \.self) { session in
                     Button {
