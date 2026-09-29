@@ -8,7 +8,7 @@
 import SwiftUI
 
 /// A ring that drains as `progress` increases, with a label and a count-up/count-down clock
-/// in the center. Used for every phase of every exercise kind during a session.
+/// in the center.
 struct TimerRingView: View {
     let text: String
     var textCountDown: Bool = true
@@ -20,8 +20,10 @@ struct TimerRingView: View {
         ZStack {
             RingShape(progress: 1.0)
                 .stroke(.secondary, lineWidth: 8)
+                .padding(8)
             RingShape(progress: 1.0 - progress)
                 .stroke(.primary, style: .init(lineWidth: 12, lineCap: .round))
+                .padding(8)
             VStack(spacing: 0) {
                 Text(text)
                     .font(.system(size: 40))
@@ -32,7 +34,7 @@ struct TimerRingView: View {
                     .font(.system(size: 60))
                     .bold()
             }
-        }
+        }.aspectRatio(1, contentMode: .fit)
     }
 }
 
@@ -58,5 +60,9 @@ struct RingShape: Shape {
 }
 
 #Preview {
-    TimerRingView(text: "Rest", timerDuration: .seconds(30), elapsedSeconds: .seconds(10), progress: 1.0 / 3.0)
+    VStack {
+        Spacer()
+        TimerRingView(text: "Rest", timerDuration: .seconds(30), elapsedSeconds: .seconds(10), progress: 1.0 / 3.0)
+            .background(.active)
+    }.background(.rest)
 }

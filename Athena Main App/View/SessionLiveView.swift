@@ -47,6 +47,7 @@ struct SessionLiveView: View {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .background(background)
+            .toolbar(content: toolbarContent)
     }
     
     var title: String {
@@ -68,6 +69,53 @@ struct SessionLiveView: View {
         }
     }
     
+    @ToolbarContentBuilder
+    func toolbarContent() -> some ToolbarContent {
+        ToolbarTitleMenu {
+            ForEach(session.superSets.enumerated(), id: \.offset) { offset, superSet in
+                Menu(superSet.name) {
+                    let exerciseData = session.data
+                        .sorted(by: { $0.position < $1.position })
+                        .filter({ $0.position.superSetIndex == offset })
+                    if let first = exerciseData.filter({ !$0.expectedData.isEmpty }).first {
+                        Button {
+                            update(.init(data: first, setIndex: 0))
+                        } label: {
+                            if state.data.position.superSetIndex == offset {
+                                Label("Restart Super Set", systemImage: "arrow.trianglehead.counterclockwise")
+                            } else {
+                                Label("Start Super Set", systemImage: "play")
+                            }
+                        }
+                    }
+                    ForEach(exerciseData.enumerated(), id: \.offset) { offset, d in
+                        Menu(d.exercise.name) {
+                            ForEach(0..<d.expectedData.count, id: \.self) { setIndex in
+                                Button("Set \(setIndex + 1)") {
+                                    update(.init(data: d, setIndex: setIndex))
+                                }.disabled(state.data == d && state.setIndex == setIndex)
+                            }
+                        }.disabled(d.expectedData.isEmpty)
+                    }
+                }
+            }
+        }
+        ToolbarItem(placement: .cancellationAction) {
+            Button {
+                dismiss()
+            } label: {
+                Label("Back", systemImage: "arrow.turn.left.up")
+            }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                next(skip: true)
+            } label: {
+                Label("Skip", systemImage: "forward.fill")
+            }
+        }
+    }
+    
     @ViewBuilder
     func mainView() -> some View {
         VStack {
@@ -83,15 +131,16 @@ struct SessionLiveView: View {
         let data = state.dataSet
         let numSets = state.data.expectedData.count
         let repText = state.repState?.text
+        let exerciseSummary = data.getSummary(useAlt: state.repState?.hasNext ?? false)
         switch state.data.exercise.category {
         case .generic(let name, _, let sideType):
-            ExerciseStateView(titleLeading: name, titleTrailing: sideType == .independent ? "[L/R]" : nil, subheadline: data.getSummary(useAlt: state.repState?.hasNext ?? false), setIndex: state.setIndex, numSets: numSets, repText: repText)
+            ExerciseStateView(titleLeading: name, titleTrailing: sideType == .independent ? "[L/R]" : nil, subheadline: exerciseSummary, setIndex: state.setIndex, numSets: numSets, repText: repText)
         case .repeater(let tag, let timeOn, let timeOff):
-            ExerciseStateView(titleLeading: tag, titleTrailing: "\(timeOn)s/\(timeOff)s", subheadline: data.getSummary(useAlt: state.repState?.hasNext ?? false), setIndex: state.setIndex, numSets: numSets, repText: repText)
+            ExerciseStateView(titleLeading: tag, titleTrailing: "\(timeOn)s/\(timeOff)s", subheadline: exerciseSummary, setIndex: state.setIndex, numSets: numSets, repText: repText)
         case .maxHang(let tag, let sideType):
-            ExerciseStateView(titleLeading: tag, titleTrailing: sideType == .independent ? "[L/R]" : nil, subheadline: data.getSummary(useAlt: state.repState?.hasNext ?? false), setIndex: state.setIndex, numSets: numSets, repText: repText)
+            ExerciseStateView(titleLeading: tag, titleTrailing: sideType == .independent ? "[L/R]" : nil, subheadline: exerciseSummary, setIndex: state.setIndex, numSets: numSets, repText: repText)
         case .campus(let name, let mirrorSets):
-            ExerciseStateView(titleLeading: name, titleTrailing: mirrorSets ? "[L/R]" : nil, subheadline: data.getSummary(useAlt: state.repState?.hasNext ?? false), setIndex: state.setIndex, numSets: numSets, repText: repText)
+            ExerciseStateView(titleLeading: name, titleTrailing: mirrorSets ? "[L/R]" : nil, subheadline: exerciseSummary, setIndex: state.setIndex, numSets: numSets, repText: repText)
         }
     }
     
@@ -110,26 +159,59 @@ struct SessionLiveView: View {
                 return "Rest"
             }
         }()
-        // TODO countdown direction
-        TimerRingView(text: text, textCountDown: true, timerDuration: timerDuration, elapsedSeconds: elapsedSeconds, progress: progress)
+        let countDown: Bool = {
+            switch state.exerciseState {
+            case .active:
+                switch state.data.exercise.category {
+                case .repeater(_, _, _): return true
+                default: return false
+                }
+            default: return true
+            }
+        }()
+        TimerRingView(text: text, textCountDown: countDown, timerDuration: timerDuration, elapsedSeconds: elapsedSeconds, progress: progress)
     }
     
     @ViewBuilder
     func controlView() -> some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 24) {
             Spacer()
             Button(action: prev) {
-                Image(systemName: "arrowshape.backward.circle")
-                    .font(.system(size: 64))
-            }
+                Image(systemName: "arrowshape.backward.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 42, height: 42)
+                    .padding(8)
+            }.buttonStyle(.glass)
+                .buttonBorderShape(.circle)
             Button(action: toggleTimer) {
-                Image(systemName: isTimerValid ? "pause.circle" : "play.circle")
-                    .font(.system(size: 96))
-            }.disabled(elapsedSeconds >= timerDuration)
-            Button(action: next) {
-                Image(systemName: allowTimerNext || elapsedSeconds >= timerDuration ? "arrowshape.forward.circle" : "checkmark.circle")
-                    .font(.system(size: 64))
-            }
+                Image(systemName: isTimerValid ? "pause.fill" : "play.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .offset(x: isTimerValid ? 0 : 6)
+                    .frame(width: 48, height: 48)
+                    .padding(16)
+                    .transaction { transaction in
+                        // Disable icon transition animation
+                        transaction.animation = nil
+                    }
+            }.buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .disabled(elapsedSeconds >= timerDuration)
+            Button {
+                next()
+            } label: {
+                Image(systemName: allowTimerNext || elapsedSeconds >= timerDuration ? "arrowshape.forward.fill" : "checkmark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 42, height: 42)
+                    .padding(8)
+                    .transaction { transaction in
+                        // Disable icon transition animation
+                        transaction.animation = nil
+                    }
+            }.buttonStyle(.glass)
+                .buttonBorderShape(.circle)
             Spacer()
         }.buttonStyle(.plain)
     }
@@ -137,31 +219,48 @@ struct SessionLiveView: View {
     // State functions
     
     func prev() {
-        stopAndResetTimer()
         // First try to go back to the prev exercise state
         // Then try to move to the prev exercise
         if let prev = state.prev ?? prevExercise {
-            state = prev
+            update(prev)
+        } else {
+            // Otherwise at least stop timer
+            stopAndResetTimer()
         }
-        // Don't start timer again
     }
     
-    func next() {
+    /// Attempts to advance the state to the next phase of the
+    /// current exercise, or to the next applicable exercise.
+    /// If no exercises remain, this view is exited
+    func next(skip: Bool = false) {
         guard allowTimerNext || elapsedSeconds >= timerDuration else {
             timerNextOverride = true
             return
         }
-        stopAndResetTimer()
         // First try to advance to the next exercise state
-        // Then try to move to the next exercise
-        if let next = state.next ?? nextExercise {
-            state = next
-            timerNextOverride = false
+        // (if we are not skipping)
+        if !skip, let next = state.next {
+            update(next)
+            startTimer()
+        } else if let nextExercise {
+            // Otherwise try to move to the next exercise
+            update(nextExercise)
             startTimer()
         } else {
-            // Session is complete, exit
+            // Session is complete, clean up and exit
+            stopAndResetTimer()
             dismiss()
         }
+    }
+    
+    /// ALL writes to `state` should go through this method
+    /// prev is an exception, since it does not want to auto-start timer
+    func update(_ newState: ViewState) {
+        // Stop timer first
+        stopAndResetTimer()
+        // Advance to next state, reset flags
+        state = newState
+        timerNextOverride = false
     }
     
     var prevExercise: ViewState? {
@@ -370,14 +469,16 @@ struct SessionLiveView: View {
                 case .ready:
                     return 10
                 case .active:
+                    // Default to 60 seconds if not explicitly set
                     if (repState?.hasNext ?? false) {
-                        return dataSet[.timeAlt]?.num ?? dataSet[.time]?.num ?? 0
+                        return dataSet[.timeAlt]?.num ?? dataSet[.time]?.num ?? 60
                     }
-                    return dataSet[.time]?.num ?? 0
+                    return dataSet[.time]?.num ?? 60
                 case .rest:
-                    return 20
+                    // Changeover period is 10 seconds
+                    return 10
                 case .record:
-                    return (repState?.hasNext ?? false) ? 20 : setRestTime
+                    return (repState?.hasNext ?? false) ? 0 : setRestTime
                 }
             case .repeater(_, let timeOn, let timeOff):
                 switch exerciseState {
@@ -395,14 +496,16 @@ struct SessionLiveView: View {
                 case .ready:
                     return 10
                 case .active:
+                    // Default to 20 seconds if not explicitly set
                     if (repState?.hasNext ?? false) {
-                        return dataSet[.timeAlt]?.num ?? dataSet[.time]?.num ?? 0
+                        return dataSet[.timeAlt]?.num ?? dataSet[.time]?.num ?? 20
                     }
-                    return dataSet[.time]?.num ?? 0
+                    return dataSet[.time]?.num ?? 20
                 case .rest:
+                    // Changeover period is 20 seconds
                     return 20
                 case .record:
-                    return (repState?.hasNext ?? false) ? 20 : setRestTime
+                    return setRestTime
                 }
             case .campus(_, _):
                 switch exerciseState {
@@ -410,7 +513,7 @@ struct SessionLiveView: View {
                     // Timer unused
                     return 0
                 case .record:
-                    return (repState?.hasNext ?? false) ? 20 : setRestTime
+                    return (repState?.hasNext ?? false) ? 0 : setRestTime
                 }
             }
         }
