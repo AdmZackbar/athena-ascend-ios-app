@@ -10,6 +10,7 @@ import SwiftUI
 internal import Combine
 
 struct SessionView: View {
+    @EnvironmentObject private var navigationStore: NavigationStore
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     
@@ -41,9 +42,7 @@ struct SessionView: View {
     }
     
     var body: some View {
-        SessionHomeView(session: session, sheetType: $sheetType, song: $song, deleteExercise: $deleteExercise, onSelect: { _ in /* TODO */ }, onFinish: {
-            session.endTime = .now
-        })
+        mainView()
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden()
@@ -77,6 +76,228 @@ struct SessionView: View {
             }
             .sheet(item: $sheetType, content: sheetView)
             .toolbar(content: buildToolbar)
+    }
+    
+    @ViewBuilder
+    func mainView() -> some View {
+        if session.finished {
+            closedHomePage()
+        } else {
+            activeHomePage()
+                .onAppear {
+                    if session.superSets.isEmpty {
+                        session.superSets.append(.init(name: "Main Set"))
+                    }
+                }
+        }
+    }
+    
+    private func activeHomePage() -> some View {
+        Form {
+            Section {
+                Button {
+                    sheetType = .athlete
+                } label: {
+                    HStack {
+                        Image(systemName: "pencil.circle")
+                            .font(.title3)
+                        if session.athletes.count > 1 {
+                            VStack(alignment: .leading) {
+                                Text("Athletes")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Text(session.athletes.map(\.name).sorted().joined(separator: ", "))
+                            }
+                        } else if let athlete = session.athletes.first {
+                            VStack(alignment: .leading) {
+                                Text("Athlete")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Text(athlete.fullName ?? athlete.name)
+                            }
+                        } else {
+                            Text("No Athletes")
+                                .italic()
+                        }
+                        Spacer()
+                    }
+                }.buttonStyle(.plain)
+                TextField("Notes", text: $session.notes, axis: .vertical)
+                    .lineLimit((session.data.isEmpty ? 9 : 3)...12)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.sentences)
+                if hasData {
+                    Button {
+                        session.endTime = .now
+                    } label: {
+                        Label("Finish Session", systemImage: "checkmark")
+                    }
+                }
+            } header: {
+                DatePicker("Start", selection: $session.startTime, displayedComponents: [.date, .hourAndMinute])
+            }
+            dataView()
+        }
+    }
+
+    @ViewBuilder
+    private func closedHomePage() -> some View {
+        Form {
+            Section {
+                TextField("Notes", text: $session.notes, axis: .vertical)
+                    .lineLimit((session.data.isEmpty ? 9 : 3)...12)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.sentences)
+                // Only show song for single athlete sessioons
+                if session.athletes.count == 1 {
+                    Button {
+                        song = session.standoutSong ?? .init(name: "", artist: "")
+                        sheetType = .song
+                    } label: {
+                        if let standoutSong = session.standoutSong {
+                            VStack(alignment: .leading) {
+                                Text("Standout Song")
+                                    .bold()
+                                Text(standoutSong.artist)
+                                    .font(.subheadline)
+                                    .italic()
+                                Text(standoutSong.name)
+                                    .font(.headline)
+                                    .bold()
+                            }
+                        } else {
+                            Label("Choose Standout Song...", systemImage: "music.note")
+                        }
+                    }.buttonStyle(.plain)
+                }
+            } header: {
+                VStack(alignment: .leading) {
+                    if session.athletes.count > 1 {
+                        Text(session.athletes.map { $0.name }.sorted().joined(separator: ", "))
+                            .font(.subheadline)
+                            .italic()
+                    } else if let athlete = session.athletes.first {
+                        Text(athlete.fullName ?? athlete.name)
+                            .font(.subheadline)
+                            .italic()
+                    }
+                    HStack {
+                        Text(session.startTime.formatted(date: .numeric, time: .shortened))
+                        Spacer()
+                        if let endTime = session.endTime {
+                            Text(Duration.seconds(endTime.timeIntervalSince(session.startTime)).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
+                        }
+                    }
+                }
+            }
+            dataView()
+        }
+    }
+    
+    @ViewBuilder
+    func dataView() -> some View {
+        if session.athletes.count > 1 {
+            multiAthleteDataView()
+        } else if !session.athletes.isEmpty {
+            singleAthleteDataView()
+        } else {
+            Section("Data") {
+                ContentUnavailableView("Add athletes to view and set data", systemImage: "person")
+            }
+        }
+    }
+    
+    @ViewBuilder
+    func multiAthleteDataView() -> some View {
+        // TODO handle routines - need to keep structure
+        // No need to structure exercises
+        let groupedData: [ExerciseData.Position: [ExerciseData]] = .init(grouping: session.data, by: { $0.position })
+        ForEach(groupedData.sorted(by: { ($0.key.superSetIndex, $0.key.setIndex) < ($1.key.superSetIndex, $1.key.setIndex) }),
+            id: \.key.hashValue) { key, athleteData in
+                Section {
+                    ForEach(athleteData.sorted(by: { $0.athlete.name < $1.athlete.name })) { d in
+                        dataView(d, headerType: .athleteName)
+                    }
+                } header: {
+                    HStack {
+                        Text(athleteData.first!.exercise.name)
+                        Spacer()
+                        Button(role: .destructive) {
+                            deleteExercise = key
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                    }
+                }
+        }
+        if !session.finished {
+            Button {
+                // Adding all exercises to default main set
+                sheetType = .addExercise(superSetIndex: 0)
+            } label: {
+                Label("Add/Remove Exercises...", systemImage: "pencil")
+            }
+        }
+    }
+    
+    @ViewBuilder
+    func singleAthleteDataView() -> some View {
+        ForEach($session.superSets.enumerated(), id: \.offset) { offset, $superSet in
+            let superSetIndex = offset
+            Section {
+                ForEach(session.data.filter { $0.position.superSetIndex == superSetIndex }
+                    .sorted(by: { $0.position.setIndex < $1.position.setIndex })
+                    .enumerated(), id: \.offset) { offset, data in
+                        dataView(data, headerType: .exerciseName)
+                            .swipeActions {
+                                Button("Delete", systemImage: "trash") {
+                                    deleteExercise = data.position
+                                }.tint(.red)
+                            }
+                }
+                if !session.finished {
+                    Button {
+                        sheetType = .addExercise(superSetIndex: superSetIndex)
+                    } label: {
+                        Label("Add/Remove Exercises...", systemImage: "pencil")
+                    }
+                }
+            } header: {
+                HStack {
+                    if session.finished {
+                        Text(superSet.name)
+                    } else {
+                        TextField("Set Name", text: $superSet.name)
+                    }
+                    Spacer()
+                    if superSet.restTime > 0 {
+                        Text("\(superSet.restTime)s Rest")
+                    }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func dataView(_ data: ExerciseData, headerType: ExerciseDataEntryView.HeaderType) -> some View {
+        Button {
+            sheetType = .exercise(data.position, athlete: data.athlete)
+        } label: {
+            HStack {
+                ExerciseDataEntryView(data: data, headerType: headerType)
+                Spacer()
+            }.contentShape(Rectangle())
+        }.buttonStyle(.plain)
+            .contextMenu {
+                if !session.finished && !data.expectedData.isEmpty {
+                    Button {
+                        // Go to exercise (set 1)
+                        navigationStore.push(ViewType.sessionLive(sessionData: data))
+                    } label: {
+                        Label("Start Exercise", systemImage: "play")
+                    }
+                }
+            }
     }
     
     @ViewBuilder
@@ -200,9 +421,9 @@ struct SessionView: View {
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
-            if !session.finished && session.routine != nil {
-                NavigationLink {
-                    SessionLiveView(session: session)
+            if !session.finished, let sessionData = session.data.filter({ !$0.expectedData.isEmpty }).first {
+                Button {
+                    navigationStore.push(ViewType.sessionLive(sessionData: sessionData))
                 } label: {
                     Label("Start", systemImage: "play")
                 }
@@ -254,7 +475,7 @@ struct SessionView: View {
     @Previewable @Query(sort: \Session.startTime) var sessions: [Session]
     NavigationStack {
         SessionView(session: sessions.first!)
-    }
+    }.environmentObject(NavigationStore())
 }
 
 #Preview("Fresh", traits: .sampleData) {

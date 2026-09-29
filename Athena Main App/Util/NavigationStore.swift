@@ -53,6 +53,10 @@ final class NavigationStore: ObservableObject {
             RoutineEditView(routine: routine)
         case .session(let session):
             SessionView(session: session)
+        case .sessionLive(let sessionData):
+            SessionLiveView(sessionData: sessionData)
+        case .sessionGroupList:
+            GroupSessionListView()
         }
     }
 }
@@ -67,6 +71,8 @@ enum ViewType: Hashable {
     case routineAdd
     case routineEdit(routine: Routine)
     case session(session: Session)
+    case sessionLive(sessionData: ExerciseData)
+    case sessionGroupList
 }
 
 extension View {

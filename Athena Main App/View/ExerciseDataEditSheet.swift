@@ -26,6 +26,7 @@ struct ExerciseDataEditSheet: View {
     }
     
     @State private var athleteData: [Athlete: [ExerciseData.DataSet]]
+    @State private var athleteNotes: [Athlete: String]
     @State private var selectedAthlete: Athlete
     @State private var showAlt: Bool
     @State private var discreteStep: Int = 1
@@ -37,7 +38,8 @@ struct ExerciseDataEditSheet: View {
         let exerciseData = session.data.filter({ $0.position == position })
         self.exercise = exerciseData.first!.exercise
         let athleteDataMap: [Athlete: [ExerciseData]] = .init(grouping: exerciseData, by: { $0.athlete })
-        self.athleteData = athleteDataMap.mapValues { $0.flatMap { $0.actualData } }
+        self.athleteData = athleteDataMap.mapValues { $0.first?.actualData ?? [] }
+        self.athleteNotes = athleteDataMap.mapValues { $0.first?.notes ?? "" }
         let athlete = initialAthlete ?? session.athletes.sorted(by: { $0.name < $1.name }).first!
         self.selectedAthlete = athlete
         self.showAlt = athleteDataMap[athlete, default: []].contains(where: { $0.actualData.hasAlt })
@@ -52,6 +54,14 @@ struct ExerciseDataEditSheet: View {
                             Text(athlete.name).tag(athlete)
                         }
                     }
+                }
+                Section("Exercise Notes") {
+                    TextField("Optional", text: .init(get: {
+                        athleteNotes[selectedAthlete] ?? ""
+                    }, set: { newValue in
+                        athleteNotes[selectedAthlete] = newValue.isEmpty ? nil : newValue
+                    }), axis: .vertical)
+                    .lineLimit(1...3)
                 }
                 let numSets = athleteData[selectedAthlete, default: []].count
                 ForEach(0..<numSets, id: \.self) { setIndex in
@@ -73,7 +83,6 @@ struct ExerciseDataEditSheet: View {
                                 .bold()
                             Spacer()
                             Button(role: .destructive) {
-                                // TODO confirm
                                 athleteData[selectedAthlete]!.remove(at: setIndex)
                             } label: {
                                 Image(systemName: "trash")
@@ -82,7 +91,17 @@ struct ExerciseDataEditSheet: View {
                     }
                 }
                 Button {
-                    athleteData[selectedAthlete, default: []].append(.init())
+                    let setIndex = athleteData[selectedAthlete]?.count ?? 0
+                    var initialData: ExerciseData.DataSet = .init()
+                    if let latest = athleteData[selectedAthlete]?.last {
+                        // Try to use the latest set as a base
+                        initialData = latest
+                    }
+                    if let expected = session.data.filter({ $0.position == position }).first?.expectedData, expected.count > setIndex {
+                        // If we have expected data, prioritize those values
+                        initialData.override(expected[setIndex].expectedToActual())
+                    }
+                    athleteData[selectedAthlete, default: []].append(initialData)
                 } label: {
                     Label("Add Set", systemImage: "plus")
                 }
@@ -131,9 +150,9 @@ struct ExerciseDataEditSheet: View {
                 }
             }
             Button {
-                athleteData.forEach { athlete, dataSets in
+                session.athletes.forEach { athlete in
                     let exerciseData = session.data.filter { $0.athlete == athlete && $0.position == position }.first!
-                    exerciseData.actualData = dataSets.map { dataSet in
+                    exerciseData.actualData = athleteData[athlete, default: []].map { dataSet in
                         if canMirror && !showAlt {
                             // Strip out all alt values
                             return dataSet.filter { !$0.key.isAlt }
@@ -143,6 +162,7 @@ struct ExerciseDataEditSheet: View {
                         }
                         return dataSet
                     }
+                    exerciseData.notes = athleteNotes[athlete, default: ""]
                 }
                 dismiss()
             } label: {

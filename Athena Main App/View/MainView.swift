@@ -70,9 +70,14 @@ struct MainView: View {
                     Label("View Exercises", systemImage: "tablecells")
                 }
                 Button {
+                    navigationStore.push(ViewType.sessionGroupList)
+                } label: {
+                    Label("View Group Sessions", systemImage: "person.3")
+                }
+                Button {
                     navigationStore.push(ViewType.athleteRoster)
                 } label: {
-                    Label("Manage Athletes", systemImage: "person.2")
+                    Label("Manage Athletes", systemImage: "person.text.rectangle")
                 }
                 Button {
                     exportAllData()

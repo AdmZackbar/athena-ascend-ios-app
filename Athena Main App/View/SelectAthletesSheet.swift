@@ -15,6 +15,7 @@ struct SelectAthletesSheet: View {
     
     let initialSelection: [Athlete]
     let onComplete: ([Athlete]) -> Void
+    // Keep this ordered
     @State var selection: [Athlete]
     
     init(initialSelection: [Athlete] = [], onComplete: @escaping ([Athlete]) -> Void) {
@@ -27,7 +28,7 @@ struct SelectAthletesSheet: View {
         NavigationStack {
             Form {
                 Section("Selection") {
-                    ForEach(selection.sorted(by: { $0.name < $1.name }).enumerated(), id: \.offset) { offset, athlete in
+                    ForEach(selection.enumerated(), id: \.offset) { offset, athlete in
                         Button {
                             selection.remove(at: offset)
                         } label: {
@@ -40,7 +41,12 @@ struct SelectAthletesSheet: View {
                     Section("Roster") {
                         ForEach(notSelected) { athlete in
                             Button {
-                                selection.append(athlete)
+                                // Keep sorted
+                                if let first = selection.firstIndex(where: { $0.name > athlete.name }) {
+                                    selection.insert(athlete, at: first)
+                                } else {
+                                    selection.append(athlete)
+                                }
                             } label: {
                                 athleteView(athlete, selected: false)
                             }.buttonStyle(.plain)

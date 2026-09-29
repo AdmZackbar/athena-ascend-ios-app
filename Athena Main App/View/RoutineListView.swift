@@ -30,7 +30,6 @@ struct RoutineListView: View {
         Menu {
             Button {
                 let session: Session = .init(routine: routine, superSets: routine.superSets)
-                session.data = routine.data.map { ExerciseData(exercise: $0.exercise, session: session, athlete: athlete, position: $0.position, expectedData: $0.expectedData) }
                 modelContext.insert(session)
                 navigationStore.push(ViewType.session(session: session))
             } label: {

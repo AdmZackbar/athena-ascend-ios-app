@@ -123,11 +123,14 @@ extension ExerciseData.DataSet {
         case .discrete(let v): return "\(v.formatted())\(dataType.getUnit(v))"
         case .number(let v): return "\(v.formatted(.number.precision(.fractionLength(0...2))))\(dataType.getUnit(Int(v)))"
         case .range(let min, let max): return "\(min)-\(max)\(dataType.getUnit(max))"
-        case .campus(let set): return value?.text
+        case .campus(_): return value?.text
         case .none: return nil
         }
     }
     
+    /// Performs a intersect-type operation on the two data sets.
+    /// If both data sets contain the same value for a given field, that
+    /// entry is removed. ONLY the first data set unique values are retained.
     static func ^ (lhs: ExerciseData.DataSet, rhs: ExerciseData.DataSet) -> ExerciseData.DataSet {
         var result: ExerciseData.DataSet = lhs
         rhs.forEach { field, rightVal in
@@ -138,6 +141,7 @@ extension ExerciseData.DataSet {
         return result
     }
 
+    /// Removes all 'alt' field values that match that of the main field values
     func dedupe() -> ExerciseData.DataSet {
         var result = self
         for altField in ExerciseData.Field.altFields {
@@ -150,6 +154,32 @@ extension ExerciseData.DataSet {
         }
         // TODO dedupe flipped version of main for campus
         return result
+    }
+    
+    /// 'Cleans' this data set by removing invalid values for an actual data set
+    /// Replaces ranges with their average values, and strips text
+    func expectedToActual() -> ExerciseData.DataSet {
+        var result = ExerciseData.DataSet()
+        self.forEach { field, value in
+            switch value {
+            case .number(_), .discrete(_), .campus(_):
+                // Use value as is
+                result[field] = value
+            case .range(_, _):
+                // Use avg of range
+                result[field] = .discrete(value.num!)
+            case .text(_):
+                // Text unsupported in actual data
+                break
+            }
+        }
+        return result
+    }
+    
+    /// Adds the contents of the gibven data set to this one,
+    /// and overrides all current values with new ones
+    mutating func override(_ rhs: ExerciseData.DataSet) {
+        self.merge(rhs, uniquingKeysWith: { $1 })
     }
 }
 

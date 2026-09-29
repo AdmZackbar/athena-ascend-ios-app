@@ -37,30 +37,20 @@ struct SessionLiveView: View {
         return state.exerciseState != .record || timerNextOverride
     }
     
-    init(session: Session, initial: ExerciseData.Position? = nil) {
-        self.session = session
-        let data: ExerciseData = {
-            if let initial {
-                // Go to selected, or first exercise if not found
-                return session.data.filter({ $0.position == initial }).first ?? session.data.sorted(by: { $0.position < $1.position }).first!
-            }
-            // Start with first exercise
-            return session.data.sorted(by: { $0.position < $1.position }).first!
-        }()
-        self.state = .init(data: data, setIndex: 0)
+    init(sessionData: ExerciseData) {
+        self.session = sessionData.session
+        self.state = .init(data: sessionData, setIndex: 0)
     }
     
     var body: some View {
-        Group {
-            VStack {
-                headerView()
-                Spacer()
-                timerView()
-                controlView()
-            }.padding([.leading, .trailing])
-        }.navigationTitle(session.superSets[state.data.position.superSetIndex].name)
+        mainView()
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .background(background)
+    }
+    
+    var title: String {
+        return session.superSets[state.superSetIndex].name
     }
     
     /// The background color of the view
@@ -79,8 +69,18 @@ struct SessionLiveView: View {
     }
     
     @ViewBuilder
-    func headerView() -> some View {
-        let data = state.data.expectedData[state.setIndex]
+    func mainView() -> some View {
+        VStack {
+            headerView(state)
+            Spacer()
+            timerView(state)
+            controlView()
+        }.padding([.leading, .trailing])
+    }
+    
+    @ViewBuilder
+    func headerView(_ state: ViewState) -> some View {
+        let data = state.dataSet
         let numSets = state.data.expectedData.count
         let repText = state.repState?.text
         switch state.data.exercise.category {
@@ -96,7 +96,7 @@ struct SessionLiveView: View {
     }
     
     @ViewBuilder
-    func timerView() -> some View {
+    func timerView(_ state: ViewState) -> some View {
         // TODO other cases
         let text: String = {
             switch state.exerciseState {
@@ -116,7 +116,22 @@ struct SessionLiveView: View {
     
     @ViewBuilder
     func controlView() -> some View {
-        SessionControlBar(isTimerRunning: isTimerValid, allowTimerNext: allowTimerNext, elapsedSeconds: elapsedSeconds, timerDuration: timerDuration, onPrev: prev, onToggle: toggleTimer, onNext: next)
+        HStack(spacing: 16) {
+            Spacer()
+            Button(action: prev) {
+                Image(systemName: "arrowshape.backward.circle")
+                    .font(.system(size: 64))
+            }
+            Button(action: toggleTimer) {
+                Image(systemName: isTimerValid ? "pause.circle" : "play.circle")
+                    .font(.system(size: 96))
+            }.disabled(elapsedSeconds >= timerDuration)
+            Button(action: next) {
+                Image(systemName: allowTimerNext || elapsedSeconds >= timerDuration ? "arrowshape.forward.circle" : "checkmark.circle")
+                    .font(.system(size: 64))
+            }
+            Spacer()
+        }.buttonStyle(.plain)
     }
     
     // State functions
@@ -128,21 +143,20 @@ struct SessionLiveView: View {
         if let prev = state.prev ?? prevExercise {
             state = prev
         }
-        startTimer()
+        // Don't start timer again
     }
     
     func next() {
-        guard allowTimerNext else {
+        guard allowTimerNext || elapsedSeconds >= timerDuration else {
             timerNextOverride = true
             return
         }
-        // Reset flags and timer
-        timerNextOverride = false
         stopAndResetTimer()
         // First try to advance to the next exercise state
         // Then try to move to the next exercise
         if let next = state.next ?? nextExercise {
             state = next
+            timerNextOverride = false
             startTimer()
         } else {
             // Session is complete, exit
@@ -151,22 +165,20 @@ struct SessionLiveView: View {
     }
     
     var prevExercise: ViewState? {
-        let superSetIndex = state.data.position.superSetIndex
-        let exIndex = state.data.position.setIndex
         let sortedData = session.data
             // Need to have data to go on
             .filter({ !$0.expectedData.isEmpty })
             // Sort by super set, then by exercise index DESCENDING
             .sorted(by: { $0.position > $1.position })
         // First check within the set
-        switch session.superSets[superSetIndex].order {
+        switch session.superSets[state.superSetIndex].order {
         case .bfs:
             // First check behind in the prev exercise for the same set index
-            if let prev = sortedData.filter({ $0.position.superSetIndex == superSetIndex && $0.position.setIndex < exIndex && $0.expectedData.count > state.setIndex }).first {
+            if let prev = sortedData.filter({ $0.position.superSetIndex == state.superSetIndex && $0.position.setIndex < state.exerciseIndex && $0.expectedData.count > state.setIndex }).first {
                 return .init(data: prev, setIndex: state.setIndex)
             }
             // Then check all if any can support the prev set index
-            if state.setIndex > 0, let prev = sortedData.filter({ $0.position.superSetIndex == superSetIndex && $0.expectedData.count > state.setIndex - 1 }).first {
+            if state.setIndex > 0, let prev = sortedData.filter({ $0.position.superSetIndex == state.superSetIndex && $0.expectedData.count > state.setIndex - 1 }).first {
                 return .init(data: prev, setIndex: state.setIndex - 1)
             }
         case .dfs:
@@ -175,12 +187,12 @@ struct SessionLiveView: View {
                 return .init(data: state.data, setIndex: state.setIndex - 1)
             }
             // Then try to move to the prev exercise (first set)
-            if let prev = sortedData.filter({ $0.position.superSetIndex == superSetIndex && $0.position.setIndex < exIndex }).first {
+            if let prev = sortedData.filter({ $0.position.superSetIndex == state.superSetIndex && $0.position.setIndex < state.exerciseIndex }).first {
                 return .init(data: prev, setIndex: prev.expectedData.count - 1)
             }
         }
         // Then go to the prev super set (if it exists and has data)
-        if let prev = sortedData.filter({ $0.position.superSetIndex < superSetIndex }).first {
+        if let prev = sortedData.filter({ $0.position.superSetIndex < state.superSetIndex }).first {
             return .init(data: prev, setIndex: prev.expectedData.count - 1)
         }
         // Otherwise, nowhere to go
@@ -188,22 +200,20 @@ struct SessionLiveView: View {
     }
     
     var nextExercise: ViewState? {
-        let superSetIndex = state.data.position.superSetIndex
-        let exIndex = state.data.position.setIndex
         let sortedData = session.data
             // Need to have data to go on
             .filter({ !$0.expectedData.isEmpty })
             // Sort by super set, then by exercise index
             .sorted(by: { $0.position < $1.position })
         // First check within the set
-        switch session.superSets[superSetIndex].order {
+        switch session.superSets[state.superSetIndex].order {
         case .bfs:
             // First check ahead in the next exercise for the same set index
-            if let next = sortedData.filter({ $0.position.superSetIndex == superSetIndex && $0.position.setIndex > exIndex && $0.expectedData.count > state.setIndex }).first {
+            if let next = sortedData.filter({ $0.position.superSetIndex == state.superSetIndex && $0.position.setIndex > state.exerciseIndex && $0.expectedData.count > state.setIndex }).first {
                 return .init(data: next, setIndex: state.setIndex)
             }
             // Then check all if any can support the next set index
-            if let next = sortedData.filter({ $0.position.superSetIndex == superSetIndex && $0.expectedData.count > state.setIndex + 1 }).first {
+            if let next = sortedData.filter({ $0.position.superSetIndex == state.superSetIndex && $0.expectedData.count > state.setIndex + 1 }).first {
                 return .init(data: next, setIndex: state.setIndex + 1)
             }
         case .dfs:
@@ -212,12 +222,12 @@ struct SessionLiveView: View {
                 return .init(data: state.data, setIndex: state.setIndex + 1)
             }
             // Then try to move to the next exercise (first set)
-            if let next = sortedData.filter({ $0.position.superSetIndex == superSetIndex && $0.position.setIndex > exIndex }).first {
+            if let next = sortedData.filter({ $0.position.superSetIndex == state.superSetIndex && $0.position.setIndex > state.exerciseIndex }).first {
                 return .init(data: next, setIndex: 0)
             }
         }
         // Then go to the next super set (if it exists and has data)
-        if let next = sortedData.filter({ $0.position.superSetIndex > superSetIndex }).first {
+        if let next = sortedData.filter({ $0.position.superSetIndex > state.superSetIndex }).first {
             return .init(data: next, setIndex: 0)
         }
         // Otherwise, nowhere to go
@@ -325,6 +335,14 @@ struct SessionLiveView: View {
             return data.expectedData[setIndex]
         }
         
+        var superSetIndex: Int {
+            return data.position.superSetIndex
+        }
+        
+        var exerciseIndex: Int {
+            return data.position.setIndex
+        }
+        
         var usesActiveTimer: Bool {
             switch data.exercise.category {
             case .generic(_, let dataTypes, _):
@@ -339,7 +357,7 @@ struct SessionLiveView: View {
         }
         
         var setRestTime: Int {
-            data.session.superSets[data.position.superSetIndex].restTime
+            data.session.superSets[superSetIndex].restTime
         }
         
         var maxTimeSeconds: Int {
@@ -560,8 +578,8 @@ struct ExerciseStateView: View {
 #Preview("Main", traits: .sampleData) {
     @Previewable @Query var sessions: [Session]
     NavigationStack {
-        SessionLiveView(session: sessions.filter({ !$0.data.isEmpty }).first!)
-    }
+        SessionLiveView(sessionData: sessions.filter({ !$0.data.isEmpty }).first!.data.first!)
+    }.environmentObject(NavigationStore())
 }
 
 #Preview("State View") {
