@@ -33,12 +33,18 @@ struct SelectExercisesSheet: View {
                         Text("No Selection")
                             .italic()
                     } else {
-                        ForEach(selection.enumerated(), id: \.offset) { offset, exercise in
-                            Button {
-                                selection.remove(at: offset)
-                            } label: {
-                                exerciseView(exercise, selected: true)
-                            }.buttonStyle(.plain)
+                        List {
+                            ForEach(selection, id: \.name) { exercise in
+                                Button {
+                                    // Do nothing
+                                } label: {
+                                    exerciseView(exercise, selected: true)
+                                }.buttonStyle(.plain)
+                            }.onDelete { indices in
+                                selection.remove(atOffsets: indices)
+                            }.onMove { indices, target in
+                                selection.move(fromOffsets: indices, toOffset: target)
+                            }
                         }
                     }
                 }
