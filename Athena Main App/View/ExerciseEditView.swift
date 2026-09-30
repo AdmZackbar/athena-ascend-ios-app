@@ -12,6 +12,8 @@ struct ExerciseEditView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var modelContext
     
+    @Query var existingExercises: [Exercise]
+    
     let exercise: Exercise?
     
     @State var draft: Draft
@@ -49,8 +51,10 @@ struct ExerciseEditView: View {
                 case .campus:
                     campusView()
                 }
-                TextField("Notes", text: $draft.notes, axis: .vertical)
-                    .lineLimit(3...9)
+                stackedView("Notes") {
+                    TextField("Optional", text: $draft.notes, axis: .vertical)
+                        .lineLimit(3...9)
+                }
             } header: {
                 Picker("Type", selection: $draft.type) {
                     ForEach(SelectExercisesSheet.ExerciseType.allCases, id: \.text) { type in
@@ -58,6 +62,13 @@ struct ExerciseEditView: View {
                     }
                 }.pickerStyle(.segmented)
                     .padding([.leading, .trailing], -16)
+            } footer: {
+                if draftExists {
+                    Text("Exercise already exists!")
+                        .font(.title3)
+                        .fontWeight(.heavy)
+                        .foregroundStyle(.red)
+                }
             }
         }.navigationTitle(exercise != nil ? "Edit Exercise" : "Add Exercise")
             .navigationBarTitleDisplayMode(.inline)
@@ -74,52 +85,107 @@ struct ExerciseEditView: View {
                         dismiss()
                     } label: {
                         Label("Save", systemImage: "checkmark")
-                    }.disabled(draft.invalid)
+                    }.disabled(draft.invalid || draftExists)
                 }
             }
     }
     
     @ViewBuilder
-    func genericView() -> some View {
-        TextField("Name", text: $draft.name)
-        ForEach(Exercise.DataType.allCases, id: \.hashValue) { dataType in
-            Toggle(text(dataType), isOn: .init(get: {
-                draft.dataTypes.contains(dataType)
-            }, set: { newValue in
-                if newValue {
-                    draft.dataTypes.append(dataType)
-                } else {
-                    draft.dataTypes.removeAll(where: { $0 == dataType })
-                }
-            }))
+    func stackedView<Content: View>(_ name: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(name)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            content()
         }
-        Picker("Side Type", selection: $draft.sideType) {
-            ForEach(Exercise.SideType.allCases, id: \.hashValue) { s in
-                Text(text(s)).tag(s)
+    }
+    
+    @ViewBuilder
+    func genericView() -> some View {
+        stackedView("Name") {
+            TextField("Required", text: $draft.name)
+        }
+        stackedView("Data Types", content: dataTypeView)
+        stackedView("Sided") {
+            Picker("Side Type", selection: $draft.sideType) {
+                ForEach(Exercise.SideType.allCases, id: \.hashValue) { s in
+                    Text(text(s)).tag(s)
+                }
+            }.pickerStyle(.segmented)
+        }
+    }
+    
+    @ViewBuilder
+    func dataTypeView() -> some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 4) {
+                ForEach(Exercise.DataType.allCases, id: \.hashValue) { dataType in
+                    if !draft.dataTypes.contains(dataType) {
+                        // Add button
+                        Button {
+                            withAnimation {
+                                draft.dataTypes.append(dataType)
+                            }
+                        } label: {
+                            HStack(spacing: 2) {
+                                Image(systemName: icon(dataType))
+                                    .font(.subheadline)
+                                Text(text(dataType))
+                                    .font(.caption)
+                            }
+                        }.buttonStyle(.glass)
+                    } else {
+                        // Remove button
+                        Button {
+                            withAnimation {
+                                draft.dataTypes.removeAll(where: { $0 == dataType })
+                            }
+                        } label: {
+                            HStack(spacing: 2) {
+                                Image(systemName: icon(dataType))
+                                    .font(.subheadline)
+                                Text(text(dataType))
+                                    .font(.caption)
+                            }
+                        }.buttonStyle(.glassProminent)
+                    }
+                }
             }
         }
     }
     
     @ViewBuilder
     func repeaterView() -> some View {
-        TextField("Tag", text: $draft.name)
-        Stepper("Time On: \(draft.timeOn)s", value: $draft.timeOn, in: 1...99)
-        Stepper("Time Off: \(draft.timeOff)s", value: $draft.timeOff, in: 1...99)
-    }
-    
-    @ViewBuilder
-    func maxHangView() -> some View {
-        TextField("Tag", text: $draft.name)
-        Picker("Side Type", selection: $draft.sideType) {
-            ForEach(Exercise.SideType.allCases, id: \.hashValue) { s in
-                Text(text(s)).tag(s)
+        stackedView("Tag") {
+            TextField("Required", text: $draft.name)
+        }
+        stackedView("Period") {
+            HStack(spacing: 8) {
+                Stepper("\(draft.timeOn)s on", value: $draft.timeOn, in: 1...99)
+                Stepper("\(draft.timeOff)s off", value: $draft.timeOff, in: 1...99)
             }
         }
     }
     
     @ViewBuilder
+    func maxHangView() -> some View {
+        stackedView("Tag") {
+            TextField("Required", text: $draft.name)
+        }
+        stackedView("Sided") {
+            Picker("Side Type", selection: $draft.sideType) {
+                ForEach(Exercise.SideType.allCases, id: \.hashValue) { s in
+                    Text(text(s)).tag(s)
+                }
+            }.pickerStyle(.segmented)
+        }
+    }
+    
+    @ViewBuilder
     func campusView() -> some View {
-        TextField("Name", text: $draft.name)
+        stackedView("Name") {
+            TextField("Required", text: $draft.name)
+        }
         Toggle("Mirror Sets", isOn: $draft.mirror)
     }
     
@@ -128,7 +194,16 @@ struct ExerciseEditView: View {
         case .reps: return "Reps"
         case .time: return "Time"
         case .weight: return "Weight"
-        case .distance: return "Height"
+        case .distance: return "Len."
+        }
+    }
+    
+    private func icon(_ dataType: Exercise.DataType) -> String {
+        switch dataType {
+        case .reps: return "number.sign"
+        case .time: return "stopwatch"
+        case .weight: return "scalemass"
+        case .distance: return "ruler"
         }
     }
     
@@ -138,6 +213,11 @@ struct ExerciseEditView: View {
         case .dependent: return "Dependent"
         case .independent: return "Independent"
         }
+    }
+    
+    var draftExists: Bool {
+        let current = draft.category
+        return existingExercises.contains(where: { $0.category == current })
     }
     
     struct Draft {
