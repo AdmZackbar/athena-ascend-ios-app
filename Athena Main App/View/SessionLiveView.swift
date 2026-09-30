@@ -459,7 +459,10 @@ struct SessionLiveView: View {
             // set for the other side of a mirrored exercise
             draftSet = data.actualData[setIndex]
         } else {
+            // This set has no data of its own yet, so notes from the previous
+            // set shouldn't carry forward - only the numeric fields are a useful default
             var seed = data.actualData.last ?? [:]
+            seed.removeValue(forKey: .notes)
             if setIndex < data.expectedData.count {
                 seed.override(data.expectedData[setIndex].expectedToActual())
             }
