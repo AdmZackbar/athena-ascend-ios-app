@@ -228,14 +228,18 @@ struct SessionLiveView: View {
     func setView(_ s: SetState) -> some View {
         VStack(spacing: 4) {
             headerView(s)
-            if s.exerciseState == .record {
+            if s.exerciseState == .ready {
+                prevDataView(s)
+            } else if s.exerciseState == .record {
                 recordEntryView(s)
+                nextSetView(s)
             }
             Spacer()
             if timerDuration > .zero {
                 timerView(s)
             }
             controlView()
+                .padding(.top, 12)
         }.padding([.leading, .trailing])
             .ignoresSafeArea(.keyboard)
             .contentShape(Rectangle())
@@ -262,37 +266,95 @@ struct SessionLiveView: View {
         let numSets = s.data.expectedData.count
         let repText = s.repState?.text
         let useAlt = s.repState?.hasNext ?? false
+        let subheadline = s.exerciseDetails
         switch s.data.exercise.category {
         case .generic(let name, _, _):
-            ExerciseStateView(titleLeading: name, subheadline: s.dataSet.getSummary(useAlt: useAlt), setIndex: s.setIndex, numSets: numSets, repText: repText)
+            ExerciseStateView(titleLeading: name, subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: repText)
         case .repeater(let tag, let timeOn, let timeOff):
-            let subheadline: String = {
-                if let reps = s.dataSet.getText(.reps), let weight = s.dataSet.getText(.weight) {
-                    return "\(reps) @ \(weight)"
-                }
-                return s.dataSet.getSummary() ?? "N/A"
-            }()
             ExerciseStateView(titleLeading: tag, titleTrailing: "\(timeOn)s/\(timeOff)s", subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: repText)
         case .maxHang(let tag, _):
-            let subheadline: String = {
-                if let time = s.dataSet.getText(.time), let weight = s.dataSet.getText(.weight) {
-                    return "\(weight) for \(time)"
-                }
-                return s.dataSet.getSummary() ?? "N/A"
-            }()
             ExerciseStateView(titleLeading: tag, subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: repText)
         case .campus(let name, let mirror):
             let campusRep: String? = {
                 guard mirror else { return nil }
                 return useAlt ? "Side 1/2" : "Side 2/2"
             }()
-            let subheadline: String = {
-                if useAlt {
-                    return s.dataSet[.campusAlt]?.text ?? s.dataSet[.campus]?.alt.text ?? "N/A"
-                }
-                return s.dataSet[.campus]?.text ?? "N/A"
-            }()
             ExerciseStateView(titleLeading: name, subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: campusRep)
+        }
+    }
+    
+    @ViewBuilder
+    func prevDataView(_ s: SetState) -> some View {
+        if let routine = session.routine, let d = s.data.exercise.data.filter({ $0.session.routine == routine && $0.session.id != session.id && $0.position == s.data.position && $0.actualData.count > s.setIndex }).sorted(by: { ($0.session.startTime, $0.position) > ($1.session.startTime, $1.position) }).first {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(d.session.startTime.formatted(date: .numeric, time: .omitted))
+                        .bold()
+                        .foregroundStyle(.secondary)
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("Set \(s.setIndex + 1):")
+                            .fontWeight(.semibold)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(d.actualData[s.setIndex].getSummary(useAlt: s.repState?.hasNext ?? false) ?? "N/A")
+                            if case .text(let notes) = d.actualData[s.setIndex][.notes] {
+                                Text(notes)
+                                    .font(.subheadline)
+                                    .italic()
+                            }
+                        }
+                        Spacer()
+                    }.font(.title3)
+                }.padding()
+            }.glassEffect(in: RoundedRectangle(cornerRadius: 16))
+                .padding(.top, 4)
+        } else if let d = s.data.exercise.data.filter({ $0.session.id != session.id && session.athletes.contains($0.athlete) }).sorted(by: { ($0.session.startTime, $0.position) > ($1.session.startTime, $1.position) }).first {
+            HStack {
+                ExerciseDataEntryView(data: d, headerType: .date)
+                    .font(.title3)
+                    .padding()
+                Spacer()
+            }.glassEffect(in: RoundedRectangle(cornerRadius: 16))
+                .padding(.top, 4)
+        }
+    }
+    
+    @ViewBuilder
+    func nextSetView(_ current: SetState) -> some View {
+        if case .inSet(let next) = nextState {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    if current.data.position == next.data.position {
+                        // Same exercise, next set
+                        Text("Next Set (\(next.setIndex + 1)/\(next.data.expectedData.count))")
+                            .font(.body)
+                            .bold()
+                            .foregroundStyle(.secondary)
+                        if let details = next.exerciseDetails {
+                            Text(details)
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .italic()
+                        }
+                    } else {
+                        // New exercise
+                        Text("Next Exercise")
+                            .font(.body)
+                            .bold()
+                            .foregroundStyle(.secondary)
+                        Text(next.exerciseName)
+                            .font(.title2)
+                            .bold()
+                        if let details = next.exerciseDetails {
+                            Text(details)
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .italic()
+                        }
+                    }
+                }.padding()
+                Spacer()
+            }.glassEffect(in: RoundedRectangle(cornerRadius: 16))
+                .padding(.top, 4)
         }
     }
     
@@ -811,6 +873,41 @@ struct SessionLiveView: View {
                 case .record:
                     return (repState?.hasNext ?? false) ? 0 : setRestTime
                 }
+            }
+        }
+        
+        var exerciseName: String {
+            switch data.exercise.category {
+            case .generic(let name, _, _):
+                return name
+            case .repeater(let tag, _, _):
+                return tag
+            case .maxHang(let tag, _):
+                return tag
+            case .campus(let name, _):
+                return name
+            }
+        }
+        
+        var exerciseDetails: String? {
+            switch data.exercise.category {
+            case .generic(_, _, _):
+                return dataSet.getSummary(useAlt: repState?.hasNext ?? false)
+            case .repeater(_, _, _):
+                if let reps = dataSet.getText(.reps), let weight = dataSet.getText(.weight) {
+                    return "\(reps) @ \(weight)"
+                }
+                return dataSet.getSummary()
+            case .maxHang(_, _):
+                if let time = dataSet.getText(.time), let weight = dataSet.getText(.weight) {
+                    return "\(weight) for \(time)"
+                }
+                return dataSet.getSummary(useAlt: repState?.hasNext ?? false)
+            case .campus(_, _):
+                if repState?.hasNext ?? false {
+                    return dataSet[.campusAlt]?.text ?? dataSet[.campus]?.alt.text
+                }
+                return dataSet[.campus]?.text
             }
         }
         

@@ -110,7 +110,7 @@ extension ExerciseData.DataSet {
     
     func getSummary(useAlt: Bool = false) -> String? {
         var values = Exercise.DataType.allCases.compactMap { useAlt ? getText($0, useAlt: true) ?? getText($0) : getText($0) }
-        if let value = useAlt ? self[.campusAlt] ?? self[.campus] : self[.campus] {
+        if let value = useAlt ? self[.campusAlt] ?? self[.campus]?.alt : self[.campus] {
             values.append(value.text)
         }
         return values.joined(separator: ", ")
