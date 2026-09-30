@@ -13,7 +13,7 @@ struct SessionView: View {
     @EnvironmentObject private var navigationStore: NavigationStore
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
-    
+
     var title: String {
         if let routine = session.routine {
             return routine.name
@@ -21,11 +21,11 @@ struct SessionView: View {
             return session.startTime.formatted(date: .numeric, time: .shortened)
         }
     }
-    
+
     var hasData: Bool {
         !session.notes.isEmpty || !session.data.filter({ !$0.actualData.isEmpty }).isEmpty
     }
-    
+
     /// The main session of the view. Is a state to allow for easy edits to notes, sets, etc.
     @State private var session: Session
     /// The current sheet that should be shown - if nil, nothing is shown
@@ -40,7 +40,7 @@ struct SessionView: View {
     init(session: Session) {
         self.session = session
     }
-    
+
     var body: some View {
         mainView()
             .navigationTitle(title)
@@ -64,6 +64,7 @@ struct SessionView: View {
             })) {
                 Button(role: .destructive) {
                     if let deleteExercise {
+                        session.data.filter({ $0.position == deleteExercise }).forEach(modelContext.delete)
                         session.data.removeAll(where: { $0.position == deleteExercise })
                         // Update positions of all later exercises to reflect the shift down
                         session.data
@@ -77,7 +78,7 @@ struct SessionView: View {
             .sheet(item: $sheetType, content: sheetView)
             .toolbar(content: buildToolbar)
     }
-    
+
     @ViewBuilder
     func mainView() -> some View {
         if session.finished {
@@ -91,7 +92,7 @@ struct SessionView: View {
                 }
         }
     }
-    
+
     private func activeHomePage() -> some View {
         Form {
             Section {
@@ -193,7 +194,7 @@ struct SessionView: View {
             dataView()
         }
     }
-    
+
     @ViewBuilder
     func dataView() -> some View {
         if session.athletes.count > 1 {
@@ -206,7 +207,7 @@ struct SessionView: View {
             }
         }
     }
-    
+
     @ViewBuilder
     func multiAthleteDataView() -> some View {
         // TODO handle routines - need to keep structure
@@ -239,7 +240,7 @@ struct SessionView: View {
             }
         }
     }
-    
+
     @ViewBuilder
     func singleAthleteDataView() -> some View {
         ForEach($session.superSets.enumerated(), id: \.offset) { offset, $superSet in
@@ -277,7 +278,7 @@ struct SessionView: View {
             }
         }
     }
-    
+
     @ViewBuilder
     private func dataView(_ data: ExerciseData, headerType: ExerciseDataEntryView.HeaderType) -> some View {
         Button {
@@ -299,7 +300,7 @@ struct SessionView: View {
                 }
             }
     }
-    
+
     @ViewBuilder
     func sheetView(_ t: SheetType) -> some View {
         switch t {
@@ -319,6 +320,7 @@ struct SessionView: View {
             SelectExercisesSheet(initialSelection: initialSelection) { newSelection in
                 let removedExercises = initialSelection.filter { !newSelection.contains($0) }
                 // Remove all data for the removed exercises
+                session.data.filter({ removedExercises.contains($0.exercise) && $0.position.superSetIndex == superSetIndex }).forEach(modelContext.delete)
                 session.data.removeAll(where: { removedExercises.contains($0.exercise) && $0.position.superSetIndex == superSetIndex })
                 // Add exercise data and update existing indices
                 for index in 0..<newSelection.count {
@@ -339,6 +341,7 @@ struct SessionView: View {
                 let removedAthletes = session.athletes.filter { !newSelection.contains($0) }
                 // Remove athletes and associated data from session
                 session.athletes.removeAll(where: { removedAthletes.contains($0) })
+                session.data.filter({ removedAthletes.contains($0.athlete) }).forEach(modelContext.delete)
                 session.data.removeAll(where: { removedAthletes.contains($0.athlete) })
                 // Add athletes and placeholder data to session
                 session.athletes += newAthletes
@@ -369,7 +372,7 @@ struct SessionView: View {
             editSongSheet()
         }
     }
-    
+
     @ViewBuilder
     func editDateSheet() -> some View {
         NavigationStack {
@@ -391,7 +394,7 @@ struct SessionView: View {
                 }
         }.presentationDetents([.medium])
     }
-    
+
     @ViewBuilder
     func editSongSheet() -> some View {
         NavigationStack {
@@ -485,7 +488,7 @@ struct SessionView: View {
             }
         }
     }
-    
+
     enum SheetType: Identifiable, Hashable {
         var id: String {
             switch self {
@@ -508,7 +511,7 @@ struct SessionView: View {
         case exercise(_ position: ExerciseData.Position, athlete: Athlete? = nil)
         case song
     }
-    
+
 }
 
 #Preview(traits: .sampleData) {

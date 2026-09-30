@@ -10,16 +10,17 @@ import SwiftUI
 
 struct RoutineEditView: View {
     @EnvironmentObject private var navigationStore: NavigationStore
+    @Environment(\.modelContext) var modelContext
 
     @State private var routine: Routine
     @State private var sheetType: SheetType? = nil
     @State private var deleteSuperIndex: Int? = nil
     @State private var deleteExercise: ExerciseData.Position? = nil
-    
+
     init(routine: Routine) {
         self.routine = routine
     }
-    
+
     var body: some View {
         Form {
             Section {
@@ -93,6 +94,7 @@ struct RoutineEditView: View {
                     if let deleteSuperIndex {
                         routine.superSets.remove(at: deleteSuperIndex)
                         // Remove exercise data
+                        routine.data.filter({ $0.position.superSetIndex == deleteSuperIndex }).forEach(modelContext.delete)
                         routine.data.removeAll(where: { $0.position.superSetIndex == deleteSuperIndex })
                         // Update position indices
                         routine.data
@@ -110,6 +112,7 @@ struct RoutineEditView: View {
             })) {
                 Button("Delete", role: .destructive) {
                     if let deleteExercise {
+                        routine.data.filter({ $0.position == deleteExercise }).forEach(modelContext.delete)
                         routine.data.removeAll(where: { $0.position == deleteExercise })
                         // Update positions of all later exercises to reflect the shift down
                         routine.data
@@ -142,6 +145,7 @@ struct RoutineEditView: View {
                     SelectExercisesSheet(initialSelection: initialSelection) { newSelection in
                         let removedExercises = initialSelection.filter { !newSelection.contains($0) }
                         // Remove all data for the removed exercises
+                        routine.data.filter({ removedExercises.contains($0.exercise) && $0.position.superSetIndex == superSetIndex }).forEach(modelContext.delete)
                         routine.data.removeAll(where: { removedExercises.contains($0.exercise) && $0.position.superSetIndex == superSetIndex })
                         // Add exercise data and update existing indices
                         for index in 0..<newSelection.count {
@@ -163,7 +167,7 @@ struct RoutineEditView: View {
                 }
             }
     }
-    
+
     @ToolbarContentBuilder
     func toolbarContent() -> some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
@@ -174,7 +178,7 @@ struct RoutineEditView: View {
             }
         }
     }
-    
+
     enum SheetType: Hashable {
         case addExercise(_ superSetIndex: Int)
         case editData(_ data: RoutineData)
