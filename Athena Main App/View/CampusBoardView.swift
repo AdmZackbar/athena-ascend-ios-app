@@ -109,7 +109,7 @@ struct CampusBoardView: View {
                         dismiss()
                     } label: {
                         Label("Save", systemImage: "checkmark")
-                    }.disabled(moves.isEmpty)
+                    }
                 }
             }
     }
@@ -167,9 +167,6 @@ struct CampusBoardView: View {
             rungView(rung)
         }.buttonStyle(.glass)
             .foregroundStyle(.primary)
-            .contextMenu {
-                rungActions(rung)
-            }
     }
     
     private func computeInitialGrip(_ rung: CampusRung) -> Side {

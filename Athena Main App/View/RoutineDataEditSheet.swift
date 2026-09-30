@@ -324,14 +324,14 @@ struct RoutineDataEditSheet: View {
                         let max = getMax(field: field) ?? newValue
                         let value: ExerciseData.Value = newValue >= max ? .discrete(newValue) : .range(min: newValue, max: max)
                         setValue(dataType: dataType, alt: alt, value: value)
-                    }))
+                    }), in: dataType.stepperIntRange, step: discreteStep)
                     Stepper("Max", value: .init(get: {
                         getMax(field: field) ?? getInt(field: field) ?? 0
                     }, set: { newValue in
                         let min = getMin(field: field) ?? newValue
                         let value: ExerciseData.Value = newValue <= min ? .discrete(newValue) : .range(min: min, max: newValue)
                         setValue(dataType: dataType, alt: alt, value: value)
-                    }))
+                    }), in: dataType.stepperIntRange, step: discreteStep)
                 }
             }
         case .text:
@@ -360,7 +360,7 @@ struct RoutineDataEditSheet: View {
                 return getInt(field: dataType.field) ?? 0
             }, set: { newValue in
                 setValue(dataType: dataType, alt: alt, value: .discrete(newValue))
-            }), in: 0...999, step: discreteStep)
+            }), in: dataType.stepperIntRange, step: discreteStep)
         case .weight:
             Stepper(sets[editSetIndex].0.getText(dataType, useAlt: alt) ?? "0 lbs", value: .init(get: {
                 if alt, let altValue = getDouble(field: dataType.altField) {
@@ -369,7 +369,7 @@ struct RoutineDataEditSheet: View {
                 return getDouble(field: dataType.field) ?? 0
             }, set: { newValue in
                 setValue(dataType: dataType, alt: alt, value: .number(newValue))
-            }), in: 0...999, step: numberStep, format: .number.precision(.fractionLength(0...1)))
+            }), in: dataType.stepperDoubleRange, step: numberStep, format: .number.precision(.fractionLength(0...1)))
         }
     }
     

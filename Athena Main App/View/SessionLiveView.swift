@@ -249,6 +249,7 @@ struct SessionLiveView: View {
         Group {
             VStack(spacing: 8) {
                 DataSetEditor(exercise: s.data.exercise, dataSet: $draftSet, sides: sides(for: s))
+                    .buttonStyle(.glass)
             }.padding()
         }.glassEffect(in: RoundedRectangle(cornerRadius: 16))
             .font(.title3)
