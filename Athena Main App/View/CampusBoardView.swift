@@ -31,6 +31,7 @@ struct CampusBoardView: View {
     let onComplete: (CampusSet) -> Void
     @State var board: CampusBoard
     @State var moves: [CampusMove]
+    @State private var behavior: SelectBehavior = .regular
     
     init(set: CampusSet, onComplete: @escaping (CampusSet) -> Void) {
         self.onComplete = onComplete
@@ -51,7 +52,7 @@ struct CampusBoardView: View {
                             Text("No Moves Set")
                                 .bold()
                                 .italic()
-                        }.buttonStyle(.bordered)
+                        }.buttonStyle(.glass)
                             .tint(.primary)
                     }
                     HStack {
@@ -69,26 +70,35 @@ struct CampusBoardView: View {
                         }
                     }
                     Spacer()
-                }.onAppear {
-                    if moves.isEmpty {
-                        moves = [.init(rung: .full(1), side: .both)]
-                    }
                 }
             } header: {
                 Picker("Campus Board", selection: $board) {
                     ForEach(CampusBoard.allCases, id: \.name) { b in
-                        Text(b.name).tag(b)
+                        Text(b.abbreviation).tag(b)
                     }
-                }
+                }.pickerStyle(.segmented)
             } footer: {
-                Text("(\(board.abbreviation)) \(moves.text)")
-                    .font(.subheadline)
+                VStack(alignment: .leading) {
+                    Text(board.name)
+                    Text(moves.text)
+                }.font(.subheadline)
                     .fontWeight(.heavy)
             }
         }.navigationTitle("Edit Moves")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
+                    Menu {
+                        ForEach(SelectBehavior.allCases, id: \.name) { b in
+                            Button {
+                                behavior = b
+                            } label: {
+                                Label(b.name, systemImage: b.icon)
+                            }.disabled(behavior == b)
+                        }
+                    } label: {
+                        Label("Behavior", systemImage: "ellipsis")
+                    }
                     Button {
                         moves.removeAll()
                     } label: {
@@ -142,7 +152,7 @@ struct CampusBoardView: View {
                     } label: {
                         Text(move.text)
                             .bold()
-                    }.buttonStyle(.bordered)
+                    }.buttonStyle(.glass)
                         .tint(move.side.color)
                 }
             }
@@ -155,23 +165,28 @@ struct CampusBoardView: View {
             moves.append(.init(rung: rung, side: computeInitialGrip(rung)))
         } label: {
             rungView(rung)
-        }.buttonStyle(.borderedProminent)
-            .tint(.primary)
+        }.buttonStyle(.glass)
+            .foregroundStyle(.primary)
             .contextMenu {
                 rungActions(rung)
             }
     }
     
     private func computeInitialGrip(_ rung: CampusRung) -> Side {
-        guard let last = moves.last else { return .both }
-        if last.rung == rung {
+        switch behavior {
+        case .regular:
+            guard let last = moves.last else { return .both }
+            if last.rung == rung {
+                return .both
+            }
+            switch last.side {
+            case .both, .right:
+                return .left
+            case .left:
+                return .right
+            }
+        case .doubles:
             return .both
-        }
-        switch last.side {
-        case .both, .left:
-            return .right
-        case .right:
-            return .left
         }
     }
     
@@ -211,6 +226,29 @@ struct CampusBoardView: View {
                 Spacer()
             }.font(.title3)
                 .fontWeight(.heavy)
+        }
+    }
+    
+    enum SelectBehavior: CaseIterable {
+        case regular
+        case doubles
+        
+        var name: String {
+            switch self {
+            case .regular:
+                "Regular"
+            case .doubles:
+                "Doubles"
+            }
+        }
+        
+        var icon: String {
+            switch self {
+            case .regular:
+                "hand.raised"
+            case .doubles:
+                "hands.clap"
+            }
         }
     }
 }

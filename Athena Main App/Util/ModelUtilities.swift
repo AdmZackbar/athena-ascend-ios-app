@@ -287,6 +287,13 @@ extension ExerciseData.Value {
         }
     }
     
+    var max: Int? {
+        if case .range(_, let max) = self {
+            return max
+        }
+        return num
+    }
+    
     var alt: ExerciseData.Value {
         switch self {
         case .campus(let set): return .campus(set.flipped())

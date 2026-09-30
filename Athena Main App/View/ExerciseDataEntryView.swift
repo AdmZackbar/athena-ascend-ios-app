@@ -107,8 +107,8 @@ struct ExerciseDataEntryView: View {
                 let dataTypes: [Exercise.DataType] = [.reps, .weight]
                 Text(dataTypes.map { getText(dataSet: dataSet, dataType: $0, useAlt: false) }.joined(separator: " @ "))
             case .maxHang(_, _):
-                let dataTypes: [Exercise.DataType] = [.time, .weight]
-                Text(dataTypes.map { getText(dataSet: dataSet, dataType: $0, useAlt: false) }.joined(separator: " @ "))
+                let dataTypes: [Exercise.DataType] = [.weight, .time]
+                Text(dataTypes.map { getText(dataSet: dataSet, dataType: $0, useAlt: false) }.joined(separator: " for "))
             case .campus(_, let mirrorSets):
                 if mirrorSets {
                     Text(dataSet[.campus]?.text ?? "N/A")

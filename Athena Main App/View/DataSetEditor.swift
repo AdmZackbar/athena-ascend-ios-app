@@ -107,20 +107,16 @@ struct DataSetEditor: View {
     private func stepper(dataType: Exercise.DataType, alt: Bool) -> some View {
         switch dataType {
         case .reps, .time, .distance:
-            Stepper(dataSet.getText(dataType, useAlt: alt) ?? "0\(dataType.getUnit(0))", value: .init(get: {
-                if alt, let altValue = getInt(dataType.altField) ?? getInt(dataType.field) {
-                    return altValue
-                }
-                return getInt(dataType.field) ?? 0
+            let resolved = (alt ? getInt(dataType.altField) ?? getInt(dataType.field) : getInt(dataType.field)) ?? 0
+            Stepper("\(resolved.formatted())\(dataType.getUnit(resolved))", value: .init(get: {
+                resolved
             }, set: { newValue in
                 dataSet[dataType.getField(alt: alt)] = .discrete(newValue)
             }), in: 0...999, step: discreteStep)
         case .weight:
-            Stepper(dataSet.getText(dataType, useAlt: alt) ?? "0 lbs", value: .init(get: {
-                if alt, let altValue = getDouble(dataType.altField) ?? getDouble(dataType.field) {
-                    return altValue
-                }
-                return getDouble(dataType.field) ?? 0
+            let resolved = (alt ? getDouble(dataType.altField) ?? getDouble(dataType.field) : getDouble(dataType.field)) ?? 0
+            Stepper("\(resolved.formatted(.number.precision(.fractionLength(0...1)))) lbs", value: .init(get: {
+                resolved
             }, set: { newValue in
                 dataSet[dataType.getField(alt: alt)] = .number(newValue)
             }), in: 0...999, step: numberStep, format: .number.precision(.fractionLength(0...1)))

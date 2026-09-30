@@ -67,7 +67,8 @@ struct SelectExercisesSheet: View {
                         ForEach(ExerciseType.allCases, id: \.text) { t in
                             Text(t.text).tag(t)
                         }
-                    }.padding([.leading, .trailing], -16)
+                    }.pickerStyle(.segmented)
+                        .padding([.leading, .trailing], -16)
                 }
             }.navigationTitle("Select Exercise(s)")
                 .navigationBarTitleDisplayMode(.inline)

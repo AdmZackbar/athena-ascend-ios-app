@@ -120,7 +120,7 @@ struct SessionView: View {
                                 .italic()
                         }
                         Spacer()
-                    }
+                    }.contentShape(Rectangle())
                 }.buttonStyle(.plain)
                 TextField("Notes", text: $session.notes, axis: .vertical)
                     .lineLimit((session.data.isEmpty ? 9 : 3)...12)
@@ -246,7 +246,7 @@ struct SessionView: View {
             let superSetIndex = offset
             Section {
                 ForEach(session.data.filter { $0.position.superSetIndex == superSetIndex }
-                    .sorted(by: { $0.position.setIndex < $1.position.setIndex })
+                    .sorted(by: { $0.position < $1.position })
                     .enumerated(), id: \.offset) { offset, data in
                         dataView(data, headerType: .exerciseName)
                             .swipeActions {
@@ -309,18 +309,19 @@ struct SessionView: View {
                 .compactMap { $0.exercise })
                 .sorted(by: { $0.name < $1.name })
             SelectExercisesSheet(initialSelection: initialSelection) { newSelection in
-                let newExercises = newSelection.filter { !initialSelection.contains($0) }
                 let removedExercises = initialSelection.filter { !newSelection.contains($0) }
                 // Remove all data for the removed exercises
-                session.data.removeAll(where: { removedExercises.contains($0.exercise) })
-                // Add athlete placeholder data
-                let nextSetIndex: Int = session.data
-                    .filter { $0.position.superSetIndex == superSetIndex }
-                    .map { $0.position.setIndex }
-                    .max() ?? 0
-                for athlete in session.athletes {
-                    session.data += newExercises.enumerated().map { offset, exercise in
-                        ExerciseData(exercise: exercise, session: session, athlete: athlete, position: .init(superSetIndex: superSetIndex, setIndex: nextSetIndex + offset))
+                session.data.removeAll(where: { removedExercises.contains($0.exercise) && $0.position.superSetIndex == superSetIndex })
+                // Add exercise data and update existing indices
+                for index in 0..<newSelection.count {
+                    let exercise = newSelection[index]
+                    if initialSelection.contains(exercise) {
+                        // Exists, update index
+                        session.data.filter({ $0.exercise == exercise && $0.position.superSetIndex == superSetIndex })
+                            .forEach({ $0.position.setIndex = index })
+                    } else {
+                        // New, need to create data
+                        session.data += session.athletes.map { .init(exercise: exercise, session: session, athlete: $0, position: .init(superSetIndex: superSetIndex, setIndex: index)) }
                     }
                 }
             }

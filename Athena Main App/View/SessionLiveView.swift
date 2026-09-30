@@ -280,9 +280,18 @@ struct SessionLiveView: View {
                 return s.dataSet.getSummary() ?? "N/A"
             }()
             ExerciseStateView(titleLeading: tag, subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: repText)
-        case .campus(let name, _):
-            // TODO check alt
-            ExerciseStateView(titleLeading: name, subheadline: s.dataSet[.campus]?.text ?? "N/A", setIndex: s.setIndex, numSets: numSets, repText: repText)
+        case .campus(let name, let mirror):
+            let campusRep: String? = {
+                guard mirror else { return nil }
+                return useAlt ? "Side 1/2" : "Side 2/2"
+            }()
+            let subheadline: String = {
+                if useAlt {
+                    return s.dataSet[.campusAlt]?.text ?? s.dataSet[.campus]?.alt.text ?? "N/A"
+                }
+                return s.dataSet[.campus]?.text ?? "N/A"
+            }()
+            ExerciseStateView(titleLeading: name, subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: campusRep)
         }
     }
     
@@ -754,9 +763,9 @@ struct SessionLiveView: View {
                 case .active:
                     // Default to 60 seconds if not explicitly set
                     if (repState?.hasNext ?? false) {
-                        return dataSet[.timeAlt]?.num ?? dataSet[.time]?.num ?? 60
+                        return dataSet[.timeAlt]?.max ?? dataSet[.time]?.max ?? 60
                     }
-                    return dataSet[.time]?.num ?? 60
+                    return dataSet[.time]?.max ?? 60
                 case .rest:
                     // Changeover period is 10 seconds
                     return 10
@@ -781,9 +790,9 @@ struct SessionLiveView: View {
                 case .active:
                     // Default to 20 seconds if not explicitly set
                     if (repState?.hasNext ?? false) {
-                        return dataSet[.timeAlt]?.num ?? dataSet[.time]?.num ?? 20
+                        return dataSet[.timeAlt]?.max ?? dataSet[.time]?.max ?? 20
                     }
-                    return dataSet[.time]?.num ?? 20
+                    return dataSet[.time]?.max ?? 20
                 case .rest:
                     // Changeover period is 20 seconds
                     return 20

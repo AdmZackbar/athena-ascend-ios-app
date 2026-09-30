@@ -134,17 +134,20 @@ struct RoutineEditView: View {
                         .compactMap { $0.exercise })
                         .sorted(by: { $0.name < $1.name })
                     SelectExercisesSheet(initialSelection: initialSelection) { newSelection in
-                        let newExercises = newSelection.filter { !initialSelection.contains($0) }
                         let removedExercises = initialSelection.filter { !newSelection.contains($0) }
                         // Remove all data for the removed exercises
-                        routine.data.removeAll(where: { removedExercises.contains($0.exercise) })
-                        // Add athlete placeholder data
-                        let nextSetIndex: Int = routine.data
-                            .filter { $0.position.superSetIndex == superSetIndex }
-                            .map { $0.position.setIndex }
-                            .max() ?? 0
-                        routine.data += newExercises.enumerated().map { offset, exercise in
-                            RoutineData(exercise: exercise, routine: routine, position: .init(superSetIndex: superSetIndex, setIndex: nextSetIndex + offset))
+                        routine.data.removeAll(where: { removedExercises.contains($0.exercise) && $0.position.superSetIndex == superSetIndex })
+                        // Add exercise data and update existing indices
+                        for index in 0..<newSelection.count {
+                            let exercise = newSelection[index]
+                            if initialSelection.contains(exercise) {
+                                // Exists, update index
+                                routine.data.filter({ $0.exercise == exercise && $0.position.superSetIndex == superSetIndex })
+                                    .forEach({ $0.position.setIndex = index })
+                            } else {
+                                // New, need to create data
+                                routine.data.append(.init(exercise: exercise, routine: routine, position: .init(superSetIndex: superSetIndex, setIndex: index)))
+                            }
                         }
                     }
                 case .editData(let data):
