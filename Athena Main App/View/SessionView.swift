@@ -361,15 +361,12 @@ struct SessionView: View {
                     }
                 }
             }
+        case .date:
+            editDateSheet()
         case .exercise(let position, let athlete):
             ExerciseDataEditSheet(session: session, position: position, initialAthlete: athlete)
         case .song:
             editSongSheet()
-        case .date:
-            editDateSheet()
-        default:
-            // TODO
-            EmptyView()
         }
     }
     
@@ -502,8 +499,6 @@ struct SessionView: View {
                 "ex-\(position.superSetIndex)-\(position.setIndex)-\(athlete?.uuid.uuidString ?? "")"
             case .song:
                 "song"
-            case .exercisePicker(let setIndex):
-                "exercise-picker-\(setIndex)"
             }
         }
 
@@ -512,7 +507,6 @@ struct SessionView: View {
         case date
         case exercise(_ position: ExerciseData.Position, athlete: Athlete? = nil)
         case song
-        case exercisePicker(setIndex: Int)
     }
     
 }
