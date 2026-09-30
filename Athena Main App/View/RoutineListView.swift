@@ -12,15 +12,16 @@ struct RoutineListView: View {
     @EnvironmentObject private var navigationStore: NavigationStore
     @Environment(\.modelContext) private var modelContext
     
-    @Query(sort: \Routine.name) private var routines: [Routine]
-    @Query(sort: \Athlete.name) private var athletes: [Athlete]
+    @Query(sort: \Routine.createdAt, order: .reverse) private var routines: [Routine]
     
     let athlete: Athlete
     
     var body: some View {
         List {
-            ForEach(routines) { routine in
-                routineEntryView(routine)
+            Section("All Routines") {
+                ForEach(routines) { routine in
+                    routineEntryView(routine)
+                }
             }
         }
     }
@@ -49,12 +50,29 @@ struct RoutineListView: View {
                 Label("Delete", systemImage: "trash")
             }
         } label: {
-            HStack {
+            routineView(routine)
+        }.buttonStyle(.plain)
+    }
+    
+    @ViewBuilder
+    func routineView(_ routine: Routine) -> some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading) {
+                Text("\(routine.sessions.count) sessions")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 Text(routine.name)
                     .fontWeight(.semibold)
-                Spacer()
-            }.contentShape(Rectangle())
-        }.buttonStyle(.plain)
+            }
+            Spacer()
+            VStack(alignment: .trailing) {
+                Text("Created At")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(routine.createdAt.formatted(date: .numeric, time: .omitted))
+                    .fontWeight(.semibold)
+            }
+        }.contentShape(Rectangle())
     }
 }
 

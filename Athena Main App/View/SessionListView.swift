@@ -54,27 +54,24 @@ struct SessionListView: View {
 
     @ViewBuilder
     func sessionView(_ session: Session) -> some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Group {
-                    if let routine = session.routine {
-                        Text(routine.name)
-                    }
-                }.font(.subheadline)
-                    .italic()
-                HStack {
-                    Text(session.startTime.formatted(date: .long, time: .omitted))
-                    Spacer()
-                    Text(session.startTime.formatted(date: .omitted, time: .shortened))
-                }.fontWeight(.semibold)
-                HStack {
-                    Spacer()
-                    if let endTime = session.endTime {
-                        Text(Duration.seconds(endTime.timeIntervalSince(session.startTime)).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
-                    }
-                }.font(.subheadline)
-            }
-            Spacer()
+        VStack(alignment: .leading) {
+            Text(session.routine?.name ?? "No Routine")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+            HStack {
+                Text(session.startTime.formatted(date: .long, time: .omitted))
+                Spacer()
+                Text(session.startTime.formatted(date: .omitted, time: .shortened))
+            }.fontWeight(.semibold)
+            HStack {
+                Text("\(session.data.filter({ !$0.actualData.isEmpty }).count) exercises")
+                Spacer()
+                if let endTime = session.endTime {
+                    Text(Duration.seconds(endTime.timeIntervalSince(session.startTime)).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
+                }
+            }.font(.subheadline)
+                .italic()
         }
     }
 }
