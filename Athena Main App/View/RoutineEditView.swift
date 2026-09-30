@@ -15,7 +15,6 @@ struct RoutineEditView: View {
     @State private var routine: Routine
     @State private var sheetType: SheetType? = nil
     @State private var deleteSuperIndex: Int? = nil
-    @State private var deleteExercise: ExerciseData.Position? = nil
 
     init(routine: Routine) {
         self.routine = routine
@@ -28,24 +27,38 @@ struct RoutineEditView: View {
             }
             ForEach($routine.superSets.enumerated(), id: \.offset) { offset, $superSet in
                 Section {
-                    ForEach(routine.data
-                        .filter { $0.position.superSetIndex == offset }
-                        .sorted(by: { $0.position < $1.position })) { data in
-                            Button {
-                                sheetType = .editData(data)
-                            } label: {
-                                HStack {
-                                    RoutineDataEntryView(data: data)
-                                    Spacer()
-                                }.contentShape(Rectangle())
-                            }.buttonStyle(.plain)
-                                .contextMenu {
-                                    Button(role: .destructive) {
-                                        deleteExercise = data.position
-                                    } label: {
-                                        Label("Remove Exercise", systemImage: "trash")
-                                    }
+                    List {
+                        ForEach(routine.data
+                            .filter { $0.position.superSetIndex == offset }
+                            .sorted(by: { $0.position < $1.position })) { data in
+                                Button {
+                                    sheetType = .editData(data)
+                                } label: {
+                                    HStack {
+                                        RoutineDataEntryView(data: data)
+                                        Spacer()
+                                    }.contentShape(Rectangle())
+                                }.buttonStyle(.plain)
+                            }.onMove { indices, target in
+                                var items = routine.data.filter { $0.position.superSetIndex == offset }
+                                    .sorted(by: { $0.position < $1.position })
+                                items.move(fromOffsets: indices, toOffset: target)
+                                items.enumerated().forEach { newIndex, item in
+                                    item.position = .init(superSetIndex: offset, setIndex: newIndex)
                                 }
+                            }.onDelete { indices in
+                                // Remove/delete exercises
+                                var items = routine.data.filter { $0.position.superSetIndex == offset }
+                                    .sorted(by: { $0.position < $1.position })
+                                let toDelete = indices.map { items[$0] }
+                                toDelete.forEach(modelContext.delete)
+                                routine.data.removeAll(where: { toDelete.contains($0) })
+                                // Update remaining indices
+                                items.remove(atOffsets: indices)
+                                items.enumerated().forEach { newIndex, item in
+                                    item.position = .init(superSetIndex: offset, setIndex: newIndex)
+                                }
+                            }
                     }
                     Button {
                         sheetType = .addExercise(offset)
@@ -100,24 +113,6 @@ struct RoutineEditView: View {
                         routine.data
                             .filter { $0.position.superSetIndex > deleteSuperIndex }
                             .forEach { $0.position = .init(superSetIndex: $0.position.superSetIndex - 1, setIndex: $0.position.setIndex) }
-                    }
-                }
-            }
-            .alert("Delete Exercise?", isPresented: .init(get: {
-                deleteExercise != nil
-            }, set: { newValue in
-                if !newValue {
-                    deleteExercise = nil
-                }
-            })) {
-                Button("Delete", role: .destructive) {
-                    if let deleteExercise {
-                        routine.data.filter({ $0.position == deleteExercise }).forEach(modelContext.delete)
-                        routine.data.removeAll(where: { $0.position == deleteExercise })
-                        // Update positions of all later exercises to reflect the shift down
-                        routine.data
-                            .filter { $0.position.superSetIndex == deleteExercise.superSetIndex && $0.position.setIndex > deleteExercise.setIndex }
-                            .forEach { $0.position = .init(superSetIndex: $0.position.superSetIndex, setIndex: $0.position.setIndex - 1) }
                     }
                 }
             }

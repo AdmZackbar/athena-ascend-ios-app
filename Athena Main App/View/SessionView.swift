@@ -35,7 +35,6 @@ struct SessionView: View {
     /// If true, the delete alert should be shown
     @State private var showAlert: Bool = false
     @State private var timerNextOverride: Bool = false
-    @State private var deleteExercise: ExerciseData.Position? = nil
 
     init(session: Session) {
         self.session = session
@@ -55,26 +54,6 @@ struct SessionView: View {
                     Label("Delete", systemImage: "trash")
                 }
             })
-            .alert("Delete Exercise?", isPresented: .init(get: {
-                deleteExercise != nil
-            }, set: { newValue in
-                if !newValue {
-                    deleteExercise = nil
-                }
-            })) {
-                Button(role: .destructive) {
-                    if let deleteExercise {
-                        session.data.filter({ $0.position == deleteExercise }).forEach(modelContext.delete)
-                        session.data.removeAll(where: { $0.position == deleteExercise })
-                        // Update positions of all later exercises to reflect the shift down
-                        session.data
-                            .filter { $0.position.superSetIndex == deleteExercise.superSetIndex && $0.position.setIndex > deleteExercise.setIndex }
-                            .forEach { $0.position = .init(superSetIndex: $0.position.superSetIndex, setIndex: $0.position.setIndex - 1) }
-                    }
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-            }
             .sheet(item: $sheetType, content: sheetView)
             .toolbar(content: buildToolbar)
     }
@@ -214,7 +193,7 @@ struct SessionView: View {
         // No need to structure exercises
         let groupedData: [ExerciseData.Position: [ExerciseData]] = .init(grouping: session.data, by: { $0.position })
         ForEach(groupedData.sorted(by: { ($0.key.superSetIndex, $0.key.setIndex) < ($1.key.superSetIndex, $1.key.setIndex) }),
-            id: \.key.hashValue) { key, athleteData in
+            id: \.key) { key, athleteData in
                 Section {
                     ForEach(athleteData.sorted(by: { $0.athlete.name < $1.athlete.name })) { d in
                         dataView(d, headerType: .athleteName)
@@ -222,12 +201,6 @@ struct SessionView: View {
                 } header: {
                     HStack {
                         Text(athleteData.first!.exercise.name)
-                        Spacer()
-                        Button(role: .destructive) {
-                            deleteExercise = key
-                        } label: {
-                            Image(systemName: "trash")
-                        }
                     }
                 }
         }
@@ -246,15 +219,30 @@ struct SessionView: View {
         ForEach($session.superSets.enumerated(), id: \.offset) { offset, $superSet in
             let superSetIndex = offset
             Section {
-                ForEach(session.data.filter { $0.position.superSetIndex == superSetIndex }
-                    .sorted(by: { $0.position < $1.position })
-                    .enumerated(), id: \.offset) { offset, data in
-                        dataView(data, headerType: .exerciseName)
-                            .swipeActions {
-                                Button("Delete", systemImage: "trash") {
-                                    deleteExercise = data.position
-                                }.tint(.red)
+                List {
+                    ForEach(session.data.filter { $0.position.superSetIndex == superSetIndex }
+                        .sorted(by: { $0.position < $1.position })) { data in
+                            dataView(data, headerType: .exerciseName)
+                        }.onMove { indices, target in
+                            var items = session.data.filter { $0.position.superSetIndex == superSetIndex }
+                                .sorted(by: { $0.position < $1.position })
+                            items.move(fromOffsets: indices, toOffset: target)
+                            items.enumerated().forEach { newIndex, item in
+                                item.position = .init(superSetIndex: superSetIndex, setIndex: newIndex)
                             }
+                        }.onDelete { indices in
+                            // Remove/delete exercises
+                            var items = session.data.filter { $0.position.superSetIndex == superSetIndex }
+                                .sorted(by: { $0.position < $1.position })
+                            let toDelete = indices.map { items[$0] }
+                            toDelete.forEach(modelContext.delete)
+                            session.data.removeAll(where: { toDelete.contains($0) })
+                            // Update remaining indices
+                            items.remove(atOffsets: indices)
+                            items.enumerated().forEach { newIndex, item in
+                                item.position = .init(superSetIndex: superSetIndex, setIndex: newIndex)
+                            }
+                        }
                 }
                 if !session.finished {
                     Button {
