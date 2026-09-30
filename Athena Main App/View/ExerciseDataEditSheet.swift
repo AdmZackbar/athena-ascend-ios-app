@@ -140,7 +140,16 @@ struct ExerciseDataEditSheet: View {
             }
             Button {
                 session.athletes.forEach { athlete in
-                    let exerciseData = session.data.filter { $0.athlete == athlete && $0.position == position }.first!
+                    // An athlete can reach this sheet (via the picker) without an existing
+                    // row for this position - e.g. one added to the session after this
+                    // exercise slot was created. Create it instead of assuming it exists.
+                    let exerciseData: ExerciseData
+                    if let existing = session.data.first(where: { $0.athlete == athlete && $0.position == position }) {
+                        exerciseData = existing
+                    } else {
+                        exerciseData = ExerciseData(exercise: exercise, session: session, athlete: athlete, position: position)
+                        session.data.append(exerciseData)
+                    }
                     exerciseData.actualData = athleteData[athlete, default: []].map { dataSet in
                         dataSet.normalized(canMirror: canMirror, showAlt: showAlt)
                     }

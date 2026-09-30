@@ -304,10 +304,18 @@ struct SessionView: View {
     func sheetView(_ t: SheetType) -> some View {
         switch t {
         case .addExercise(let superSetIndex):
-            let initialSelection = Set(session.data
+            // Preserve the existing exercise order (by position) rather than an
+            // alphabetical Set ordering, so opening/closing this sheet without
+            // reordering doesn't silently reshuffle the superset.
+            let initialSelection = session.data
                 .filter { $0.position.superSetIndex == superSetIndex }
-                .compactMap { $0.exercise })
-                .sorted(by: { $0.name < $1.name })
+                .sorted(by: { $0.position < $1.position })
+                .compactMap { $0.exercise }
+                .reduce(into: [Exercise]()) { result, exercise in
+                    if !result.contains(exercise) {
+                        result.append(exercise)
+                    }
+                }
             SelectExercisesSheet(initialSelection: initialSelection) { newSelection in
                 let removedExercises = initialSelection.filter { !newSelection.contains($0) }
                 // Remove all data for the removed exercises
@@ -334,9 +342,22 @@ struct SessionView: View {
                 session.data.removeAll(where: { removedAthletes.contains($0.athlete) })
                 // Add athletes and placeholder data to session
                 session.athletes += newAthletes
+                // Build one template entry per existing exercise slot so every new
+                // athlete gets a matching row - falling back to the routine for slots
+                // no athlete has data for yet, and preferring existing data (which may
+                // have diverged from the routine) otherwise.
+                var templates: [ExerciseData.Position: (exercise: Exercise, expectedData: [ExerciseData.DataSet])] = [:]
                 if let routine = session.routine {
-                    for athlete in newAthletes {
-                        session.data += routine.data.map { ExerciseData(exercise: $0.exercise, session: session, athlete: athlete, position: $0.position, expectedData: $0.expectedData) }
+                    for d in routine.data {
+                        templates[d.position] = (d.exercise, d.expectedData)
+                    }
+                }
+                for d in session.data {
+                    templates[d.position] = (d.exercise, d.expectedData)
+                }
+                for athlete in newAthletes {
+                    session.data += templates.map { position, template in
+                        ExerciseData(exercise: template.exercise, session: session, athlete: athlete, position: position, expectedData: template.expectedData)
                     }
                 }
             }

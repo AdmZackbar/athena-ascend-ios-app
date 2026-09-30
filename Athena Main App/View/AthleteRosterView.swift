@@ -47,6 +47,11 @@ struct AthleteRosterView: View {
                 }
                 Button("Delete", role: .destructive) {
                     if let deleteTarget {
+                        // Otherwise MainView keeps reading a dangling reference, since it
+                        // only re-resolves the current athlete when it's nil.
+                        if navigationStore.currentAthlete == deleteTarget {
+                            navigationStore.currentAthlete = nil
+                        }
                         modelContext.delete(deleteTarget)
                     }
                     deleteTarget = nil

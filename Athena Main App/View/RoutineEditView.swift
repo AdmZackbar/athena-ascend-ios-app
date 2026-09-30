@@ -10,16 +10,14 @@ import SwiftUI
 
 struct RoutineEditView: View {
     @EnvironmentObject private var navigationStore: NavigationStore
-    
+
     @State private var routine: Routine
-    @State private var isNew: Bool
     @State private var sheetType: SheetType? = nil
     @State private var deleteSuperIndex: Int? = nil
     @State private var deleteExercise: ExerciseData.Position? = nil
     
-    init(routine: Routine? = nil) {
-        self.routine = routine ?? .init(superSets: [.init(name: "")])
-        self.isNew = routine == nil
+    init(routine: Routine) {
+        self.routine = routine
     }
     
     var body: some View {
@@ -129,10 +127,18 @@ struct RoutineEditView: View {
             })) {
                 switch sheetType {
                 case .addExercise(let superSetIndex):
-                    let initialSelection = Set(routine.data
+                    // Preserve the existing exercise order (by position) rather than an
+                    // alphabetical Set ordering, so opening/closing this sheet without
+                    // reordering doesn't silently reshuffle the superset.
+                    let initialSelection = routine.data
                         .filter { $0.position.superSetIndex == superSetIndex }
-                        .compactMap { $0.exercise })
-                        .sorted(by: { $0.name < $1.name })
+                        .sorted(by: { $0.position < $1.position })
+                        .compactMap { $0.exercise }
+                        .reduce(into: [Exercise]()) { result, exercise in
+                            if !result.contains(exercise) {
+                                result.append(exercise)
+                            }
+                        }
                     SelectExercisesSheet(initialSelection: initialSelection) { newSelection in
                         let removedExercises = initialSelection.filter { !newSelection.contains($0) }
                         // Remove all data for the removed exercises
@@ -182,8 +188,8 @@ struct RoutineEditView: View {
     }
 }
 
-#Preview("Fresh", traits: .sampleData) {
+#Preview("Fresh") {
     NavigationStack {
-        RoutineEditView()
+        RoutineEditView(routine: .init(superSets: [.init(name: "")]))
     }
 }

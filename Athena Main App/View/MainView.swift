@@ -101,7 +101,9 @@ struct MainView: View {
                     Label("Start New Session", systemImage: "clock")
                 }
                 Button {
-                    navigationStore.push(ViewType.routineAdd)
+                    let routine = Routine(superSets: [.init(name: "")])
+                    modelContext.insert(routine)
+                    navigationStore.push(ViewType.routineEdit(routine: routine))
                 } label: {
                     Label("Create New Routine", systemImage: "map")
                 }
