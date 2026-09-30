@@ -14,7 +14,7 @@ struct ExerciseView: View {
     @Query(sort: \Athlete.name) private var athletes: [Athlete]
     
     @State var exercise: Exercise
-    @State private var selectedAthlete: Athlete? = nil
+    @State var selectedAthlete: Athlete?
     
     var body: some View {
         Form {
@@ -25,7 +25,7 @@ struct ExerciseView: View {
                     if data.isEmpty {
                         ContentUnavailableView("No data for athlete", systemImage: "tablecells")
                     } else {
-                        ForEach(data) { d in
+                        ForEach(data.sorted(by: { $0.session.startTime > $1.session.startTime })) { d in
                             ExerciseDataEntryView(data: d, headerType: .date)
                         }
                     }

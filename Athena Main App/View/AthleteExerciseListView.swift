@@ -64,7 +64,7 @@ struct AthleteExerciseListView: View {
         if !list.isEmpty {
             ForEach(list) { exercise in
                 Button {
-                    navigationStore.push(ViewType.exercise(exercise: exercise))
+                    navigationStore.push(ViewType.exercise(exercise: exercise, selectedAthlete: athlete))
                 } label: {
                     exerciseView(exercise)
                 }.buttonStyle(.plain)
