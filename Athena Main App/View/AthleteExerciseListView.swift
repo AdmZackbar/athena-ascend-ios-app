@@ -82,7 +82,7 @@ struct AthleteExerciseListView: View {
             VStack(alignment: .leading) {
                 Text(exercise.name)
                     .font(.headline)
-                Text("\(exercise.data.count) data sets")
+                Text("\(exercise.data.filter({ $0.athlete == athlete }).count) data sets")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
