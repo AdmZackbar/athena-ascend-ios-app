@@ -15,10 +15,11 @@ struct ExerciseEditView: View {
     @Query var existingExercises: [Exercise]
     
     let exercise: Exercise?
+    let onAdd: ((Exercise) -> Void)?
     
     @State var draft: Draft
     
-    init(exercise: Exercise? = nil) {
+    init(exercise: Exercise? = nil, onAdd: ((Exercise) -> Void)? = nil) {
         self.exercise = exercise
         var draft: Draft
         switch exercise?.category {
@@ -36,6 +37,7 @@ struct ExerciseEditView: View {
         draft.notes = exercise?.notes ?? ""
         // Assign once, don't edit after
         self.draft = draft
+        self.onAdd = onAdd
     }
     
     var body: some View {
@@ -80,7 +82,11 @@ struct ExerciseEditView: View {
                             exercise.notes = draft.notes
                             try? modelContext.save()
                         } else {
-                            modelContext.insert(Exercise(category: draft.category, notes: draft.notes))
+                            let exercise = Exercise(category: draft.category, notes: draft.notes)
+                            modelContext.insert(exercise)
+                            if let onAdd {
+                                onAdd(exercise)
+                            }
                         }
                         dismiss()
                     } label: {

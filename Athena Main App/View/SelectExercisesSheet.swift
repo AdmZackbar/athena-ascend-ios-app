@@ -35,11 +35,7 @@ struct SelectExercisesSheet: View {
                     } else {
                         List {
                             ForEach(selection, id: \.name) { exercise in
-                                Button {
-                                    // Do nothing
-                                } label: {
-                                    exerciseView(exercise, selected: true)
-                                }.buttonStyle(.plain)
+                                exerciseView(exercise, selected: true)
                             }.onDelete { indices in
                                 selection.remove(atOffsets: indices)
                             }.onMove { indices, target in
@@ -48,34 +44,12 @@ struct SelectExercisesSheet: View {
                         }
                     }
                 }
-                let notSelected = exercises.filter { !selection.contains($0) }
-                    .filter { selectedType.hasType($0) }
-                    .filter { filter.isEmpty || $0.name.localizedCaseInsensitiveContains(filter) }
-                    .sorted(by: { $0.name < $1.name })
-                Section {
-                    if !notSelected.isEmpty {
-                        ForEach(notSelected) { exercise in
-                            Button {
-                                selection.append(exercise)
-                            } label: {
-                                exerciseView(exercise, selected: false)
-                            }.buttonStyle(.plain)
-                        }
-                    } else if exercises.isEmpty {
-                        ContentUnavailableView("No exercises in database", systemImage: "tablecells")
-                    } else if exercises.filter({ !selection.contains($0) }).isEmpty {
-                        ContentUnavailableView("All exercises selected", systemImage: "checkmark")
-                    } else {
-                        ContentUnavailableView("No remaining exercises match filters", systemImage: "line.3.horizontal.decrease")
-                    }
-                } header: {
-                    Picker("Exercise Type", selection: $selectedType) {
-                        ForEach(ExerciseType.allCases, id: \.text) { t in
-                            Text(t.text).tag(t)
-                        }
-                    }.pickerStyle(.segmented)
-                        .padding([.leading, .trailing], -16)
+                if !filter.isEmpty {
+                    notSelectedByFilter()
+                } else {
+                    notSelectedByType()
                 }
+                
             }.navigationTitle("Select Exercise(s)")
                 .navigationBarTitleDisplayMode(.inline)
                 .searchable(text: $filter)
@@ -89,7 +63,9 @@ struct SelectExercisesSheet: View {
                     }
                     ToolbarItemGroup(placement: .primaryAction) {
                         NavigationLink {
-                            ExerciseEditView()
+                            ExerciseEditView() { newExercise in
+                                selection.append(newExercise)
+                            }
                         } label: {
                             Label("Add New Exercise", systemImage: "plus")
                         }
@@ -112,6 +88,61 @@ struct SelectExercisesSheet: View {
                 .strikethrough(!selected && initialSelection.contains(exercise))
             Spacer()
         }.contentShape(Rectangle())
+    }
+    
+    @ViewBuilder
+    func notSelectedByFilter() -> some View {
+        let notSelected = exercises.filter { !selection.contains($0) }
+            .filter { $0.name.localizedCaseInsensitiveContains(filter) }
+            .sorted(by: { $0.name < $1.name })
+        if !notSelected.isEmpty {
+            let byType: [ExerciseType: [Exercise]] = .init(grouping: notSelected, by: { .from($0.category) })
+            ForEach(ExerciseType.allCases, id: \.text) { type in
+                if let list = byType[type], !list.isEmpty {
+                    Section(type.text) {
+                        exerciseListView(list)
+                    }
+                }
+            }
+        } else {
+            // Show placeholders
+            exerciseListView([])
+        }
+    }
+    
+    @ViewBuilder
+    func notSelectedByType() -> some View {
+        Section {
+            exerciseListView(exercises.filter { !selection.contains($0) }
+                .filter { selectedType.hasType($0) }
+                .sorted(by: { $0.name < $1.name }))
+        } header: {
+            Picker("Exercise Type", selection: $selectedType) {
+                ForEach(ExerciseType.allCases, id: \.text) { t in
+                    Text(t.text).tag(t)
+                }
+            }.pickerStyle(.segmented)
+                .padding([.leading, .trailing], -16)
+        }
+    }
+    
+    @ViewBuilder
+    func exerciseListView(_ list: [Exercise]) -> some View {
+        if !list.isEmpty {
+            ForEach(list) { exercise in
+                Button {
+                    selection.append(exercise)
+                } label: {
+                    exerciseView(exercise, selected: false)
+                }.buttonStyle(.plain)
+            }
+        } else if exercises.isEmpty {
+            ContentUnavailableView("No exercises in database", systemImage: "tablecells")
+        } else if exercises.filter({ !selection.contains($0) }).isEmpty {
+            ContentUnavailableView("All exercises selected", systemImage: "checkmark")
+        } else {
+            ContentUnavailableView("No remaining exercises match filters", systemImage: "line.3.horizontal.decrease")
+        }
     }
     
     enum ExerciseType: CaseIterable {
@@ -139,6 +170,15 @@ struct SelectExercisesSheet: View {
                 return self == .maxHang
             case .campus(_, _):
                 return self == .campus
+            }
+        }
+        
+        static func from(_ category: Exercise.Category) -> ExerciseType {
+            switch category {
+            case .generic(_, _, _): return .generic
+            case .repeater(_, _, _): return .repeater
+            case .maxHang(_, _): return .maxHang
+            case .campus(_, _): return .campus
             }
         }
     }
