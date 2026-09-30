@@ -49,7 +49,6 @@ struct SelectExercisesSheet: View {
                 } else {
                     notSelectedByType()
                 }
-                
             }.navigationTitle("Select Exercise(s)")
                 .navigationBarTitleDisplayMode(.inline)
                 .searchable(text: $filter)
@@ -114,7 +113,7 @@ struct SelectExercisesSheet: View {
     func notSelectedByType() -> some View {
         Section {
             exerciseListView(exercises.filter { !selection.contains($0) }
-                .filter { selectedType.hasType($0) }
+                .filter { selectedType == .from($0.category) }
                 .sorted(by: { $0.name < $1.name }))
         } header: {
             Picker("Exercise Type", selection: $selectedType) {
@@ -157,19 +156,6 @@ struct SelectExercisesSheet: View {
             case .repeater: "Repeater"
             case .maxHang: "Max Hang"
             case .campus: "Campus"
-            }
-        }
-        
-        func hasType(_ exercise: Exercise) -> Bool {
-            switch exercise.category {
-            case .generic(_, _, _):
-                return self == .generic
-            case .repeater(_, _, _):
-                return self == .repeater
-            case .maxHang(_, _):
-                return self == .maxHang
-            case .campus(_, _):
-                return self == .campus
             }
         }
         

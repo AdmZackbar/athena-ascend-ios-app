@@ -25,7 +25,7 @@ struct ExerciseView: View {
                     if data.isEmpty {
                         ContentUnavailableView("No data for athlete", systemImage: "tablecells")
                     } else {
-                        ForEach(data.sorted(by: { $0.session.startTime > $1.session.startTime })) { d in
+                        ForEach(data) { d in
                             ExerciseDataEntryView(data: d, headerType: .date)
                         }
                     }

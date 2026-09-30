@@ -79,6 +79,11 @@ struct MainView: View {
                 } label: {
                     Label("Manage Athletes", systemImage: "person.text.rectangle")
                 }
+                NavigationLink {
+                    OrphanedDataView()
+                } label: {
+                    Label("Orphaned Exercise Data", systemImage: "questionmark.folder")
+                }
                 Button {
                     exportAllData()
                 } label: {
