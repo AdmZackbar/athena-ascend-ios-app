@@ -365,10 +365,34 @@ struct SessionView: View {
             ExerciseDataEditSheet(session: session, position: position, initialAthlete: athlete)
         case .song:
             editSongSheet()
+        case .date:
+            editDateSheet()
         default:
             // TODO
             EmptyView()
         }
+    }
+    
+    @ViewBuilder
+    func editDateSheet() -> some View {
+        NavigationStack {
+            Form {
+                DatePicker("Start", selection: $session.startTime, displayedComponents: [.date, .hourAndMinute])
+                DatePicker("End", selection: .init(get: {
+                    session.endTime ?? session.startTime
+                }, set: { newValue in
+                    session.endTime = newValue
+                }), in: session.startTime..., displayedComponents: [.date, .hourAndMinute])
+            }.navigationTitle("Edit Start/End Date")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            sheetType = nil
+                        }
+                    }
+                }
+        }.presentationDetents([.medium])
     }
     
     @ViewBuilder
