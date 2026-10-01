@@ -91,7 +91,7 @@ struct ExerciseEditView: View {
                         dismiss()
                     } label: {
                         Label("Save", systemImage: "checkmark")
-                    }.disabled(draft.invalid || draftExists)
+                    }.disabled(draft.invalid || (exercise == nil && draftExists))
                 }
             }
     }
