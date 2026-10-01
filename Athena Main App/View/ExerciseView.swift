@@ -15,6 +15,7 @@ struct ExerciseView: View {
     
     @State var exercise: Exercise
     @State var selectedAthlete: Athlete?
+    @State private var editingData: ExerciseData?
     
     var body: some View {
         Form {
@@ -26,7 +27,14 @@ struct ExerciseView: View {
                         ContentUnavailableView("No data for athlete", systemImage: "tablecells")
                     } else {
                         ForEach(data.sorted(by: { $0.session.startTime > $1.session.startTime })) { d in
-                            ExerciseDataEntryView(data: d, headerType: .date)
+                            Button {
+                                editingData = d
+                            } label: {
+                                HStack {
+                                    ExerciseDataEntryView(data: d, headerType: .date)
+                                    Spacer()
+                                }.contentShape(Rectangle())
+                            }.buttonStyle(.plain)
                         }
                     }
                 } else {
@@ -47,6 +55,9 @@ struct ExerciseView: View {
             }
         }.navigationTitle(exercise.name)
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(item: $editingData) { data in
+                ExerciseDataEditSheet(session: data.session, position: data.position, initialAthlete: data.athlete)
+            }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
