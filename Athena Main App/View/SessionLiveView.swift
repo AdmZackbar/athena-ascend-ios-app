@@ -61,14 +61,30 @@ struct SessionLiveView: View {
     }
     
     var body: some View {
-        connectivityHooks(
-            mainView()
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
-                .navigationBarBackButtonHidden()
-                .background(background)
-                .toolbar(content: toolbarContent)
-        )
+        mainView()
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden()
+            .background(background)
+            .toolbar(content: toolbarContent)
+            .onAppear {
+                SessionConnectivity.shared.send(activeSessionSnapshot)
+                SessionLiveActivity.shared.sync(activeSessionSnapshot)
+                // Drop anything submitted while no session view was around to apply it, so it
+                // can't fire late against whatever exercise happens to be on screen next.
+                commandCenter.consume()
+            }
+            .onChange(of: activeSessionSnapshot) { _, newValue in
+                SessionConnectivity.shared.send(newValue)
+                SessionLiveActivity.shared.sync(newValue)
+            }
+            .onChange(of: commandCenter.pendingCommand) { _, newValue in
+                handleRemoteCommand(newValue)
+            }
+            .onDisappear {
+                SessionConnectivity.shared.send(nil)
+                SessionLiveActivity.shared.sync(nil)
+            }
     }
 
     var title: String {
@@ -135,32 +151,6 @@ struct SessionLiveView: View {
         case .rest: return .rest
         case .record: return .record
         }
-    }
-
-    /// Applies the WatchConnectivity and Live Activity lifecycle hooks. Split out of `body`
-    /// because folding these directly into that already-long modifier chain made the whole
-    /// expression too complex for the type-checker.
-    @ViewBuilder
-    private func connectivityHooks(_ content: some View) -> some View {
-        content
-            .onAppear {
-                SessionConnectivity.shared.send(activeSessionSnapshot)
-                SessionLiveActivity.shared.sync(activeSessionSnapshot)
-                // Drop anything submitted while no session view was around to apply it, so it
-                // can't fire late against whatever exercise happens to be on screen next.
-                commandCenter.consume()
-            }
-            .onChange(of: activeSessionSnapshot) { _, newValue in
-                SessionConnectivity.shared.send(newValue)
-                SessionLiveActivity.shared.sync(newValue)
-            }
-            .onChange(of: commandCenter.pendingCommand) { _, newValue in
-                handleRemoteCommand(newValue)
-            }
-            .onDisappear {
-                SessionConnectivity.shared.send(nil)
-                SessionLiveActivity.shared.sync(nil)
-            }
     }
 
     /// Applies a command received from the watch or Live Activity, exactly as if the phone's
@@ -1197,9 +1187,22 @@ struct ExerciseStateView: View {
 }
 
 #Preview("Main", traits: .sampleData) {
-    @Previewable @Query var sessions: [Session]
+    @Previewable @Query(sort: \Session.startTime) var sessions: [Session]
     NavigationStack {
-        SessionLiveView(session: sessions.first!)
+        Form {
+            ForEach(sessions, id: \.uuid) { session in
+                NavigationLink {
+                    SessionLiveView(session: session)
+                } label: {
+                    VStack(alignment: .leading) {
+                        Text(session.startTime.formatted())
+                        Text(session.athletes.map({ $0.name }).joined(separator: ", "))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
     }.environmentObject(NavigationStore())
 }
 

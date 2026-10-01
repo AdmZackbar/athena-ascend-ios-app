@@ -126,7 +126,7 @@ struct TestDataModifier: PreviewModifier {
         let inde = Athlete(name: "Inde", createdAt: date.addingTimeInterval(150))
         let jace = Athlete(name: "Jace", createdAt: date.addingTimeInterval(180))
         let jack = Athlete(name: "Jack", createdAt: date.addingTimeInterval(210))
-        let freshSession = Session()
+        let freshSession = Session(superSets: [.init(name: "Main Set")])
         freshSession.athletes += [linsay, allie, inde, jace, jack]
         context.insert(freshSession)
     }
