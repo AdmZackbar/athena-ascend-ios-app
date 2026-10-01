@@ -13,15 +13,12 @@ typealias Session = SchemaV3.Session
 extension SchemaV3 {
     @Model
     final class Session: Hashable {
-        /// Added as means of an ACTUAL persistent ID that is stable
-        /// If a session is added its persistentId (the key used in hashes and equals)
-        /// will changed once it is actually saved to the DB. This results in a fatal
-        /// error if the session is used as a key in a dictionary, since its key changes.
-        /// I don't want to make a schema change to add this, so I'm keeping it
-        /// transient for now. If this needs to be persistent across app instances,
-        /// then a schema change will be needed.
-        @Transient let uuid = UUID()
-        
+        /// Stable, persistent identity of this session. A session's persistentModelID
+        /// (the default key used in hashes and equals) changes once it's actually
+        /// saved to the DB, which is fatal if the session is used as a dictionary key -
+        /// so a stable UUID is assigned at creation instead.
+        private(set) var uuid: UUID = UUID()
+
         var routine: Routine? = nil
         var startTime: Date = Date()
         var endTime: Date? = nil
@@ -41,6 +38,7 @@ extension SchemaV3 {
              superSets: [Routine.SuperSet] = [],
              notes: String = "",
              standoutSong: Song? = nil) {
+            self.uuid = UUID()
             self.routine = routine
             self.startTime = startTime
             self.endTime = endTime
@@ -71,7 +69,7 @@ extension SchemaV3 {
         static func == (lhs: Session, rhs: Session) -> Bool {
             lhs.uuid == rhs.uuid
         }
-        
+
         /// Adds the given athletes to the session, creating one `ExerciseData` entry per
         /// existing exercise slot so every new athlete gets a matching row - falling back
         /// to the routine for slots no athlete has data for yet, and preferring existing

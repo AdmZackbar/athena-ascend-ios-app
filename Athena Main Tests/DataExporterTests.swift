@@ -108,4 +108,21 @@ struct DataExporterTests {
             #expect(liveExercises.contains { $0.category == exercise.category })
         }
     }
+
+    @Test func roundTripsSessionUUIDs() throws {
+        let container = try makeContainer()
+        let parent = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: parent) }
+
+        let directory = try DataExporter.exportAllModels(context: container.mainContext, in: parent)
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let sessionData = try Data(contentsOf: directory.appending(path: "sessions.json"))
+        let sessions = try decoder.decode([SessionExportDTO].self, from: sessionData)
+        let liveSessions = try container.mainContext.fetch(FetchDescriptor<SchemaV3.Session>())
+        #expect(!sessions.isEmpty)
+        #expect(Set(sessions.map(\.uuid)) == Set(liveSessions.map(\.uuid)))
+    }
 }

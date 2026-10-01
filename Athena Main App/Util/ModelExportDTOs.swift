@@ -162,6 +162,7 @@ struct ExerciseDataExportDTO: Codable {
 /// not a link — matches the app's own fallback-to-name pattern for when a routine has
 /// been deleted out from under a session (`Routine.sessions`'s `.nullify` delete rule).
 struct SessionExportDTO: Codable {
+    var uuid: UUID
     var routineName: String?
     var startTime: Date
     var endTime: Date?
@@ -172,6 +173,7 @@ struct SessionExportDTO: Codable {
     var data: [ExerciseDataExportDTO]
 
     init(_ session: SchemaV3.Session, exerciseIndices: [PersistentIdentifier: Int]) {
+        uuid = session.uuid
         routineName = session.routine?.name
         startTime = session.startTime
         endTime = session.endTime
