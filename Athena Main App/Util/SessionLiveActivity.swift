@@ -8,7 +8,7 @@
 import ActivityKit
 import Foundation
 
-/// Mirrors RoutineSessionView's activeSessionSnapshot into a Live Activity, exactly like
+/// Mirrors SessionLiveView's activeSessionSnapshot into a Live Activity, exactly like
 /// SessionConnectivity.send(_:) mirrors it to the watch — one idempotent entry point taking the
 /// same optional snapshot, called from the same three hooks.
 @MainActor

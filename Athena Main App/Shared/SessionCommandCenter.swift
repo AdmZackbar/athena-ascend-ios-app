@@ -7,7 +7,7 @@
 
 import Observation
 
-/// Bridge from "a command arrived from elsewhere" to "the on-screen RoutineSessionView should
+/// Bridge from "a command arrived from elsewhere" to "the on-screen SessionLiveView should
 /// react," analogous to how AudioManager.shared is referenced via @State elsewhere in that view.
 ///
 /// Deliberately has no dependency on SessionConnectivity (WatchConnectivity isn't available to

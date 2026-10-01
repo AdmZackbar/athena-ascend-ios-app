@@ -10,17 +10,6 @@ import SwiftUI
 struct ContentView: View {
     @State private var connectivity = SessionConnectivity.shared
 
-    /// Local, watch-only entry values for the .rest-phase form. Seeded once per exercise/phase
-    /// moment from the snapshot's suggested values, then left alone — never re-synced from the
-    /// phone while the person is actively editing it here.
-    @State private var restEntry = ExerciseEntryData(numLeft: 0, numRight: 0, weightLeft: 0, weightRight: 0)
-    @State private var restEntryKey: String? = nil
-
-    /// Local, watch-only entry values for the .off-phase single-value form.
-    @State private var offCount: Int = 0
-    @State private var offWeight: Double = 0
-    @State private var offEntryKey: String? = nil
-
     private var snapshot: ActiveSessionSnapshot? {
         connectivity.latestSnapshot
     }
@@ -33,34 +22,6 @@ struct ContentView: View {
                 ContentUnavailableView("No Active Session", systemImage: "figure.strengthtraining.traditional")
             }
         }
-        .onAppear {
-            seedFormsIfNeeded(snapshot)
-        }
-        .onChange(of: snapshot) { _, newValue in
-            seedFormsIfNeeded(newValue)
-        }
-    }
-
-    /// Re-seeds the local entry forms only when a *new* entry moment begins (a different
-    /// exercise, set, or phase) — re-seeding on every snapshot update would stomp whatever the
-    /// person is actively entering, which is exactly the thing this design avoids.
-    private func seedFormsIfNeeded(_ snapshot: ActiveSessionSnapshot?) {
-        guard let snapshot else { return }
-        let key = "\(snapshot.sessionStartTime.timeIntervalSinceReferenceDate)-\(snapshot.setIndex)-\(snapshot.exerciseName)-\(snapshot.phase.rawValue)"
-        if snapshot.phase == .rest, restEntryKey != key {
-            restEntry = ExerciseEntryData(
-                numLeft: snapshot.suggestedNumLeft,
-                numRight: snapshot.suggestedNumRight,
-                weightLeft: snapshot.suggestedWeightLeft,
-                weightRight: snapshot.suggestedWeightRight
-            )
-            restEntryKey = key
-        }
-        if snapshot.phase == .off && snapshot.hasOffPhaseEntry && snapshot.timerEndDate == nil, offEntryKey != key {
-            offCount = snapshot.suggestedNumRight
-            offWeight = snapshot.suggestedWeightLeft
-            offEntryKey = key
-        }
     }
 
     @ViewBuilder
@@ -68,25 +29,24 @@ struct ContentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top) {
-                    Text(snapshot.exerciseName)
+                    Text(snapshot.exerciseName ?? snapshot.superSetName)
                     Spacer()
-                    Text("(\(snapshot.setIndex + 1)/\(snapshot.setCount))")
+                    if snapshot.exerciseName != nil {
+                        Text("(\(snapshot.setIndex + 1)/\(snapshot.setCount))")
+                    }
                 }.font(.subheadline)
-                Text(snapshot.exerciseDetailText)
-                    .font(.caption)
+                if let details = snapshot.exerciseDetailText {
+                    Text(details)
+                        .font(.caption)
+                }
                 Text(snapshot.phase.displayName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if snapshot.repMax > 0 {
-                    Text("Rep \(snapshot.repCurrent)/\(snapshot.repMax)")
+                if let repText = snapshot.repText {
+                    Text(repText)
                         .font(.caption)
                 }
                 timerView(snapshot)
-                if snapshot.phase == .rest {
-                    restEntryForm(snapshot)
-                } else if snapshot.phase == .off && snapshot.hasOffPhaseEntry && snapshot.timerEndDate == nil {
-                    offEntryForm(snapshot)
-                }
                 controlRow(snapshot)
             }
             .padding()
@@ -109,51 +69,6 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func restEntryForm(_ snapshot: ActiveSessionSnapshot) -> some View {
-        VStack(alignment: .center, spacing: 0) {
-            if snapshot.recordsDualSides {
-                Text("LEFT")
-                    .font(.title3)
-            }
-            Stepper(restEntry.numLeft.formatted(), value: $restEntry.numLeft, in: 0...999)
-            Text(snapshot.unitLabel)
-            if snapshot.recordsWeight {
-                Stepper(weightLabel(restEntry.weightLeft), value: $restEntry.weightLeft, in: -200...200, step: 5)
-                Text("lbs")
-            }
-            if snapshot.recordsDualSides {
-                Spacer()
-                Text("RIGHT")
-                    .font(.title3)
-                Stepper(restEntry.numRight.formatted(), value: $restEntry.numRight, in: 0...999)
-                Text(snapshot.unitLabel)
-                if snapshot.recordsWeight {
-                    Stepper(weightLabel(restEntry.weightRight), value: $restEntry.weightRight, in: -200...200, step: 5)
-                    Text("lbs")
-                }
-            }
-        }.font(.subheadline)
-    }
-
-    /// The .off-phase mirror is always a single value (see the Design section's trace of
-    /// genericRecordView's isRight check) — one count field, one weight field, always
-    /// presented as "Right" to match the phone's own label here.
-    @ViewBuilder
-    private func offEntryForm(_ snapshot: ActiveSessionSnapshot) -> some View {
-        VStack(alignment: .leading) {
-            Text("Right")
-                .foregroundStyle(.secondary)
-                .font(.title3)
-            Stepper(offCount.formatted(), value: $offCount, in: 0...1000)
-            Text(snapshot.unitLabel)
-            if snapshot.recordsWeight {
-                Stepper(weightLabel(offWeight), value: $offWeight, in: -200...200, step: 5)
-                Text("lbs")
-            }
-        }.font(.caption)
-    }
-
-    @ViewBuilder
     private func controlRow(_ snapshot: ActiveSessionSnapshot) -> some View {
         HStack {
             Spacer()
@@ -168,10 +83,10 @@ struct ContentView: View {
             } label: {
                 Image(systemName: snapshot.timerEndDate != nil ? "pause.circle" : "play.circle")
             }.font(.system(size: 64))
-                .disabled(snapshot.timerEndDate == nil || snapshot.timerEndDate! <= .now)
+                .disabled(snapshot.timerDuration == 0)
             Spacer()
             Button {
-                connectivity.sendCommand(.next(data: nextPayload(for: snapshot)))
+                connectivity.sendCommand(.next)
             } label: {
                 Image(systemName: "arrowshape.forward.circle")
             }
@@ -179,23 +94,6 @@ struct ContentView: View {
         }
         .font(.system(size: 48))
         .buttonStyle(.plain)
-    }
-
-    /// Only the .rest and .off-with-open-entry moments have anything to send; every other
-    /// phase's Next is a plain advance, matching the phone's own controlView behavior exactly.
-    private func nextPayload(for snapshot: ActiveSessionSnapshot) -> ExerciseEntryData? {
-        if snapshot.phase == .rest {
-            return restEntry
-        } else if snapshot.phase == .off && snapshot.hasOffPhaseEntry && snapshot.timerEndDate == nil {
-            // Duplicate the single value across both sides so the phone's toGeneric(_:useAlt:)
-            // treats it as one confirmed value rather than manufacturing a spurious alt value.
-            return ExerciseEntryData(numLeft: offCount, numRight: offCount, weightLeft: offWeight, weightRight: offWeight)
-        }
-        return nil
-    }
-
-    private func weightLabel(_ weight: Double) -> String {
-        weight.formatted(.number.precision(.fractionLength(0)))
     }
 }
 

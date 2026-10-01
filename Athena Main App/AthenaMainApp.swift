@@ -20,7 +20,7 @@ struct AthenaMainApp: App {
 
     init() {
         // Start the WCSession handshake as early as possible, rather than waiting for the
-        // first RoutineSessionView to appear.
+        // first SessionLiveView to appear.
         _ = SessionConnectivity.shared
         SessionConnectivity.shared.onCommandReceived = { SessionCommandCenter.shared.submit($0) }
     }

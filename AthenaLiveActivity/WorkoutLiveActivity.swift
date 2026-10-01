@@ -26,9 +26,11 @@ struct WorkoutLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(context.state.exerciseDetailText)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        if let details = context.state.exerciseDetailText {
+                            Text(details)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                         controlRow(context.state)
                     }
                 }
@@ -46,22 +48,26 @@ struct WorkoutLiveActivity: Widget {
     private func lockScreenView(_ s: ActiveSessionSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text(s.exerciseName)
+                Text(s.exerciseName ?? s.superSetName)
                     .font(.headline)
                 Spacer()
-                Text("\(s.setIndex + 1)/\(s.setCount)")
-                    .font(.subheadline)
+                if s.exerciseName != nil {
+                    Text("\(s.setIndex + 1)/\(s.setCount)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if let details = s.exerciseDetailText {
+                Text(details)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Text(s.exerciseDetailText)
-                .font(.caption)
-                .foregroundStyle(.secondary)
             HStack {
                 Text(s.phase.displayName)
                     .font(.subheadline)
                     .bold()
-                if s.repMax > 0 {
-                    Text("Rep \(s.repCurrent)/\(s.repMax)")
+                if let repText = s.repText {
+                    Text(repText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -76,11 +82,13 @@ struct WorkoutLiveActivity: Widget {
     @ViewBuilder
     private func expandedLeading(_ s: ActiveSessionSnapshot) -> some View {
         VStack(alignment: .leading) {
-            Text(s.exerciseName)
+            Text(s.exerciseName ?? s.superSetName)
                 .font(.headline)
-            Text("\(s.setIndex + 1)/\(s.setCount)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if s.exerciseName != nil {
+                Text("\(s.setIndex + 1)/\(s.setCount)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -102,8 +110,11 @@ struct WorkoutLiveActivity: Widget {
         if s.timerEndDate != nil || s.timerDuration > 0 {
             timeView(s)
                 .font(.caption)
-        } else {
+        } else if s.exerciseName != nil {
             Text("\(s.setIndex + 1)/\(s.setCount)")
+                .font(.caption)
+        } else {
+            Text(s.phase.displayName)
                 .font(.caption)
         }
     }
@@ -128,14 +139,15 @@ struct WorkoutLiveActivity: Widget {
         .buttonStyle(.plain)
     }
 
-    /// Mirrors RoutineSessionView.background's phase-to-color mapping, minus the progress-based
+    /// Mirrors SessionLiveView.background's phase-to-color mapping, minus the progress-based
     /// .mix (the snapshot doesn't carry per-second progress, and doesn't need to for a Live
     /// Activity's tint).
-    private func phaseColor(_ phase: ActiveSessionSnapshot.Phase) -> Color {
+    private func phaseColor(_ phase: ActiveSessionSnapshot.Phase) -> Color? {
         switch phase {
-        case .ready, .off: return .ready
-        case .on: return .active
-        case .rest: return .rest
+        case .ready, .rest: return .ready
+        case .active: return .active
+        case .record: return .rest
+        case .preSet, .postSet: return nil
         }
     }
 }
@@ -147,45 +159,52 @@ extension WorkoutActivityAttributes {
 }
 
 extension ActiveSessionSnapshot {
-    fileprivate static var previewRunning: ActiveSessionSnapshot {
+    fileprivate static var previewActive: ActiveSessionSnapshot {
         ActiveSessionSnapshot(
             sessionStartTime: .now,
             routineName: "Push Day",
-            setName: "Warm-up",
-            setIndex: 1,
-            setCount: 4,
+            superSetName: "Warm-up",
+            phase: .active,
             exerciseName: "Bench Press",
             exerciseDetailText: "3 x 8-10 @ 135 lbs",
-            phase: .on,
-            repCurrent: 0,
-            repMax: 0,
+            setIndex: 1,
+            setCount: 4,
+            repText: nil,
             timerEndDate: Date().addingTimeInterval(45),
-            timerDuration: 60,
-            recordsWeight: true,
-            recordsDualSides: false,
-            hasOffPhaseEntry: false,
-            unitLabel: "reps",
-            suggestedNumLeft: 0,
-            suggestedNumRight: 0,
-            suggestedWeightLeft: 0,
-            suggestedWeightRight: 0
+            timerDuration: 60
         )
     }
 
-    fileprivate static var previewResting: ActiveSessionSnapshot {
-        var s = previewRunning
-        s.phase = .rest
+    fileprivate static var previewRecord: ActiveSessionSnapshot {
+        var s = previewActive
+        s.phase = .record
         s.timerEndDate = nil
         s.timerDuration = 90
-        s.suggestedNumLeft = 8
-        s.suggestedWeightLeft = 135
+        s.repText = "Rep 2/3"
         return s
+    }
+
+    fileprivate static var previewPreSet: ActiveSessionSnapshot {
+        ActiveSessionSnapshot(
+            sessionStartTime: .now,
+            routineName: "Push Day",
+            superSetName: "Warm-up",
+            phase: .preSet,
+            exerciseName: nil,
+            exerciseDetailText: nil,
+            setIndex: 0,
+            setCount: 0,
+            repText: nil,
+            timerEndDate: nil,
+            timerDuration: 0
+        )
     }
 }
 
 #Preview("Notification", as: .content, using: WorkoutActivityAttributes.preview) {
     WorkoutLiveActivity()
 } contentStates: {
-    ActiveSessionSnapshot.previewRunning
-    ActiveSessionSnapshot.previewResting
+    ActiveSessionSnapshot.previewActive
+    ActiveSessionSnapshot.previewRecord
+    ActiveSessionSnapshot.previewPreSet
 }

@@ -20,8 +20,9 @@ struct SessionLiveView: View {
     @Environment(\.dismiss) var dismiss
     
     let session: Session
-    
+
     @State private var state: ViewState
+    @State private var commandCenter = SessionCommandCenter.shared
     // Timer vars
     /// Set to the start time of the timer (in seconds)
     var timerDuration: Duration {
@@ -60,16 +61,124 @@ struct SessionLiveView: View {
     }
     
     var body: some View {
-        mainView()
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden()
-            .background(background)
-            .toolbar(content: toolbarContent)
+        connectivityHooks(
+            mainView()
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarBackButtonHidden()
+                .background(background)
+                .toolbar(content: toolbarContent)
+        )
     }
-    
+
     var title: String {
         return session.superSets[state.superSetIndex].name
+    }
+
+    /// Snapshot of the live session state, mirrored to the watch and the Live Activity
+    /// whenever it changes.
+    var activeSessionSnapshot: ActiveSessionSnapshot {
+        let superSetName = session.superSets[state.superSetIndex].name
+        let routineName = session.routine?.name
+        switch state {
+        case .preSet:
+            return ActiveSessionSnapshot(
+                sessionStartTime: session.startTime,
+                routineName: routineName,
+                superSetName: superSetName,
+                phase: .preSet,
+                exerciseName: nil,
+                exerciseDetailText: nil,
+                setIndex: 0,
+                setCount: 0,
+                repText: nil,
+                timerEndDate: nil,
+                timerDuration: 0
+            )
+        case .postSet:
+            return ActiveSessionSnapshot(
+                sessionStartTime: session.startTime,
+                routineName: routineName,
+                superSetName: superSetName,
+                phase: .postSet,
+                exerciseName: nil,
+                exerciseDetailText: nil,
+                setIndex: 0,
+                setCount: 0,
+                repText: nil,
+                timerEndDate: nil,
+                timerDuration: 0
+            )
+        case .inSet(let s):
+            return ActiveSessionSnapshot(
+                sessionStartTime: session.startTime,
+                routineName: routineName,
+                superSetName: superSetName,
+                phase: snapshotPhase(for: s.exerciseState),
+                exerciseName: s.exerciseName,
+                exerciseDetailText: s.exerciseDetails,
+                setIndex: s.setIndex,
+                setCount: s.data.expectedData.count,
+                repText: s.repText,
+                timerEndDate: timerEndDate,
+                timerDuration: timerDuration / .seconds(1)
+            )
+        }
+    }
+
+    /// Maps this view's SetState.ExerciseState to the shared, Codable DTO's Phase, keeping
+    /// the Shared/ types free of any dependency on this view's private types.
+    private func snapshotPhase(for state: SetState.ExerciseState) -> ActiveSessionSnapshot.Phase {
+        switch state {
+        case .ready: return .ready
+        case .active: return .active
+        case .rest: return .rest
+        case .record: return .record
+        }
+    }
+
+    /// Applies the WatchConnectivity and Live Activity lifecycle hooks. Split out of `body`
+    /// because folding these directly into that already-long modifier chain made the whole
+    /// expression too complex for the type-checker.
+    @ViewBuilder
+    private func connectivityHooks(_ content: some View) -> some View {
+        content
+            .onAppear {
+                SessionConnectivity.shared.send(activeSessionSnapshot)
+                SessionLiveActivity.shared.sync(activeSessionSnapshot)
+                // Drop anything submitted while no session view was around to apply it, so it
+                // can't fire late against whatever exercise happens to be on screen next.
+                commandCenter.consume()
+            }
+            .onChange(of: activeSessionSnapshot) { _, newValue in
+                SessionConnectivity.shared.send(newValue)
+                SessionLiveActivity.shared.sync(newValue)
+            }
+            .onChange(of: commandCenter.pendingCommand) { _, newValue in
+                handleRemoteCommand(newValue)
+            }
+            .onDisappear {
+                SessionConnectivity.shared.send(nil)
+                SessionLiveActivity.shared.sync(nil)
+            }
+    }
+
+    /// Applies a command received from the watch or Live Activity, exactly as if the phone's
+    /// own matching button had been tapped.
+    private func handleRemoteCommand(_ command: SessionCommand?) {
+        guard let command else { return }
+        switch command {
+        case .prev:
+            prev()
+        case .toggleTimer:
+            // Mirrors controlView's own `.disabled(elapsedSeconds >= timerDuration)`.
+            if elapsedSeconds < timerDuration {
+                toggleTimer()
+            }
+        case .next:
+            next()
+        }
+        commandCenter.consume()
     }
     
     /// The background color of the view
@@ -264,22 +373,16 @@ struct SessionLiveView: View {
     @ViewBuilder
     func headerView(_ s: SetState) -> some View {
         let numSets = s.data.expectedData.count
-        let repText = s.repState?.text
-        let useAlt = s.repState?.hasNext ?? false
         let subheadline = s.exerciseDetails
         switch s.data.exercise.category {
         case .generic(let name, _, _):
-            ExerciseStateView(titleLeading: name, subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: repText)
+            ExerciseStateView(titleLeading: name, subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: s.repText)
         case .repeater(let tag, let timeOn, let timeOff):
-            ExerciseStateView(titleLeading: tag, titleTrailing: "\(timeOn)s/\(timeOff)s", subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: repText)
+            ExerciseStateView(titleLeading: tag, titleTrailing: "\(timeOn)s/\(timeOff)s", subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: s.repText)
         case .maxHang(let tag, _):
-            ExerciseStateView(titleLeading: tag, subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: repText)
-        case .campus(let name, let mirror):
-            let campusRep: String? = {
-                guard mirror else { return nil }
-                return useAlt ? "Side 1/2" : "Side 2/2"
-            }()
-            ExerciseStateView(titleLeading: name, subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: campusRep)
+            ExerciseStateView(titleLeading: tag, subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: s.repText)
+        case .campus(let name, _):
+            ExerciseStateView(titleLeading: name, subheadline: subheadline, setIndex: s.setIndex, numSets: numSets, repText: s.repText)
         }
     }
     
@@ -910,7 +1013,19 @@ struct SessionLiveView: View {
                 return dataSet[.campus]?.text
             }
         }
-        
+
+        /// The rep/side indicator shown in the header and mirrored into the snapshot, so the
+        /// phone, watch, and Live Activity never disagree on this text.
+        var repText: String? {
+            switch data.exercise.category {
+            case .campus(_, let mirror):
+                guard mirror else { return nil }
+                return (repState?.hasNext ?? false) ? "Side 1/2" : "Side 2/2"
+            default:
+                return repState?.text
+            }
+        }
+
         var initialRepState: RepState? {
             switch data.exercise.category {
             case .generic(_, _, let sideType):
