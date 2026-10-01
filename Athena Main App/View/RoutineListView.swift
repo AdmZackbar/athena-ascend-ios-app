@@ -32,6 +32,7 @@ struct RoutineListView: View {
             Button {
                 let session: Session = .init(routine: routine, superSets: routine.superSets)
                 modelContext.insert(session)
+                session.addAthletes([athlete])
                 navigationStore.push(ViewType.session(session: session))
             } label: {
                 Label("Start Session", systemImage: "plus")

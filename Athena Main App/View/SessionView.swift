@@ -332,25 +332,7 @@ struct SessionView: View {
                 session.data.filter({ removedAthletes.contains($0.athlete) }).forEach(modelContext.delete)
                 session.data.removeAll(where: { removedAthletes.contains($0.athlete) })
                 // Add athletes and placeholder data to session
-                session.athletes += newAthletes
-                // Build one template entry per existing exercise slot so every new
-                // athlete gets a matching row - falling back to the routine for slots
-                // no athlete has data for yet, and preferring existing data (which may
-                // have diverged from the routine) otherwise.
-                var templates: [ExerciseData.Position: (exercise: Exercise, expectedData: [ExerciseData.DataSet])] = [:]
-                if let routine = session.routine {
-                    for d in routine.data {
-                        templates[d.position] = (d.exercise, d.expectedData)
-                    }
-                }
-                for d in session.data {
-                    templates[d.position] = (d.exercise, d.expectedData)
-                }
-                for athlete in newAthletes {
-                    session.data += templates.map { position, template in
-                        ExerciseData(exercise: template.exercise, session: session, athlete: athlete, position: position, expectedData: template.expectedData)
-                    }
-                }
+                session.addAthletes(newAthletes)
             }
         case .date:
             editDateSheet()

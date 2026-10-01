@@ -71,5 +71,27 @@ extension SchemaV3 {
         static func == (lhs: Session, rhs: Session) -> Bool {
             lhs.uuid == rhs.uuid
         }
+        
+        /// Adds the given athletes to the session, creating one `ExerciseData` entry per
+        /// existing exercise slot so every new athlete gets a matching row - falling back
+        /// to the routine for slots no athlete has data for yet, and preferring existing
+        /// data (which may have diverged from the routine) otherwise.
+        func addAthletes(_ newAthletes: [Athlete]) {
+            athletes += newAthletes
+            var templates: [ExerciseData.Position: (exercise: Exercise, expectedData: [ExerciseData.DataSet])] = [:]
+            if let routine {
+                for d in routine.data {
+                    templates[d.position] = (d.exercise, d.expectedData)
+                }
+            }
+            for d in data {
+                templates[d.position] = (d.exercise, d.expectedData)
+            }
+            for athlete in newAthletes {
+                data += templates.map { position, template in
+                    ExerciseData(exercise: template.exercise, session: self, athlete: athlete, position: position, expectedData: template.expectedData)
+                }
+            }
+        }
     }
 }

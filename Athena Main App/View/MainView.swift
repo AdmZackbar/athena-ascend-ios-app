@@ -97,9 +97,6 @@ struct MainView: View {
             Menu {
                 Button {
                     let session = Session()
-                    if let athlete = navigationStore.currentAthlete {
-                        session.athletes.append(athlete)
-                    }
                     modelContext.insert(session)
                     navigationStore.push(ViewType.session(session: session))
                 } label: {
