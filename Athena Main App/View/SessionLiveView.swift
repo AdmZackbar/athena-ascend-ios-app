@@ -598,7 +598,13 @@ struct SessionLiveView: View {
         switch s.repState {
         case .binary(let first):
             return first ? .right : .left
-        default:
+        case .multi(let current, let max):
+            if max != 2 {
+                // Currently not used, since repeaters aren't mirrored
+                return .split
+            }
+            return current == 1 ? .right : .left
+        case .none:
             // No side-specific rep state means both sides are recorded in this pass
             return .split
         }
@@ -905,67 +911,40 @@ struct SessionLiveView: View {
         }
         
         var setRestTime: Int {
-            // TODO investigate why I need this guard
-            guard superSetIndex < data.session.superSets.count else { return 0 }
             return data.session.superSets[superSetIndex].restTime
         }
         
         var maxTimeSeconds: Int {
             if !usesActiveTimer {
-                return 0
+                // Unless we are recording (and need to use set rest time
+                // before the next exercise), untimed exercises have no max time
+                return exerciseState == .record ? setRestTime : 0
             }
-            switch data.exercise.category {
-            case .generic(_, _, _):
-                switch exerciseState {
-                case .ready:
-                    return 10
-                case .active:
-                    // Default to 60 seconds if not explicitly set
+            switch exerciseState {
+            case .ready:
+                // Ready time is 10s for all timed exercises
+                return 10
+            case .active:
+                switch data.exercise.category {
+                case .repeater(_, let timeOn, _): return timeOn
+                default:
+                    // Default to 60s if not explicitly set
                     if (repState?.hasNext ?? false) {
                         return dataSet[.timeAlt]?.max ?? dataSet[.time]?.max ?? 60
                     }
                     return dataSet[.time]?.max ?? 60
-                case .rest:
-                    // Changeover period is 10 seconds
-                    return 10
-                case .record:
-                    return (repState?.hasNext ?? false) ? 0 : setRestTime
                 }
-            case .repeater(_, let timeOn, let timeOff):
-                switch exerciseState {
-                case .ready:
-                    return 10
-                case .active:
-                    return timeOn
-                case .rest:
-                    return timeOff
-                case .record:
-                    return setRestTime
+            case .rest:
+                switch data.exercise.category {
+                case .generic(_, _, _): return 10
+                case .repeater(_, _, let timeOff): return timeOff
+                // Changeover period for max hang is longer than generic
+                case .maxHang(_, _): return 20
+                // Unreachable
+                default: return 0
                 }
-            case .maxHang(_, _):
-                switch exerciseState {
-                case .ready:
-                    return 10
-                case .active:
-                    // Default to 20 seconds if not explicitly set
-                    if (repState?.hasNext ?? false) {
-                        return dataSet[.timeAlt]?.max ?? dataSet[.time]?.max ?? 20
-                    }
-                    return dataSet[.time]?.max ?? 20
-                case .rest:
-                    // Changeover period is 20 seconds
-                    return 20
-                case .record:
-                    return setRestTime
-                }
-            case .campus(_, _):
-                switch exerciseState {
-                case .ready, .active, .rest:
-                    // Timer unused
-                    return 0
-                case .record:
-                    return (repState?.hasNext ?? false) ? 0 : setRestTime
-                }
+            case .record:
+                return setRestTime
             }
         }
         
@@ -1007,13 +986,7 @@ struct SessionLiveView: View {
         /// The rep/side indicator shown in the header and mirrored into the snapshot, so the
         /// phone, watch, and Live Activity never disagree on this text.
         var repText: String? {
-            switch data.exercise.category {
-            case .campus(_, let mirror):
-                guard mirror else { return nil }
-                return (repState?.hasNext ?? false) ? "Side 1/2" : "Side 2/2"
-            default:
-                return repState?.text
-            }
+            repState?.text
         }
 
         var initialRepState: RepState? {
@@ -1026,7 +999,9 @@ struct SessionLiveView: View {
             case .maxHang(_, let sideType):
                 return sideType == .independent ? .binary(first: true) : nil
             case .campus(_, let mirrorSides):
-                return mirrorSides ? .binary(first: true) : nil
+                // Technically binary, but not left vs right
+                // Use multi for the rep 1/2 text
+                return mirrorSides ? .multi(current: 1, max: 2) : nil
             }
         }
         
@@ -1061,10 +1036,9 @@ struct SessionLiveView: View {
                 return nextState(.active, repState)
             case .record:
                 // If we have more reps in data record, we must not be using
-                // time. Therefore, stay in record and keep incrementing
-                // until we are done. Repeat until no reps remain.
+                // time. Therefore, move back to ready for the next rep
                 if let nextRep = repState?.next {
-                    return nextState(.record, nextRep)
+                    return nextState(.ready, nextRep)
                 }
                 return nil
             }
@@ -1075,8 +1049,9 @@ struct SessionLiveView: View {
         }
         
         enum ExerciseState: Hashable {
-            /// Beginning of an exercise - only should enter in this state and never return
+            /// Beginning of an exercise - entry point for every type and USUALLY don't return here
             /// All timed exercises start here - adds a delay before starting
+            /// In the case of untimed exercises, this is used between reps
             case ready
             /// Exercise in progress (time in generic, time on a hold)
             /// Repeater on period, time active in a generic exercise
