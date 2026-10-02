@@ -216,21 +216,24 @@ private struct SessionPageView: View {
                 sendCommand(.prev)
             } label: {
                 Image(systemName: "arrowshape.backward.circle")
+                    .font(.system(size: 32))
             }
+            Spacer()
             Button {
                 sendCommand(.toggleTimer)
             } label: {
                 Image(systemName: snapshot.timerEndDate != nil ? "pause.circle" : "play.circle")
-            }.font(.system(size: 48))
-                .disabled(snapshot.timerDuration == 0)
+                    .font(.system(size: 48))
+            }.disabled(snapshot.timerDuration == 0)
+            Spacer()
             Button {
                 sendCommand(.next)
             } label: {
                 Image(systemName: "arrowshape.forward.circle")
+                    .font(.system(size: 32))
             }
-        }
-        .font(.system(size: 48))
-        .buttonStyle(.plain)
+        }.padding([.leading, .trailing], 8)
+            .buttonStyle(.plain)
     }
 }
 
