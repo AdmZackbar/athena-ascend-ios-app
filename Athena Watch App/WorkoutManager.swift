@@ -10,9 +10,9 @@ import HealthKit
 import Observation
 
 /// Drives the HealthKit workout session that mirrors a live Athena session: a single,
-/// indoor Functional Strength Training workout that starts automatically alongside
-/// `SessionLiveView` and is paused/resumed/ended only from the watch's own controls -
-/// the Athena exercise timer never touches it.
+/// indoor workout (type chosen on the phone in `SessionView`) that starts automatically
+/// alongside `SessionLiveView` and is paused/resumed/ended only from the watch's own
+/// controls - the Athena exercise timer never touches it.
 ///
 /// `HKWorkoutSessionDelegate`/`HKLiveWorkoutBuilderDelegate` methods are documented as
 /// delivered on an arbitrary background queue, so each is `nonisolated` and hops to the
@@ -64,10 +64,10 @@ final class WorkoutManager: NSObject {
         }
     }
 
-    /// Starts a new Functional Strength Training workout, unless one is already running -
+    /// Starts a new workout of the given activity type, unless one is already running -
     /// `startWatchApp(with:)` may call `handle(_:)` again if `SessionLiveView` reappears
     /// while a workout from the same session is still active.
-    func startWorkout() async {
+    func startWorkout(activityType: HKWorkoutActivityType = .functionalStrengthTraining) async {
         guard session == nil else { return }
         lastWorkout = nil
 
@@ -87,7 +87,7 @@ final class WorkoutManager: NSObject {
         }
 
         let configuration = HKWorkoutConfiguration()
-        configuration.activityType = .functionalStrengthTraining
+        configuration.activityType = activityType
         configuration.locationType = .indoor
 
         do {

@@ -35,6 +35,7 @@ struct SessionView: View {
     /// If true, the delete alert should be shown
     @State private var showAlert: Bool = false
     @State private var timerNextOverride: Bool = false
+    @State private var workoutMirror = WorkoutMirror.shared
 
     init(session: Session) {
         self.session = session
@@ -106,6 +107,14 @@ struct SessionView: View {
                     .lineLimit((session.data.isEmpty ? 9 : 3)...12)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.sentences)
+                if session.athletes.count == 1 {
+                    Picker("Type:", selection: $workoutMirror.workoutType) {
+                        ForEach(WorkoutMirror.WorkoutType.allCases) { type in
+                            Label(type.name, systemImage: type.icon)
+                                .tag(type)
+                        }
+                    }
+                }
                 if hasData {
                     Button {
                         session.endTime = .now

@@ -28,6 +28,41 @@ final class WorkoutMirror: NSObject {
     /// Latest metrics mirrored from the watch, for `SessionLiveView`'s metrics strip.
     private(set) var metrics: WorkoutMetrics?
 
+    /// The HK workout type to start on the watch, chosen from `SessionView`'s picker.
+    var workoutType: WorkoutType = .strengthFunctional
+
+    enum WorkoutType: String, CaseIterable, Identifiable {
+        case strengthFunctional
+        case yoga
+        case core
+
+        var id: Self { self }
+
+        var name: String {
+            switch self {
+            case .strengthFunctional: "Str. Training"
+            case .yoga: "Yoga"
+            case .core: "Core Training"
+            }
+        }
+        
+        var icon: String {
+            switch self {
+            case .strengthFunctional: "figure.strengthtraining.functional"
+            case .yoga: "figure.yoga"
+            case .core: "figure.core.training"
+            }
+        }
+
+        var activityType: HKWorkoutActivityType {
+            switch self {
+            case .strengthFunctional: .functionalStrengthTraining
+            case .yoga: .yoga
+            case .core: .coreTraining
+            }
+        }
+    }
+
     private static let shareTypes: Set<HKSampleType> = [
         HKQuantityType.workoutType(),
     ]
@@ -60,7 +95,7 @@ final class WorkoutMirror: NSObject {
         }
     }
 
-    /// Starts the watch's Functional Strength Training workout for `session`, unless
+    /// Starts the watch's workout (of the selected `workoutType`) for `session`, unless
     /// it has more than one athlete - the watch wearer can only stand in for one.
     func startIfEligible(for session: Session) {
         guard session.athletes.count == 1, HKHealthStore.isHealthDataAvailable() else { return }
@@ -69,7 +104,7 @@ final class WorkoutMirror: NSObject {
             do {
                 try await healthStore.requestAuthorization(toShare: Self.shareTypes, read: Self.readTypes)
                 let configuration = HKWorkoutConfiguration()
-                configuration.activityType = .functionalStrengthTraining
+                configuration.activityType = workoutType.activityType
                 configuration.locationType = .indoor
                 try await healthStore.startWatchApp(toHandle: configuration)
             } catch {
