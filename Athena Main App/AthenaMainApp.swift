@@ -23,6 +23,8 @@ struct AthenaMainApp: App {
         // first SessionLiveView to appear.
         _ = SessionConnectivity.shared
         SessionConnectivity.shared.onCommandReceived = { SessionCommandCenter.shared.submit($0) }
+        // Register the HealthKit mirroring handler before any session can start one.
+        _ = WorkoutMirror.shared
     }
 
     var body: some Scene {

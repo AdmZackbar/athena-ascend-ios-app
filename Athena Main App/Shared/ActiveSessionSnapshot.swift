@@ -25,6 +25,10 @@ nonisolated struct ActiveSessionSnapshot: Codable, Hashable {
     var repText: String?              // e.g. "Rep 2/5", "Right", "Left", "Side 1/2"
     var timerEndDate: Date?           // nil = no running timer (paused, or n/a)
     var timerDuration: TimeInterval   // total duration, for the watch's progress ring; 0 = no timer
+    /// Time left at the moment the timer was paused. Resent once, alongside `timerEndDate`
+    /// going nil, so paused displays can show an accurate (if frozen) countdown instead of
+    /// just a static "Paused" label. nil whenever `timerEndDate` is set or there's no timer.
+    var timerRemaining: TimeInterval?
 
     enum Phase: String, Codable {
         case preSet, ready, active, rest, record, postSet

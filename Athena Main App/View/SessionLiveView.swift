@@ -23,6 +23,7 @@ struct SessionLiveView: View {
 
     @State private var state: ViewState
     @State private var commandCenter = SessionCommandCenter.shared
+    @State private var workoutMirror = WorkoutMirror.shared
     // Timer vars
     /// Set to the start time of the timer (in seconds)
     var timerDuration: Duration {
@@ -73,6 +74,8 @@ struct SessionLiveView: View {
                 // Drop anything submitted while no session view was around to apply it, so it
                 // can't fire late against whatever exercise happens to be on screen next.
                 commandCenter.consume()
+                // No-op for multi-athlete sessions or when HealthKit is unavailable.
+                workoutMirror.startIfEligible(for: session)
             }
             .onChange(of: activeSessionSnapshot) { _, newValue in
                 SessionConnectivity.shared.send(newValue)
@@ -109,7 +112,8 @@ struct SessionLiveView: View {
                 setCount: 0,
                 repText: nil,
                 timerEndDate: nil,
-                timerDuration: 0
+                timerDuration: 0,
+                timerRemaining: nil
             )
         case .postSet:
             return ActiveSessionSnapshot(
@@ -123,7 +127,8 @@ struct SessionLiveView: View {
                 setCount: 0,
                 repText: nil,
                 timerEndDate: nil,
-                timerDuration: 0
+                timerDuration: 0,
+                timerRemaining: nil
             )
         case .inSet(let s):
             return ActiveSessionSnapshot(
@@ -137,7 +142,11 @@ struct SessionLiveView: View {
                 setCount: s.data.expectedData.count,
                 repText: s.repText,
                 timerEndDate: timerEndDate,
-                timerDuration: timerDuration / .seconds(1)
+                timerDuration: timerDuration / .seconds(1),
+                // Only meaningful once paused (timerEndDate goes nil) - resyncs the exact
+                // remaining time once, rather than ticking it down locally, since `elapsedSeconds`
+                // doesn't change again until the timer resumes.
+                timerRemaining: timerEndDate == nil && timerDuration > .zero ? (timerDuration - elapsedSeconds) / .seconds(1) : nil
             )
         }
     }
@@ -250,76 +259,104 @@ struct SessionLiveView: View {
         }
     }
     
+    /// Compact heart rate / calorie strip fed by the mirrored HealthKit workout.
+    /// Hidden entirely once no workout is active (multi-athlete sessions, or the watch
+    /// hasn't connected yet).
+    @ViewBuilder
+    var workoutMetricsStrip: some View {
+        if let metrics = workoutMirror.metrics, metrics.state.isActive {
+            HStack(spacing: 16) {
+                if let heartRate = metrics.heartRate {
+                    Label("\(Int(heartRate.rounded()))", systemImage: "heart.fill")
+                        .foregroundStyle(.red)
+                }
+                Label("\(Int(metrics.activeEnergy.rounded())) KCAL", systemImage: "flame.fill")
+                    .foregroundStyle(.orange)
+                Spacer()
+            }
+            .font(.caption)
+            .fontWeight(.medium)
+            .padding(.horizontal)
+            .padding(.top, 4)
+        }
+    }
+
     @ViewBuilder
     func preSetView(_ index: Int) -> some View {
-        ZStack(alignment: .bottom) {
-            Form {
-                ForEach(session.data.filter({ $0.position.superSetIndex == index }).sorted(by: { $0.position < $1.position })) { d in
-                    Section {
-                        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-                            ForEach(d.expectedData.enumerated(), id: \.offset) { offset, setData in
-                                GridRow(alignment: .top) {
-                                    Text("Set \(offset + 1)")
-                                        .fontWeight(.semibold)
-                                    VStack(alignment: .leading) {
-                                        Text(setData.getSummary() ?? "N/A")
-                                        if setData.hasAlt {
-                                            Text(setData.getSummary(useAlt: true) ?? "N/A")
+        VStack(spacing: 0) {
+            workoutMetricsStrip
+            ZStack(alignment: .bottom) {
+                Form {
+                    ForEach(session.data.filter({ $0.position.superSetIndex == index }).sorted(by: { $0.position < $1.position })) { d in
+                        Section {
+                            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+                                ForEach(d.expectedData.enumerated(), id: \.offset) { offset, setData in
+                                    GridRow(alignment: .top) {
+                                        Text("Set \(offset + 1)")
+                                            .fontWeight(.semibold)
+                                        VStack(alignment: .leading) {
+                                            Text(setData.getSummary() ?? "N/A")
+                                            if setData.hasAlt {
+                                                Text(setData.getSummary(useAlt: true) ?? "N/A")
+                                            }
                                         }
                                     }
                                 }
                             }
+                        } header: {
+                            Text(d.exercise.name)
                         }
-                    } header: {
-                        Text(d.exercise.name)
                     }
-                }
-            }.padding(.bottom, 64)
-            Button {
-                next()
-            } label: {
-                Label("Start", systemImage: "play.fill")
-                    .font(.title)
-                    .bold()
-                    .frame(maxWidth: .infinity, minHeight: 48)
-            }.buttonStyle(.glass)
-                .padding([.leading, .trailing])
+                }.padding(.bottom, 64)
+                Button {
+                    next()
+                } label: {
+                    Label("Start", systemImage: "play.fill")
+                        .font(.title)
+                        .bold()
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                }.buttonStyle(.glass)
+                    .padding([.leading, .trailing])
+            }
         }
     }
-    
+
     @ViewBuilder
     func postSetView(_ index: Int) -> some View {
-        ZStack(alignment: .bottom) {
-            Form {
-                ForEach(session.data.filter({ $0.position.superSetIndex == index }).sorted(by: { $0.position < $1.position })) { d in
-                    Section {
-                        ExerciseDataEntryView(data: d)
-                        TextField("Notes", text: .init(get: {
-                            d.notes
-                        }, set: { newValue in
-                            d.notes = newValue
-                        }))
-                    } header: {
-                        Text(d.exercise.name)
+        VStack(spacing: 0) {
+            workoutMetricsStrip
+            ZStack(alignment: .bottom) {
+                Form {
+                    ForEach(session.data.filter({ $0.position.superSetIndex == index }).sorted(by: { $0.position < $1.position })) { d in
+                        Section {
+                            ExerciseDataEntryView(data: d)
+                            TextField("Notes", text: .init(get: {
+                                d.notes
+                            }, set: { newValue in
+                                d.notes = newValue
+                            }))
+                        } header: {
+                            Text(d.exercise.name)
+                        }
                     }
-                }
-            }.padding(.bottom, 64)
-            Button {
-                next()
-            } label: {
-                if index + 1 < session.superSets.count {
-                    Label("Next", systemImage: "arrow.right")
-                        .font(.title)
-                        .bold()
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                } else {
-                    Label("Finish", systemImage: "rectangle.portrait.and.arrow.right")
-                        .font(.title)
-                        .bold()
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                }
-            }.buttonStyle(.glass)
-                .padding([.leading, .trailing])
+                }.padding(.bottom, 64)
+                Button {
+                    next()
+                } label: {
+                    if index + 1 < session.superSets.count {
+                        Label("Next", systemImage: "arrow.right")
+                            .font(.title)
+                            .bold()
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                    } else {
+                        Label("Finish", systemImage: "rectangle.portrait.and.arrow.right")
+                            .font(.title)
+                            .bold()
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                    }
+                }.buttonStyle(.glass)
+                    .padding([.leading, .trailing])
+            }
         }
     }
     
@@ -327,6 +364,7 @@ struct SessionLiveView: View {
     func setView(_ s: SetState) -> some View {
         VStack(spacing: 4) {
             headerView(s)
+            workoutMetricsStrip
             if s.exerciseState == .ready {
                 prevDataView(s)
             } else if s.exerciseState == .record {
@@ -561,6 +599,11 @@ struct SessionLiveView: View {
         } else {
             // Session is complete, clean up and exit
             stopAndResetTimer()
+            // Ends and saves the mirrored HealthKit workout, if one is running
+            workoutMirror.requestEnd()
+            // Set the end time so that the session is 'finished'
+            session.endTime = .now
+            // Go back to session view
             dismiss()
         }
     }

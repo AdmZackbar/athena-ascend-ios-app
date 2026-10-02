@@ -92,15 +92,18 @@ struct WorkoutLiveActivity: Widget {
         }
     }
 
-    /// Native, system-driven countdown so the Live Activity never needs a per-second update from
-    /// the app — same range math as the watch's timerView (ContentView.swift).
+    /// Native, system-driven countdown while running so the Live Activity never needs a
+    /// per-second update from the app — same range math as the watch's timerView
+    /// (ContentView.swift). When paused, `timerRemaining` is a one-time resync rendered as a
+    /// static value, since nothing updates it again until the timer resumes.
     @ViewBuilder
     private func timeView(_ s: ActiveSessionSnapshot) -> some View {
         if let end = s.timerEndDate {
             Text(timerInterval: end.addingTimeInterval(-s.timerDuration)...end, countsDown: true)
                 .monospacedDigit()
-        } else if s.timerDuration > 0 {
-            Text("Paused")
+        } else if let remaining = s.timerRemaining {
+            Text(Duration.seconds(remaining), format: .time(pattern: .minuteSecond(padMinuteToLength: 2)))
+                .monospacedDigit()
                 .foregroundStyle(.secondary)
         }
     }
@@ -171,7 +174,8 @@ extension ActiveSessionSnapshot {
             setCount: 4,
             repText: nil,
             timerEndDate: Date().addingTimeInterval(45),
-            timerDuration: 60
+            timerDuration: 60,
+            timerRemaining: nil
         )
     }
 
@@ -180,6 +184,7 @@ extension ActiveSessionSnapshot {
         s.phase = .record
         s.timerEndDate = nil
         s.timerDuration = 90
+        s.timerRemaining = 35
         s.repText = "Rep 2/3"
         return s
     }
@@ -196,7 +201,8 @@ extension ActiveSessionSnapshot {
             setCount: 0,
             repText: nil,
             timerEndDate: nil,
-            timerDuration: 0
+            timerDuration: 0,
+            timerRemaining: nil
         )
     }
 }

@@ -87,6 +87,7 @@
 		E8182427302F4A0B00DED693 /* Athena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Athena.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8182438302F4A0C00DED693 /* AthenaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AthenaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8182442302F4A0C00DED693 /* AthenaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AthenaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E81C427F306ECD2C00A1DC0A /* Athena-Watch-App-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Athena-Watch-App-Info.plist"; sourceTree = "<group>"; };
 		E8A939A4305B27F400648A16 /* Athena Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Athena Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8A939B0305B27F500648A16 /* Athena Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Athena Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8A939BA305B27F500648A16 /* Athena Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Athena Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -214,6 +215,7 @@
 		E818241E302F4A0B00DED693 = {
 			isa = PBXGroup;
 			children = (
+				E81C427F306ECD2C00A1DC0A /* Athena-Watch-App-Info.plist */,
 				E8182429302F4A0B00DED693 /* Athena Main App */,
 				E818243B302F4A0C00DED693 /* Athena Main Tests */,
 				E8182445302F4A0C00DED693 /* Athena Main UITests */,
@@ -634,6 +636,8 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Athena;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Athena reads your heart rate and energy burned to show live workout metrics during a session.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Athena saves your strength training workouts to Health.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -686,6 +690,8 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Athena;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Athena reads your heart rate and energy burned to show live workout metrics during a session.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Athena saves your strength training workouts to Health.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -949,12 +955,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Athena Watch App/Athena Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = FU2B76F7PF;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Athena-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Athena;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Athena reads your heart rate and energy burned to show live workout metrics during a session.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Athena saves your strength training workouts to Health.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.wassynger.Athena;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -982,12 +992,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Athena Watch App/Athena Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = FU2B76F7PF;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Athena-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Athena;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Athena reads your heart rate and energy burned to show live workout metrics during a session.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Athena saves your strength training workouts to Health.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.wassynger.Athena;
 				LD_RUNPATH_SEARCH_PATHS = (
