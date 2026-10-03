@@ -70,7 +70,7 @@ struct SessionLiveView: View {
             .toolbar(content: toolbarContent)
             .onAppear {
                 SessionConnectivity.shared.send(activeSessionSnapshot)
-                SessionLiveActivity.shared.sync(activeSessionSnapshot)
+                SessionLiveActivity.shared.sync(liveActivitySnapshot)
                 // Drop anything submitted while no session view was around to apply it, so it
                 // can't fire late against whatever exercise happens to be on screen next.
                 commandCenter.consume()
@@ -78,7 +78,12 @@ struct SessionLiveView: View {
                 workoutMirror.startIfEligible(for: session)
             }
             .onChange(of: activeSessionSnapshot) { _, newValue in
+                // Watch gets every field, including per-tap record field updates.
                 SessionConnectivity.shared.send(newValue)
+            }
+            .onChange(of: liveActivitySnapshot) { _, newValue in
+                // Live Activity excludes recordFields, so stepper taps don't trigger an
+                // ActivityKit update for every single tap.
                 SessionLiveActivity.shared.sync(newValue)
             }
             .onChange(of: commandCenter.pendingCommand) { _, newValue in
@@ -146,9 +151,19 @@ struct SessionLiveView: View {
                 // Only meaningful once paused (timerEndDate goes nil) - resyncs the exact
                 // remaining time once, rather than ticking it down locally, since `elapsedSeconds`
                 // doesn't change again until the timer resumes.
-                timerRemaining: timerEndDate == nil && timerDuration > .zero ? (timerDuration - elapsedSeconds) / .seconds(1) : nil
+                timerRemaining: timerEndDate == nil && timerDuration > .zero ? (timerDuration - elapsedSeconds) / .seconds(1) : nil,
+                recordFields: recordFields(for: s)
             )
         }
+    }
+
+    /// Same as `activeSessionSnapshot`, but without `recordFields` - the Live Activity has no
+    /// need for stepper data, and dropping it keeps per-tap edits from triggering an
+    /// ActivityKit update every time.
+    var liveActivitySnapshot: ActiveSessionSnapshot {
+        var snapshot = activeSessionSnapshot
+        snapshot.recordFields = nil
+        return snapshot
     }
 
     /// Maps this view's SetState.ExerciseState to the shared, Codable DTO's Phase, keeping
@@ -176,10 +191,16 @@ struct SessionLiveView: View {
             }
         case .next:
             next()
+        case .setRecordValue(let key, let value):
+            // Ignore stale commands that arrive after we've left the record phase
+            // (e.g. a message queued while reachability was flaky).
+            if let s = recordSetState {
+                setDraftValue(key, to: value, for: s)
+            }
         }
         commandCenter.consume()
     }
-    
+
     /// The background color of the view
     var background: some ShapeStyle {
         switch state {
@@ -651,6 +672,116 @@ struct SessionLiveView: View {
             // No side-specific rep state means both sides are recorded in this pass
             return .split
         }
+    }
+
+    /// Builds the watch's stepper descriptions for the current record phase, mirroring
+    /// `DataSetEditor`'s layout: same data types per category, same side splitting. Returns
+    /// nil outside the record phase and for campus exercises, which have no steppable fields.
+    private func recordFields(for s: SetState) -> [ActiveSessionSnapshot.RecordField]? {
+        guard s.exerciseState == .record else { return nil }
+        switch s.data.exercise.category {
+        case .campus:
+            return nil
+        case .generic(_, let dataTypes, _):
+            return Exercise.DataType.allCases
+                .filter { dataTypes.contains($0) }
+                .flatMap { recordFields(for: $0, s: s) }
+        case .repeater:
+            return recordFields(for: .reps, s: s) + recordFields(for: .weight, s: s)
+        case .maxHang:
+            return recordFields(for: .time, s: s) + recordFields(for: .weight, s: s)
+        }
+    }
+
+    /// One data type's field(s) for the current side(s), matching `DataSetEditor.stepperGroup`.
+    private func recordFields(for dataType: Exercise.DataType, s: SetState) -> [ActiveSessionSnapshot.RecordField] {
+        switch sides(for: s) {
+        case .split:
+            return [recordField(dataType, alt: false, sideLabel: "Left"), recordField(dataType, alt: true, sideLabel: "Right")]
+        case .both:
+            return [recordField(dataType, alt: false, sideLabel: "Both")]
+        case .single, .left:
+            return [recordField(dataType, alt: false, sideLabel: nil)]
+        case .right:
+            return [recordField(dataType, alt: true, sideLabel: nil)]
+        }
+    }
+
+    private func recordField(_ dataType: Exercise.DataType, alt: Bool, sideLabel: String?) -> ActiveSessionSnapshot.RecordField {
+        .init(
+            key: recordKey(for: dataType, alt: alt),
+            name: recordFieldName(for: dataType),
+            sideLabel: sideLabel,
+            value: fieldValue(dataType.getField(alt: alt)),
+            isDiscrete: dataType != .weight,
+            step: dataType == .weight ? 5 : 1,
+            range: dataType.stepperDoubleRange,
+            unitSingular: dataType.getUnit(1),
+            unitPlural: dataType.getUnit(2)
+        )
+    }
+
+    /// Reads `draftSet`'s current value for a field, defaulting to 0 like `DataSetEditor`'s steppers.
+    private func fieldValue(_ field: ExerciseData.Field) -> Double {
+        switch draftSet[field] {
+        case .discrete(let v): return Double(v)
+        case .number(let v): return v
+        default: return 0
+        }
+    }
+
+    private func recordFieldName(for dataType: Exercise.DataType) -> String {
+        switch dataType {
+        case .reps: return "Reps"
+        case .time: return "Time"
+        case .weight: return "Weight"
+        case .distance: return "Height"
+        }
+    }
+
+    private func recordKey(for dataType: Exercise.DataType, alt: Bool) -> ActiveSessionSnapshot.RecordField.Key {
+        switch (dataType, alt) {
+        case (.reps, false): return .reps
+        case (.reps, true): return .repsAlt
+        case (.time, false): return .time
+        case (.time, true): return .timeAlt
+        case (.weight, false): return .weight
+        case (.weight, true): return .weightAlt
+        case (.distance, false): return .distance
+        case (.distance, true): return .distanceAlt
+        }
+    }
+
+    private func dataType(for key: ActiveSessionSnapshot.RecordField.Key) -> Exercise.DataType {
+        switch key {
+        case .reps, .repsAlt: return .reps
+        case .time, .timeAlt: return .time
+        case .weight, .weightAlt: return .weight
+        case .distance, .distanceAlt: return .distance
+        }
+    }
+
+    private func field(for key: ActiveSessionSnapshot.RecordField.Key) -> ExerciseData.Field {
+        switch key {
+        case .reps: return .reps
+        case .repsAlt: return .repsAlt
+        case .time: return .time
+        case .timeAlt: return .timeAlt
+        case .weight: return .weight
+        case .weightAlt: return .weightAlt
+        case .distance: return .distance
+        case .distanceAlt: return .distanceAlt
+        }
+    }
+
+    /// Applies a `.setRecordValue` command to `draftSet`, matching `DataSetEditor.stepper`'s
+    /// encoding (`.discrete` for whole-number fields, `.number` for weight) and clamping to
+    /// the same range the watch was told about.
+    private func setDraftValue(_ key: ActiveSessionSnapshot.RecordField.Key, to value: Double, for s: SetState) {
+        let dataType = dataType(for: key)
+        let range = dataType.stepperDoubleRange
+        let clamped = min(max(value, range.lowerBound), range.upperBound)
+        draftSet[field(for: key)] = dataType == .weight ? .number(clamped) : .discrete(Int(clamped.rounded()))
     }
 
     /// Populates `draftSet` from any data already recorded for this set,

@@ -29,6 +29,11 @@ nonisolated struct ActiveSessionSnapshot: Codable, Hashable {
     /// going nil, so paused displays can show an accurate (if frozen) countdown instead of
     /// just a static "Paused" label. nil whenever `timerEndDate` is set or there's no timer.
     var timerRemaining: TimeInterval?
+    /// Editable fields for the current set's actual data, so the watch can offer steppers
+    /// during the record phase. nil outside `.record` and for campus exercises (no fields
+    /// to mirror there yet). Defaulted so existing call sites (previews, older payloads)
+    /// keep compiling/decoding without changes.
+    var recordFields: [RecordField]? = nil
 
     enum Phase: String, Codable {
         case preSet, ready, active, rest, record, postSet
@@ -43,6 +48,28 @@ nonisolated struct ActiveSessionSnapshot: Codable, Hashable {
             case .record: return "Rest"
             case .postSet: return "Complete"
             }
+        }
+    }
+
+    /// One steppable field for the current set, mirroring a single `ExerciseData.Field`.
+    /// Carries everything the watch needs to render and validate a `Stepper` without any
+    /// knowledge of the underlying exercise model - the watch target can't see SwiftData.
+    struct RecordField: Codable, Hashable, Identifiable {
+        var key: Key
+        var name: String          // e.g. "Reps", "Time", "Weight", "Distance"
+        var sideLabel: String?    // "Left" / "Right" / "Both", mirroring DataSetEditor; nil if unsided
+        var value: Double
+        var isDiscrete: Bool      // true -> whole-number steps (.discrete), false -> .number
+        var step: Double
+        var range: ClosedRange<Double>
+        var unitSingular: String  // e.g. " rep", "s", " lb", "\""
+        var unitPlural: String    // e.g. " reps", "s", " lbs", "\""
+
+        var id: Key { key }
+
+        /// Identifies which underlying `ExerciseData.Field` this stepper edits.
+        enum Key: String, Codable, Hashable {
+            case reps, repsAlt, time, timeAlt, weight, weightAlt, distance, distanceAlt
         }
     }
 }
