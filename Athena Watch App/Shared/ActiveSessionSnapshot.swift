@@ -34,6 +34,15 @@ nonisolated struct ActiveSessionSnapshot: Codable, Hashable {
     /// to mirror there yet). Defaulted so existing call sites (previews, older payloads)
     /// keep compiling/decoding without changes.
     var recordFields: [RecordField]? = nil
+    /// Monotonically increasing per session, bumped by `SessionLiveView` every time `state` or
+    /// `timerEndDate` actually changes. Used instead of a wall-clock "sent at" timestamp to order
+    /// deliveries: a `Date` only reflects when `send()` happened to be *called*, not which data
+    /// generation the snapshot actually carries. SwiftUI's `onChange` was observed occasionally
+    /// dispatching a stale, half-updated snapshot *after* a later, fully-updated explicit send -
+    /// since both reads capture this field atomically alongside every other field, the stale one
+    /// is guaranteed to carry a strictly older `sequence`, so the receiver can reject it
+    /// regardless of transmission order. Defaulted for old payloads/previews.
+    var sequence: Int = 0
 
     enum Phase: String, Codable {
         case preSet, ready, active, rest, record, postSet

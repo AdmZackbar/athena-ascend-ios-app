@@ -23,6 +23,12 @@ final class SessionConnectivity: NSObject, WCSessionDelegate {
     private(set) var latestSnapshot: ActiveSessionSnapshot?
     /// Phone sets this to learn about incoming remote commands.
     var onCommandReceived: ((SessionCommand) -> Void)?
+    /// `(sessionStartTime, sequence)` of the last applied snapshot, so a late-arriving delivery
+    /// (via whichever transport resolves slower) carrying an older `sequence` for the *same*
+    /// session can't regress `latestSnapshot` back to a stale phase. Keyed on `sequence` - a
+    /// per-session-generation counter - rather than a wall-clock send time, since a `Date` only
+    /// reflects when `send()` was *called*, not which data generation the snapshot carries.
+    private var lastApplied: (sessionStartTime: Date, sequence: Int)?
 
     private override init() {
         super.init()
@@ -42,6 +48,12 @@ final class SessionConnectivity: NSObject, WCSessionDelegate {
         // installed and running. Attempting the send and letting it fail harmlessly (logged,
         // swallowed by try?) is what actually lets this recover once the pairing catches up.
         try? session.updateApplicationContext(["activeSession": data])
+        // transferUserInfo is a queued, FIFO, *guaranteed*-delivery background channel - unlike
+        // updateApplicationContext (last-value-only, "delivered when the opportunity arises",
+        // with no guarantee any specific update is individually delivered) this reliably
+        // reaches the watch even while it's unreachable (e.g. not foregrounded mid-workout),
+        // a real gap updateApplicationContext alone leaves on real hardware.
+        session.transferUserInfo(["activeSession": data])
         if session.isReachable {
             session.sendMessage(["activeSession": data], replyHandler: nil, errorHandler: nil)
         }
@@ -65,10 +77,30 @@ final class SessionConnectivity: NSObject, WCSessionDelegate {
         handleIncoming(applicationContext)
     }
 
+    nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        handleIncoming(userInfo)
+    }
+
     nonisolated private func handleIncoming(_ payload: [String: Any]) {
         if let data = payload["activeSession"] as? Data,
            let state = try? JSONDecoder().decode(ActiveSessionState.self, from: data) {
-            Task { @MainActor in self.latestSnapshot = state.snapshot }
+            Task { @MainActor in
+                // Guard + update happens atomically on the main actor (no suspension in
+                // between), so this stays correct regardless of which transport delivers first.
+                guard let newSnapshot = state.snapshot else {
+                    // No active session - always apply immediately (clears the display), and
+                    // reset tracking so the next session's early, low sequence numbers aren't
+                    // mistaken for stale leftovers from this one.
+                    self.lastApplied = nil
+                    self.latestSnapshot = nil
+                    return
+                }
+                let isNewSession = self.lastApplied?.sessionStartTime != newSnapshot.sessionStartTime
+                let accepted = isNewSession || newSnapshot.sequence > (self.lastApplied?.sequence ?? -1)
+                guard accepted else { return }
+                self.lastApplied = (newSnapshot.sessionStartTime, newSnapshot.sequence)
+                self.latestSnapshot = newSnapshot
+            }
         }
         if let data = payload["command"] as? Data,
            let command = try? JSONDecoder().decode(SessionCommand.self, from: data) {

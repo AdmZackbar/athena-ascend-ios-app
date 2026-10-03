@@ -41,10 +41,19 @@ struct SessionLiveView: View {
     /// The absolute end date of the current timer, if running. Lets the watch render a live
     /// countdown without any per-second WatchConnectivity traffic.
     @State private var timerEndDate: Date? = nil
-    /// The current timer, if in use
+    /// The current visual ticker, if in use - purely cosmetic, anchored to `timerEndDate` so it
+    /// can't drift; never decides when to advance the phase.
     @State private var cancellable: Cancellable?
+    /// Scheduled, one-shot phase advance for the current timer - fires exactly once, at
+    /// `timerEndDate`, regardless of how the visual ticker above is behaving.
+    @State private var advanceTask: Task<Void, Never>?
     /// If false, disallows the timer from advancing state after the record/rest period ends
     @State private var timerNextOverride: Bool = false
+    /// Monotonic generation counter, bumped in `update()`/`startTimer()`/`pauseTimer()` and
+    /// mirrored into every `activeSessionSnapshot` as `sequence`. See `ActiveSessionSnapshot`'s
+    /// doc comment for why this - not a wall-clock send time - is what orders deliveries on the
+    /// receiving end.
+    @State private var snapshotVersion: Int = 0
     /// The in-progress edits for the current set's actual data, shown during the record phase
     @State private var draftSet: ExerciseData.DataSet = [:]
     /// If true, the timer is allowed to modify the state when it finishes
@@ -90,6 +99,11 @@ struct SessionLiveView: View {
                 handleRemoteCommand(newValue)
             }
             .onDisappear {
+                // Nothing else cancels a pending scheduled advance if the view is dismissed out
+                // from under it (e.g. backing out mid-rest) - without this it would still fire
+                // later and call next(), which can end up touching a session this view no longer
+                // owns.
+                cancelTimers()
                 SessionConnectivity.shared.send(nil)
                 SessionLiveActivity.shared.sync(nil)
             }
@@ -118,7 +132,8 @@ struct SessionLiveView: View {
                 repText: nil,
                 timerEndDate: nil,
                 timerDuration: 0,
-                timerRemaining: nil
+                timerRemaining: nil,
+                sequence: snapshotVersion
             )
         case .postSet:
             return ActiveSessionSnapshot(
@@ -133,7 +148,8 @@ struct SessionLiveView: View {
                 repText: nil,
                 timerEndDate: nil,
                 timerDuration: 0,
-                timerRemaining: nil
+                timerRemaining: nil,
+                sequence: snapshotVersion
             )
         case .inSet(let s):
             return ActiveSessionSnapshot(
@@ -152,7 +168,8 @@ struct SessionLiveView: View {
                 // remaining time once, rather than ticking it down locally, since `elapsedSeconds`
                 // doesn't change again until the timer resumes.
                 timerRemaining: timerEndDate == nil && timerDuration > .zero ? (timerDuration - elapsedSeconds) / .seconds(1) : nil,
-                recordFields: recordFields(for: s)
+                recordFields: recordFields(for: s),
+                sequence: snapshotVersion
             )
         }
     }
@@ -408,9 +425,16 @@ struct SessionLiveView: View {
 
     @ViewBuilder
     func recordEntryView(_ s: SetState) -> some View {
+        // A custom Binding (not plain $draftSet) so every edit also bumps snapshotVersion -
+        // without it, the watch's ordering guard sees an unchanged sequence on a genuinely new
+        // recordFields value and rejects it as stale.
+        let draftSetBinding = Binding(
+            get: { draftSet },
+            set: { draftSet = $0; snapshotVersion += 1 }
+        )
         Group {
             VStack(spacing: 8) {
-                DataSetEditor(exercise: s.data.exercise, dataSet: $draftSet, sides: sides(for: s))
+                DataSetEditor(exercise: s.data.exercise, dataSet: draftSetBinding, sides: sides(for: s))
                     .buttonStyle(.glass)
             }.padding()
         }.glassEffect(in: RoundedRectangle(cornerRadius: 16))
@@ -637,6 +661,7 @@ struct SessionLiveView: View {
         // Advance to next state, reset flags
         state = newState
         timerNextOverride = false
+        snapshotVersion += 1
         // Seed the data entry draft whenever we land on a record phase
         if case .inSet(let s) = newState, s.exerciseState == .record {
             seedDraft(for: s)
@@ -782,6 +807,9 @@ struct SessionLiveView: View {
         let range = dataType.stepperDoubleRange
         let clamped = min(max(value, range.lowerBound), range.upperBound)
         draftSet[field(for: key)] = dataType == .weight ? .number(clamped) : .discrete(Int(clamped.rounded()))
+        // Bump so the echoed-back snapshot (which clears the watch's optimistic `pending` state
+        // for this field) isn't rejected by the receiver's ordering guard as a non-newer sequence.
+        snapshotVersion += 1
     }
 
     /// Populates `draftSet` from any data already recorded for this set,
@@ -921,62 +949,127 @@ struct SessionLiveView: View {
     private func toggleTimer() {
         isTimerValid ? pauseTimer() : startTimer()
     }
-    
+
+    private var timerDurationMs: Int {
+        Int(timerDuration / .milliseconds(1))
+    }
+
     private func startTimer() {
         guard timerDuration > .zero else { return }
-        timerEndDate = Date.now.addingTimeInterval((timerDuration - elapsedSeconds) / .seconds(1))
+        cancelTimers()
+        // Based on elapsedMilliseconds (not the whole-second elapsedSeconds), so resuming after a
+        // pause reschedules for the exact remaining time rather than losing up to 999ms to
+        // whole-second rounding.
+        let remaining = max(timerDuration - .milliseconds(elapsedMilliseconds), .zero)
+        let end = Date.now.addingTimeInterval(remaining / .seconds(1))
+        timerEndDate = end
+        snapshotVersion += 1
+        // The functional phase-advance: scheduled exactly once, anchored to wall-clock time
+        // (`end`), independent of the cosmetic ticker below.
+        scheduleAdvance(after: remaining)
+        // Cosmetic only - resyncs the on-screen countdown from wall-clock time on every tick, so
+        // it can't drift even if a tick is delayed or the main thread is busy.
         cancellable = Timer
-            .publish(every: 0.01, on: .main, in: .common)
+            .publish(every: 1.0 / 30.0, on: .main, in: .common)
             .autoconnect()
             .sink { _ in
-                if newSecondPassed {
-                    withAnimation(.easeInOut) {
-                        if elapsedSeconds < timerDuration {
-                            elapsedSeconds += .seconds(1.0)
-                        }
-                    } completion: {
-                        if shouldStopTimer {
-                            if allowTimerNext {
-                                stopAndResetTimer()
-                                // Go to next state if applicable
-                                if timerDuration > .zero {
-                                    next()
-                                }
-                            } else {
-                                // Don't reset, keep showing 0:00 until handled
-                                pauseTimer()
-                            }
-                        }
-                    }
-                }
-                if !shouldStopTimer {
-                    elapsedMilliseconds += 10
-                }
+                syncElapsed(remaining: max(0, end.timeIntervalSinceNow))
             }
     }
-    
+
+    /// Resyncs the displayed countdown (and the WatchConnectivity-mirrored `elapsedSeconds`) from
+    /// however much time is actually left, per the system clock.
+    private func syncElapsed(remaining: TimeInterval) {
+        let totalMs = timerDurationMs
+        let ms = min(totalMs, max(0, totalMs - Int((remaining * 1000).rounded(.up))))
+        if ms != elapsedMilliseconds {
+            elapsedMilliseconds = ms
+        }
+        let whole = Duration.seconds(ms / 1000)
+        if whole != elapsedSeconds {
+            withAnimation(.easeInOut) {
+                elapsedSeconds = whole
+            }
+        }
+    }
+
+    /// Schedules the one and only call to `handleTimerExpired()` for this timer run, at `delay`
+    /// from now. Replaces the old "poll a tick count for exact equality" approach, which could
+    /// drift behind wall-clock time under main-thread load and raced with SwiftUI's render passes
+    /// right at the phase boundary.
+    private func scheduleAdvance(after delay: Duration) {
+        advanceTask?.cancel()
+        advanceTask = Task { @MainActor in
+            if delay > .zero {
+                do {
+                    try await Task.sleep(for: delay, tolerance: .milliseconds(5))
+                } catch {
+                    return // cancelled during sleep
+                }
+            } else {
+                await Task.yield() // never resolve synchronously inside next()/startTimer()
+            }
+            guard !Task.isCancelled else { return } // cancelled after sleep but before resuming
+            advanceTask = nil
+            handleTimerExpired()
+        }
+    }
+
+    /// Fires exactly once per timer run, at `timerEndDate`. `allowTimerNext` is deliberately read
+    /// live here (not captured earlier), so a `next()` tap mid-countdown that sets
+    /// `timerNextOverride = true` can still retroactively let this pending advance through.
+    ///
+    /// Sends the resulting snapshot explicitly rather than relying on `.onChange(of:
+    /// activeSessionSnapshot)` to pick it up: when this resumes from `Task.sleep` (unlike a
+    /// synchronous button-tap call), `onChange` was observed firing with a stale, half-updated
+    /// snapshot (old phase, nil timerEndDate) that it then never corrects - confirmed via logging
+    /// both the raw @State at mutation time and what `onChange` actually dispatched. Wrapping in
+    /// `withAnimation` didn't change this, so don't depend on `onChange`'s dispatch for this path
+    /// at all; send what we just synchronously set instead.
+    private func handleTimerExpired() {
+        if allowTimerNext {
+            stopAndResetTimer()
+            next()
+        } else {
+            // Don't reset, keep showing 0:00 until handled
+            cancelTimers()
+            timerEndDate = nil
+            elapsedMilliseconds = timerDurationMs
+            snapshotVersion += 1
+            withAnimation(.easeInOut) {
+                elapsedSeconds = timerDuration
+            }
+        }
+        SessionConnectivity.shared.send(activeSessionSnapshot)
+        SessionLiveActivity.shared.sync(liveActivitySnapshot)
+    }
+
+    private func cancelTimers() {
+        cancellable?.cancel()
+        cancellable = nil
+        advanceTask?.cancel()
+        advanceTask = nil
+    }
+
     private var progress: Double {
         // Using milliseconds for smoother animation
         let elapsed: Duration = .milliseconds(elapsedMilliseconds)
         return (timerDuration - elapsed) / timerDuration
     }
-    
+
     private var isTimerValid: Bool {
         cancellable != nil
     }
 
-    private var shouldStopTimer: Bool {
-        .milliseconds(elapsedMilliseconds) == timerDuration
-    }
-    
-    private var newSecondPassed: Bool {
-        elapsedMilliseconds > 0 && elapsedMilliseconds % 1000 == 0
-    }
-    
     private func pauseTimer() {
-        cancellable?.cancel()
-        cancellable = nil
+        // Freeze the display at the true elapsed time (per the system clock), not whatever the
+        // ticker's last frame happened to compute.
+        if let end = timerEndDate {
+            syncElapsed(remaining: max(0, end.timeIntervalSinceNow))
+        }
+        cancelTimers()
         timerEndDate = nil
+        snapshotVersion += 1
     }
     
     private func stopAndResetTimer() {
