@@ -35,7 +35,7 @@ struct SessionListView: View {
     
     @ViewBuilder
     private func sessionsView(_ sessions: [Session]) -> some View {
-        ForEach(sessions, id: \.self) { session in
+        ForEach(sessions.enumerated(), id: \.offset) { offset, session in
             Button {
                 navigationStore.push(ViewType.session(session: session))
             } label: {
