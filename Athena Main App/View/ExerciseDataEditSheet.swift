@@ -59,13 +59,20 @@ struct ExerciseDataEditSheet: View {
                     .lineLimit(1...3)
                 }
                 let numSets = athleteData[selectedAthlete, default: []].count
+                let sides: DataSetEditor.Sides = {
+                    if canMirror {
+                        return showAlt ? .split : .both
+                    } else {
+                        return .single
+                    }
+                }()
                 ForEach(0..<numSets, id: \.self) { setIndex in
                     Section {
                         DataSetEditor(exercise: exercise, dataSet: .init(get: {
                             athleteData[selectedAthlete, default: []][setIndex]
                         }, set: { newValue in
                             athleteData[selectedAthlete, default: [.init()]][setIndex] = newValue
-                        }), sides: showAlt ? .split : (canMirror ? .both : .single), discreteStep: discreteStep, numberStep: numberStep)
+                        }), sides: sides, discreteStep: discreteStep, numberStep: numberStep)
                     } header: {
                         HStack {
                             Text("Set \(setIndex + 1)")
