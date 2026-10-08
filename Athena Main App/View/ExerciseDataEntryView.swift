@@ -106,9 +106,14 @@ struct ExerciseDataEntryView: View {
             case .repeater(_, _, _):
                 let dataTypes: [Exercise.DataType] = [.reps, .weight]
                 Text(dataTypes.map { getText(dataSet: dataSet, dataType: $0, useAlt: false) }.joined(separator: " @ "))
-            case .maxHang(_, _):
+            case .maxHang(_, let sideType):
                 let dataTypes: [Exercise.DataType] = [.weight, .time]
-                Text(dataTypes.map { getText(dataSet: dataSet, dataType: $0, useAlt: false) }.joined(separator: " for "))
+                if sideType == .independent && dataSet.hasAlt {
+                    Text("L: \(dataTypes.map { getText(dataSet: dataSet, dataType: $0, useAlt: false) }.joined(separator: " for "))")
+                    Text("R: \(dataTypes.map { getText(dataSet: dataSet, dataType: $0, useAlt: true) }.joined(separator: " for "))")
+                } else {
+                    Text(dataTypes.map { getText(dataSet: dataSet, dataType: $0, useAlt: false) }.joined(separator: " for "))
+                }
             case .campus(_, let mirrorSets):
                 if mirrorSets {
                     Text(dataSet[.campus]?.text ?? "N/A")
@@ -125,7 +130,10 @@ struct ExerciseDataEntryView: View {
     }
     
     private func getText(dataSet: ExerciseData.DataSet, dataType: Exercise.DataType, useAlt: Bool) -> String {
-        return dataSet.getText(dataType, useAlt: useAlt) ?? "N/A"
+        if useAlt {
+            return dataSet.getText(dataType, useAlt: true) ?? dataSet.getText(dataType, useAlt: false) ?? "N/A"
+        }
+        return dataSet.getText(dataType, useAlt: false) ?? "N/A"
     }
     
     enum HeaderType {
