@@ -24,6 +24,7 @@ extension CampusSet.Side {
 }
 
 struct CampusBoardView: View {
+    @EnvironmentObject var navigationStore: NavigationStore
     @Environment(\.dismiss) var dismiss
     
     typealias Side = CampusSet.Side
@@ -31,7 +32,6 @@ struct CampusBoardView: View {
     let onComplete: (CampusSet) -> Void
     @State var board: CampusBoard
     @State var moves: [CampusMove]
-    @State private var behavior: SelectBehavior = .regular
     
     init(set: CampusSet, onComplete: @escaping (CampusSet) -> Void) {
         self.onComplete = onComplete
@@ -88,16 +88,14 @@ struct CampusBoardView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
-                    Menu {
-                        ForEach(SelectBehavior.allCases, id: \.name) { b in
-                            Button {
-                                behavior = b
-                            } label: {
-                                Label(b.name, systemImage: b.icon)
-                            }.disabled(behavior == b)
+                    Button {
+                        if navigationStore.campusSelectBehavior == .regular {
+                            navigationStore.campusSelectBehavior = .doubles
+                        } else {
+                            navigationStore.campusSelectBehavior = .regular
                         }
                     } label: {
-                        Label("Behavior", systemImage: "ellipsis")
+                        Label(navigationStore.campusSelectBehavior.name, systemImage: navigationStore.campusSelectBehavior.icon)
                     }
                     Button {
                         moves.removeAll()
@@ -170,7 +168,7 @@ struct CampusBoardView: View {
     }
     
     private func computeInitialGrip(_ rung: CampusRung) -> Side {
-        switch behavior {
+        switch navigationStore.campusSelectBehavior {
         case .regular:
             guard let last = moves.last else { return .both }
             if last.rung == rung {
@@ -255,5 +253,5 @@ struct CampusBoardView: View {
         CampusBoardView(set: .init(board: .largeEdges, moves: [.init(rung: .full(1), side: .both)])) { moves in
             // TODO
         }
-    }
+    }.environmentObject(NavigationStore())
 }

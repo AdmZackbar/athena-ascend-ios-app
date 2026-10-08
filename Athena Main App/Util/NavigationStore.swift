@@ -12,6 +12,7 @@ internal import Combine
 final class NavigationStore: ObservableObject {
     @Published var path = NavigationPath()
     @Published var currentAthlete: Athlete? = nil
+    @Published var campusSelectBehavior: CampusBoardView.SelectBehavior = .regular
     
     func push(_ value: any Hashable) {
         path.append(value)
