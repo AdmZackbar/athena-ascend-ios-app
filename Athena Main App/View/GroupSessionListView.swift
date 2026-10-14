@@ -17,7 +17,7 @@ struct GroupSessionListView: View {
     var body: some View {
         List {
             Section("Unoccupied Sessions") {
-                ForEach(sessions.filter({ $0.athletes.isEmpty }), id: \.self) { session in
+                ForEach(sessions.filter({ $0.athletes.isEmpty }).enumerated(), id: \.offset) { offset, session in
                     Button {
                         navigationStore.push(ViewType.session(session: session))
                     } label: {
@@ -34,7 +34,7 @@ struct GroupSessionListView: View {
                 }
             }
             Section("Group Sessions") {
-                ForEach(sessions.filter({ $0.athletes.count > 1 }), id: \.self) { session in
+                ForEach(sessions.filter({ $0.athletes.count > 1 }).enumerated(), id: \.offset) { offset, session in
                     Button {
                         navigationStore.push(ViewType.session(session: session))
                     } label: {
